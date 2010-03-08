@@ -2244,14 +2244,6 @@ dput_out:
 	return retval;
 }
 
-
-static void free_mnt_ns(struct mnt_namespace *ns)
-{
-	proc_free_inum(ns->proc_inum);
-	put_user_ns(ns->user_ns);
-	kfree(ns);
-}
-
 /*
  * Assign a sequence number so we can detect when we attempt to bind
  * mount a reference to an older mount namespace into the current
@@ -2261,7 +2253,7 @@ static void free_mnt_ns(struct mnt_namespace *ns)
  */
 static atomic64_t mnt_ns_seq = ATOMIC64_INIT(1);
 
-static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
+static struct mnt_namespace *alloc_mnt_ns(void)
 {
 	struct mnt_namespace *new_ns;
 	int ret;
@@ -2269,11 +2261,6 @@ static struct mnt_namespace *alloc_mnt_ns(struct user_namespace *user_ns)
 	new_ns = kmalloc(sizeof(struct mnt_namespace), GFP_KERNEL);
 	if (!new_ns)
 		return ERR_PTR(-ENOMEM);
-	ret = proc_alloc_inum(&new_ns->proc_inum);
-	if (ret) {
-		kfree(new_ns);
-		return ERR_PTR(ret);
-	}
 	new_ns->seq = atomic64_add_return(1, &mnt_ns_seq);
 	atomic_set(&new_ns->count, 1);
 	new_ns->root = NULL;
@@ -2726,8 +2713,7 @@ static int mntns_install(struct nsproxy *nsproxy, void *ns)
 	struct mnt_namespace *mnt_ns = ns;
 	struct path root;
 
-	if (!ns_capable(mnt_ns->user_ns, CAP_SYS_ADMIN) ||
-		!nsown_capable(CAP_SYS_CHROOT))
+	if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_CHROOT))
 		return -EINVAL;
 
 	if (fs->users != 1)
@@ -2752,17 +2738,9 @@ static int mntns_install(struct nsproxy *nsproxy, void *ns)
 	return 0;
 }
 
-static unsigned int mntns_inum(void *ns)
-{
-	struct mnt_namespace *mnt_ns = ns;
-	return mnt_ns->proc_inum;
-}
-
 const struct proc_ns_operations mntns_operations = {
 	.name		= "mnt",
 	.type		= CLONE_NEWNS,
 	.get		= mntns_get,
 	.put		= mntns_put,
-	.install	= mntns_install,
-	.inum		= mntns_inum,
 };

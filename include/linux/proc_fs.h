@@ -241,14 +241,6 @@ static inline bool proc_ns_inode(struct inode *inode)
 	return false;
 }
 
-static inline int proc_alloc_inum(unsigned int *inum)
-{
-	*inum = 1;
-	return 0;
-}
-static inline void proc_free_inum(unsigned int inum)
-{
-}
 #endif /* CONFIG_PROC_FS */
 
 #if !defined(CONFIG_PROC_KCORE)
