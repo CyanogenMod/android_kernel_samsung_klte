@@ -370,7 +370,7 @@ retry:
 	if (i > UINT_MAX - PROC_DYNAMIC_FIRST) {
 		spin_lock_irq(&proc_inum_lock);
 		ida_remove(&proc_inum_ida, i);
-		spin_unlock_irq(&proc_inum_lock);
+		spin_unlock(&proc_inum_lock);
 		return -ENOSPC;
 	}
 	*inum = PROC_DYNAMIC_FIRST + i;
