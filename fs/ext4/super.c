@@ -512,6 +512,7 @@ void __ext4_error(struct super_block *sb, const char *function,
 	else
 		printk(KERN_ERR "__ext4_error: failed to allocate page buf for panic msg\n");
 	va_end(args);
+	save_error_info(sb, function, line);
 
 	ext4_handle_error(sb, page_buf);
 	if (page_buf)
