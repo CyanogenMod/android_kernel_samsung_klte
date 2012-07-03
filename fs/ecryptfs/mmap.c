@@ -537,7 +537,6 @@ static int ecryptfs_write_end(struct file *file,
 			"zeros in page with index = [0x%.16lx]\n", index);
 		goto out;
 	}
-
 	rc = ecryptfs_encrypt_page(page);
 	if (rc) {
 		ecryptfs_printk(KERN_WARNING, "Error encrypting page (upper "
@@ -550,7 +549,7 @@ static int ecryptfs_write_end(struct file *file,
 			"[0x%.16llx]\n",
 			(unsigned long long)i_size_read(ecryptfs_inode));
 	}
-		rc = ecryptfs_write_inode_size_to_metadata(ecryptfs_inode);
+	rc = ecryptfs_write_inode_size_to_metadata(ecryptfs_inode);
 	if (rc)
 		printk(KERN_ERR "Error writing inode size to metadata; "
 		       "rc = [%d]\n", rc);
