@@ -2053,6 +2053,7 @@ int usb_new_device(struct usb_device *udev)
 #endif
 	call_battery_notify(udev, 1);
 #endif
+
 	device_enable_async_suspend(&udev->dev);
 
 	/*
