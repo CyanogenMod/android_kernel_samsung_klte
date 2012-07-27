@@ -7,6 +7,7 @@ struct mnt_namespace {
 	unsigned int            proc_inum;
 	struct mount *	root;
 	struct list_head	list;
+	struct user_namespace	*user_ns;
 	u64			seq;	/* Sequence number to prevent loops */
 	wait_queue_head_t poll;
 	int event;
