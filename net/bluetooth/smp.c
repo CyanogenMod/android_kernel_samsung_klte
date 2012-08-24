@@ -734,7 +734,7 @@ invalid_key:
 	return 0;
 }
 
-int smp_conn_security(struct l2cap_conn *conn, __u8 sec_level)
+int smp_conn_security(struct hci_conn *hcon, __u8 sec_level)
 {
 	struct hci_conn *hcon = conn->hcon;
 	__u8 authreq;
