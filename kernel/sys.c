@@ -429,6 +429,7 @@ void kernel_restart(char *cmd)
 	kernel_sec_set_normal_pwroff(1);
 #endif
 	kernel_restart_prepare(cmd);
+	disable_nonboot_cpus();
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
 	else
