@@ -46,6 +46,8 @@
 
 static int smp_distribute_keys(struct l2cap_conn *conn, __u8 force);
 
+#define AUTH_REQ_MASK   0x07
+
 static inline void swap128(u8 src[16], u8 dst[16])
 {
 	int i;
