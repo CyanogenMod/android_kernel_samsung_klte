@@ -187,7 +187,8 @@ static unsigned long zone_dirtyable_memory(struct zone *zone)
 {
 	unsigned long nr_pages;
 
-	nr_pages = zone_page_state(zone, NR_FREE_PAGES);
+	nr_pages = zone_page_state(zone, NR_FREE_PAGES) +
+		zone_reclaimable_pages(zone);
 	nr_pages -= min(nr_pages, zone->dirty_balance_reserve);
 
 	nr_pages += zone_page_state(zone, NR_INACTIVE_FILE);
@@ -241,9 +242,9 @@ unsigned long global_dirtyable_memory(void)
 {
 	unsigned long x;
 
-	x = global_page_state(NR_FREE_PAGES);
+	x = global_page_state(NR_FREE_PAGES) + global_reclaimable_pages();
 	x -= min(x, dirty_balance_reserve);
-
+	
 	x += global_page_state(NR_INACTIVE_FILE);
 	x += global_page_state(NR_ACTIVE_FILE);
 
