@@ -19,6 +19,7 @@ ENTRY(memset)
 	ands	r3, r0, #3		@ 1 unaligned?
 	mov	ip, r0			@ preserve r0 as return value
 	bne	6f			@ 1
+
 /*
  * we know that the pointer in ip is aligned to a word boundary.
  */
