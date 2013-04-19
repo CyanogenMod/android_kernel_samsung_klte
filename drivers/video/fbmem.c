@@ -1396,6 +1396,7 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 		len = info->fix.mmio_len;
 	}
 	mutex_unlock(&info->mm_lock);
+
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	fb_pgprotect(file, vma, start);
 
