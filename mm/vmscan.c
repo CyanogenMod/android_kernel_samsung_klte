@@ -196,11 +196,9 @@ unsigned long zone_reclaimable_pages(struct zone *zone)
 	nr = zone_page_state(zone, NR_ACTIVE_FILE) +
 	     zone_page_state(zone, NR_INACTIVE_FILE);
 
-#ifndef CONFIG_RUNTIME_COMPCACHE
 	if (get_nr_swap_pages() > 0)
 		nr += zone_page_state(zone, NR_ACTIVE_ANON) +
 		      zone_page_state(zone, NR_INACTIVE_ANON);
-#endif /* CONFIG_RUNTIME_COMPCACHE */
 
 	return nr;
 }
