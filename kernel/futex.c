@@ -885,7 +885,7 @@ retry:
 	 * We dont have the lock. Look up the PI state (or create it if
 	 * we are the first waiter):
 	 */
-	ret = lookup_pi_state(uval, hb, key, ps, task);
+	ret = lookup_pi_state(uval, hb, key, ps);
 
 	if (unlikely(ret)) {
 		switch (ret) {
