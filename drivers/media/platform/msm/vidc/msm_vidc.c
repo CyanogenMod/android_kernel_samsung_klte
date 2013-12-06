@@ -964,12 +964,12 @@ int msm_vidc_dqbuf(void *instance, struct v4l2_buffer *b)
 		}
 	}
 
-	if (!buffer_info) { 
-		dprintk(VIDC_ERR, 
-		"%s: error - no buffer info found in registered list\n", 
-		__func__); 
-		return -EINVAL; 
-	} 
+	if (!buffer_info) {
+		dprintk(VIDC_ERR,
+			"%s: error - no buffer info found in registered list\n",
+			__func__);
+		return -EINVAL;
+	}
 
 	if (is_dynamic_output_buffer_mode(b, inst)) {
 		mutex_lock(&inst->lock);
