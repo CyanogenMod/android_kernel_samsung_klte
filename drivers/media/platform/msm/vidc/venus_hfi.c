@@ -963,6 +963,7 @@ static inline int venus_hfi_power_off(struct venus_hfi_device *device)
 
 	device->power_enabled = 0;
 	--device->pwr_cnt;
+	dprintk(VIDC_INFO, "entering power collapse\n");
 already_disabled:
 	return rc;
 }
@@ -1024,18 +1025,45 @@ static inline int venus_hfi_power_on(struct venus_hfi_device *device)
 
 	/* Reboot the firmware */
 
+
+	/*
+	 * Re-program all of the registers that get reset as a result of
+	 * regulator_disable() and _enable()
+	 */
+	venus_hfi_set_registers(device);
+
+	venus_hfi_write_register(device, VIDC_UC_REGION_ADDR,
+			(u32)device->iface_q_table.align_device_addr, 0);
+	venus_hfi_write_register(device,
+			VIDC_UC_REGION_SIZE, SHARED_QSIZE, 0);
+	venus_hfi_write_register(device, VIDC_CPU_CS_SCIACMDARG2,
+		(u32)device->iface_q_table.align_device_addr,
+		device->iface_q_table.align_virtual_addr);
+
+	if (!IS_ERR_OR_NULL(device->sfr.align_device_addr))
+		venus_hfi_write_register(device, VIDC_SFR_ADDR,
+				(u32)device->sfr.align_device_addr, 0);
+	if (!IS_ERR_OR_NULL(device->qdss.align_device_addr))
+		venus_hfi_write_register(device, VIDC_MMAP_ADDR,
+				(u32)device->qdss.align_device_addr, 0);
+
+	/* Reboot the firmware */
 	rc = venus_hfi_tzbsp_set_video_state(TZBSP_VIDEO_STATE_RESUME);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to resume video core %d\n", rc);
 		goto err_set_video_state;
 	}
+
+	/* Wait for boot completion */
 	rc = venus_hfi_reset_core(device);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to reset venus core");
 		goto err_reset_core;
 	}
+
 	device->power_enabled = 1;
 	++device->pwr_cnt;
+	dprintk(VIDC_INFO, "resuming from power collapse\n");
 	return rc;
 err_reset_core:
 	venus_hfi_tzbsp_set_video_state(TZBSP_VIDEO_STATE_SUSPEND);
