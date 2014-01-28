@@ -29,6 +29,7 @@
 #include <mach/cpuidle.h>
 #include <mach/event_timer.h>
 #include "pm.h"
+#include "ext-buck-support.h"
 #include "rpm-notifier.h"
 #include "spm.h"
 #include "idle.h"
@@ -940,6 +941,7 @@ static int lpm_system_probe(struct platform_device *pdev)
 	int num_levels = 0;
 	struct device_node *node;
 	char *key;
+	bool ext_buck;
 	int ret;
 
 	for_each_child_of_node(pdev->dev.of_node, node)
@@ -950,7 +952,7 @@ static int lpm_system_probe(struct platform_device *pdev)
 
 	if (!level)
 		return -ENOMEM;
-
+	ext_buck = msm_get_ext_buck_presence();
 	l = &level[0];
 	for_each_child_of_node(pdev->dev.of_node, node) {
 
@@ -969,10 +971,13 @@ static int lpm_system_probe(struct platform_device *pdev)
 			goto fail;
 		}
 
-		if (l->l2_mode == MSM_SPM_L2_MODE_GDHS ||
-				l->l2_mode == MSM_SPM_L2_MODE_POWER_COLLAPSE)
+		if (ext_buck && l->l2_mode ==
+				MSM_SPM_L2_MODE_POWER_COLLAPSE) {
 			l->notify_rpm = true;
-
+		} else if (l->l2_mode == MSM_SPM_L2_MODE_GDHS ||
+				l->l2_mode == MSM_SPM_L2_MODE_POWER_COLLAPSE) {
+			l->notify_rpm = true;
+		}
 		if (l->l2_mode >= MSM_SPM_L2_MODE_GDHS)
 			l->sync = true;
 
