@@ -3617,7 +3617,6 @@ static int ax_suspend(struct usb_interface *intf,
 }
 
 
-
 static int ax_resume(struct usb_interface *intf)
 {
 	struct usbnet *dev = usb_get_intfdata(intf);
