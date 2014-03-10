@@ -888,6 +888,9 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	pr_info("FB_NUM:%d, MDSS_FB_%s -- \n", mfd->panel_info->fb_num,
 			blank_mode ? "BLANK": "UNBLANK");
 
+	/* Notify listeners */
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
+
 	return ret;
 }
 
