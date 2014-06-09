@@ -895,32 +895,18 @@ int usb_wwan_resume(struct usb_serial *serial)
 			usb_anchor_urb(urb, &portdata->submitted);
 			err = usb_submit_urb(urb, GFP_ATOMIC);
 			if (err < 0) {
-<<<<<<< HEAD
 				err("%s: Error %d for bulk URB[%d]:%p %d",
 				    __func__, err, j, urb, i);
 				usb_unanchor_urb(urb);
 				intfdata->suspended = 1;
-				spin_unlock_irq(&intfdata->susp_lock);
 				goto err_out;
-=======
-				err("%s: Error %d for bulk URB %d",
-				    __func__, err, i);
-				err_count++;
->>>>>>> 9e91351... USB: usb_wwan: fix potential blocked I/O after resume
 			}
 		}
 	}
 	spin_unlock_irq(&intfdata->susp_lock);
 
-<<<<<<< HEAD
 err_out:
 	return err;
-=======
-	if (err_count)
-		return -EIO;
-
-	return 0;
->>>>>>> 9e91351... USB: usb_wwan: fix potential blocked I/O after resume
 }
 EXPORT_SYMBOL(usb_wwan_resume);
 #endif
