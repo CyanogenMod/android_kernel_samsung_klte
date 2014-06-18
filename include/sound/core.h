@@ -121,7 +121,7 @@ struct snd_card {
 	struct list_head controls;	/* all controls for this card */
 	struct list_head ctl_files;	/* active control files */
 	struct mutex user_ctl_lock;	/* protects user controls against
-			                            concurrent access */
+					   concurrent access */
 
 	struct snd_info_entry *proc_root;	/* root for soundcard specific files */
 	struct snd_info_entry *proc_id;	/* the card id */

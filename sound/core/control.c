@@ -998,7 +998,7 @@ static int snd_ctl_elem_unlock(struct snd_ctl_file *file,
 
 struct user_element {
 	struct snd_ctl_elem_info info;
-	struct snd_card *card;	
+	struct snd_card *card;
 	void *elem_data;		/* element data */
 	unsigned long elem_data_size;	/* size of element data in bytes */
 	void *tlv_data;			/* TLV data */
@@ -1044,7 +1044,7 @@ static int snd_ctl_elem_user_get(struct snd_kcontrol *kcontrol,
 
 	mutex_lock(&ue->card->user_ctl_lock);
 	memcpy(&ucontrol->value, ue->elem_data, ue->elem_data_size);
-	mutex_unlock(&ue->card->user_ctl_lock);	
+	mutex_unlock(&ue->card->user_ctl_lock);
 	return 0;
 }
 
@@ -1053,7 +1053,7 @@ static int snd_ctl_elem_user_put(struct snd_kcontrol *kcontrol,
 {
 	int change;
 	struct user_element *ue = kcontrol->private_data;
-	
+
 	mutex_lock(&ue->card->user_ctl_lock);
 	change = memcmp(&ucontrol->value, ue->elem_data, ue->elem_data_size) != 0;
 	if (change)
@@ -1078,7 +1078,7 @@ static int snd_ctl_elem_user_tlv(struct snd_kcontrol *kcontrol,
 		new_data = memdup_user(tlv, size);
 		if (IS_ERR(new_data))
 			return PTR_ERR(new_data);
-		mutex_lock(&ue->card->user_ctl_lock);		
+		mutex_lock(&ue->card->user_ctl_lock);
 		change = ue->tlv_data_size != size;
 		if (!change)
 			change = memcmp(ue->tlv_data, new_data, size);
