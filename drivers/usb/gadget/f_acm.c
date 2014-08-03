@@ -19,7 +19,6 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 #ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-#include <linux/usb/android_composite.h>
 #include <mach/usb_gadget_xport.h>
 #endif
 #include "u_serial.h"
