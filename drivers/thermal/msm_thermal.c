@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,7 @@
 
 static struct msm_thermal_data msm_thermal_info;
 static struct delayed_work check_temp_work;
+static struct delayed_work temp_log_work;
 static bool core_control_enabled;
 static uint32_t cpus_offlined;
 static DEFINE_MUTEX(core_control_mutex);
@@ -156,7 +157,7 @@ enum ocr_request {
 
 #define VDD_RES_RO_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 0444; \
+	ko_attr.attr.mode = 444; \
 	ko_attr.show = vdd_rstr_reg_##_name##_show; \
 	ko_attr.store = NULL; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -164,7 +165,7 @@ enum ocr_request {
 
 #define VDD_RES_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 0644; \
+	ko_attr.attr.mode = 644; \
 	ko_attr.show = vdd_rstr_reg_##_name##_show; \
 	ko_attr.store = vdd_rstr_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -181,7 +182,7 @@ enum ocr_request {
 
 #define OCR_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 0644; \
+	ko_attr.attr.mode = 644; \
 	ko_attr.show = ocr_reg_##_name##_show; \
 	ko_attr.store = ocr_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -189,7 +190,7 @@ enum ocr_request {
 
 #define PSM_RW_ATTRIB(_rail, ko_attr, j, _name) \
 	ko_attr.attr.name = __stringify(_name); \
-	ko_attr.attr.mode = 0644; \
+	ko_attr.attr.mode = 644; \
 	ko_attr.show = psm_reg_##_name##_show; \
 	ko_attr.store = psm_reg_##_name##_store; \
 	sysfs_attr_init(&ko_attr.attr); \
@@ -425,7 +426,7 @@ done_vdd_rstr_en:
 
 static struct vdd_rstr_enable vdd_rstr_en = {
 	.ko_attr.attr.name = __stringify(enabled),
-	.ko_attr.attr.mode = 0644,
+	.ko_attr.attr.mode = 644,
 	.ko_attr.show = vdd_rstr_en_show,
 	.ko_attr.store = vdd_rstr_en_store,
 	.enabled = 1,
@@ -743,8 +744,11 @@ static int msm_thermal_get_freq_table(void)
 
 	while (table[i].frequency != CPUFREQ_TABLE_END)
 		i++;
-
+//#ifdef CONFIG_SEC_PM
+//	limit_idx_low = 7;
+//#else
 	limit_idx_low = 0;
+//#endif
 	limit_idx_high = limit_idx = i - 1;
 	BUG_ON(limit_idx_high <= 0 || limit_idx_high <= limit_idx_low);
 fail:
@@ -1107,6 +1111,11 @@ static void __ref do_freq_control(long temp)
 		if (limit_idx < limit_idx_low)
 			limit_idx = limit_idx_low;
 		max_freq = table[limit_idx].frequency;
+
+#ifdef CONFIG_SEC_PM_DEBUG
+		pr_info("%s: down Limit=%d Temp: %ld\n",
+				KBUILD_MODNAME, limit_idx, temp);
+#endif
 	} else if (temp < msm_thermal_info.limit_temp_degC -
 		 msm_thermal_info.temp_hysteresis_degC) {
 		if (limit_idx == limit_idx_high)
@@ -1118,6 +1127,11 @@ static void __ref do_freq_control(long temp)
 			max_freq = UINT_MAX;
 		} else
 			max_freq = table[limit_idx].frequency;
+
+#ifdef CONFIG_SEC_PM_DEBUG
+		pr_info("%s: up Limit=%d Temp: %ld\n",
+				KBUILD_MODNAME, limit_idx, temp);
+#endif
 	}
 
 	if (max_freq == cpus[cpu].limited_max_freq)
@@ -1167,6 +1181,32 @@ reschedule:
 	if (enabled)
 		schedule_delayed_work(&check_temp_work,
 				msecs_to_jiffies(msm_thermal_info.poll_ms));
+}
+
+
+static void __ref msm_therm_temp_log(struct work_struct *work)
+{
+
+	struct tsens_device tsens_dev;
+	long temp =  0;
+	int i, added = 0, ret = 0;
+	uint32_t max_sensors = 0;
+	char buffer[500];
+
+	if(!tsens_get_max_sensor_num(&max_sensors))
+	{
+		pr_info( "Debug Temp for Sensor: ");
+		for(i=0;i<max_sensors;i++)
+		{
+			tsens_dev.sensor_num = i;
+			tsens_get_temp(&tsens_dev, &temp);
+			ret = sprintf(buffer + added, "(%d --- %ld)", i, temp);
+			added += ret;						
+		}
+		pr_info("%s", buffer);
+	}
+	schedule_delayed_work(&temp_log_work,
+				HZ*5); //For every 5 seconds log the temperature values of all the msm thermistors.
 }
 
 static int __ref msm_thermal_cpu_callback(struct notifier_block *nfb,
@@ -1511,8 +1551,14 @@ static void __ref disable_msm_thermal(void)
 	uint32_t cpu = 0;
 
 	/* make sure check_temp is no longer running */
+	/* kor_ts@sec
+	 * flush_scheduled_work () should be avoided.
+	 */
+	cancel_delayed_work_sync(&check_temp_work);
+	/*
 	cancel_delayed_work(&check_temp_work);
 	flush_scheduled_work();
+	*/
 
 	get_online_cpus();
 	for_each_possible_cpu(cpu) {
@@ -1769,6 +1815,18 @@ int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
 	int ret = 0;
 	uint32_t cpu;
 
+	for_each_possible_cpu(cpu) {
+		cpus[cpu].cpu = cpu;
+		cpus[cpu].offline = 0;
+		cpus[cpu].user_offline = 0;
+		cpus[cpu].hotplug_thresh_clear = false;
+		cpus[cpu].max_freq = false;
+		cpus[cpu].user_max_freq = UINT_MAX;
+		cpus[cpu].user_min_freq = 0;
+		cpus[cpu].limited_max_freq = UINT_MAX;
+		cpus[cpu].limited_min_freq = 0;
+		cpus[cpu].freq_thresh_clear = false;
+	}
 	BUG_ON(!pdata);
 	tsens_get_max_sensor_num(&max_tsens_num);
 	memcpy(&msm_thermal_info, pdata, sizeof(struct msm_thermal_data));
@@ -1779,10 +1837,6 @@ int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
 		return -EINVAL;
 
 	enabled = 1;
-	for_each_possible_cpu(cpu) {
-		cpus[cpu].limited_max_freq = UINT_MAX;
-		cpus[cpu].limited_min_freq = 0;
-	}
 	ret = cpufreq_register_notifier(&msm_thermal_cpufreq_notifier,
 			CPUFREQ_POLICY_NOTIFIER);
 	if (ret)
@@ -2433,10 +2487,6 @@ static int probe_cc(struct device_node *node, struct msm_thermal_data *data,
 	}
 
 	for_each_possible_cpu(cpu) {
-		cpus[cpu].cpu = cpu;
-		cpus[cpu].offline = 0;
-		cpus[cpu].user_offline = 0;
-		cpus[cpu].hotplug_thresh_clear = false;
 		ret = of_property_read_string_index(node, key, cpu,
 				&cpus[cpu].sensor_type);
 		if (ret)
@@ -2470,7 +2520,6 @@ static int probe_freq_mitigation(struct device_node *node,
 {
 	char *key = NULL;
 	int ret = 0;
-	uint32_t cpu;
 
 	key = "qcom,freq-mitigation-temp";
 	ret = of_property_read_u32(node, key, &data->freq_mitig_temp_degc);
@@ -2494,14 +2543,6 @@ static int probe_freq_mitigation(struct device_node *node,
 		goto PROBE_FREQ_EXIT;
 
 	freq_mitigation_enabled = 1;
-	for_each_possible_cpu(cpu) {
-		cpus[cpu].max_freq = false;
-		cpus[cpu].user_max_freq = UINT_MAX;
-		cpus[cpu].user_min_freq = 0;
-		cpus[cpu].limited_max_freq = UINT_MAX;
-		cpus[cpu].limited_min_freq = 0;
-		cpus[cpu].freq_thresh_clear = false;
-	}
 
 PROBE_FREQ_EXIT:
 	if (ret) {
@@ -2576,11 +2617,17 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 	 * Need to make sure sysfs node is created again
 	 */
 	if (psm_nodes_called) {
-		msm_thermal_add_psm_nodes();
+		ret = msm_thermal_add_psm_nodes();
+		if (ret)
+			pr_err("%s:%d msm_thermal_add_psm_nodes err",
+					__func__, __LINE__);
 		psm_nodes_called = false;
 	}
 	if (vdd_rstr_nodes_called) {
-		msm_thermal_add_vdd_rstr_nodes();
+		ret = msm_thermal_add_vdd_rstr_nodes();
+		if (ret)
+			pr_err("%s:%d msm_thermal_add_vdd_rstr_nodes err",
+					__func__, __LINE__);
 		vdd_rstr_nodes_called = false;
 	}
 	if (ocr_nodes_called) {
@@ -2602,6 +2649,7 @@ fail:
 static int msm_thermal_dev_exit(struct platform_device *inp_dev)
 {
 	msm_thermal_ioctl_cleanup();
+	cancel_delayed_work_sync(&temp_log_work);
 	return 0;
 }
 
@@ -2622,6 +2670,9 @@ static struct platform_driver msm_thermal_device_driver = {
 
 int __init msm_thermal_device_init(void)
 {
+	INIT_DELAYED_WORK(&temp_log_work, msm_therm_temp_log);
+	schedule_delayed_work(&temp_log_work, HZ*2);
+
 	return platform_driver_register(&msm_thermal_device_driver);
 }
 

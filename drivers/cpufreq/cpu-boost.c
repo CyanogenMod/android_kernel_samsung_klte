@@ -17,6 +17,9 @@
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/cpufreq.h>
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+#include <linux/cpu.h>
+#endif
 #include <linux/sched.h>
 #include <linux/jiffies.h>
 #include <linux/kthread.h>
@@ -58,6 +61,53 @@ module_param(input_boost_ms, uint, 0644);
 static u64 last_input_time;
 #define MIN_INPUT_INTERVAL (150 * USEC_PER_MSEC)
 
+
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+/*
+ * The CPUFREQ_ADJUST notifier is used to override the current policy min to
+ * make sure policy min >= boost_min. The cpufreq framework then does the job
+ * of enforcing the new policy.
+ *
+ * The sync kthread needs to run on the CPU in question to avoid deadlocks in
+ * the wake up code. Achieve this by binding the thread to the respective
+ * CPU. But a CPU going offline unbinds threads from that CPU. So, set it up
+ * again each time the CPU comes back up. We can use CPUFREQ_START to figure
+ * out a CPU is coming online instead of registering for hotplug notifiers.
+ */
+static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, void *data)
+{
+	struct cpufreq_policy *policy = data;
+	unsigned int cpu = policy->cpu;
+	struct cpu_sync *s = &per_cpu(sync_info, cpu);
+	unsigned int b_min = s->boost_min;
+	unsigned int ib_min = s->input_boost_min;
+	unsigned int min;
+
+	switch (val) {
+	case CPUFREQ_ADJUST:
+		if (!b_min && !ib_min)
+			break;
+
+		min = max(b_min, ib_min);
+
+		pr_debug("CPU%u policy min before boost: %u kHz\n",
+			 cpu, policy->min);
+		pr_debug("CPU%u boost min: %u kHz\n", cpu, min);
+
+		cpufreq_verify_within_limits(policy, min, UINT_MAX);
+
+		pr_debug("CPU%u policy min after boost: %u kHz\n",
+			 cpu, policy->min);
+		break;
+
+	case CPUFREQ_START:
+		set_cpus_allowed(s->thread, *cpumask_of(cpu));
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+#else
 /*
  * The CPUFREQ_ADJUST notifier is used to override the current policy min to
  * make sure policy min >= boost_min. The cpufreq framework then does the job
@@ -91,7 +141,7 @@ static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, voi
 
 	return NOTIFY_OK;
 }
-
+#endif
 static struct notifier_block boost_adjust_nb = {
 	.notifier_call = boost_adjust_notify,
 };
@@ -146,14 +196,11 @@ static int boost_mig_sync_thread(void *data)
 		if (ret)
 			continue;
 
-		if (dest_policy.cur >= src_policy.cur ) {
-			pr_debug("No sync. CPU%d@%dKHz >= CPU%d@%dKHz\n",
-				 dest_cpu, dest_policy.cur, src_cpu, src_policy.cur);
+		if (src_policy.min == src_policy.cur &&
+				src_policy.min <= dest_policy.min){
 			continue;
 		}
 
-		if (sync_threshold && (dest_policy.cur >= sync_threshold))
-			continue;
 
 		cancel_delayed_work_sync(&s->boost_rem);
 		if (sync_threshold) {
@@ -166,8 +213,18 @@ static int boost_mig_sync_thread(void *data)
 		}
 		/* Force policy re-evaluation to trigger adjust notifier. */
 		cpufreq_update_policy(dest_cpu);
+		/* Notify source CPU of policy change */
+		cpufreq_update_policy(src_cpu);
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+		get_online_cpus();
+		if (cpu_online(dest_cpu))
+			queue_delayed_work_on(dest_cpu, cpu_boost_wq,
+				&s->boost_rem, msecs_to_jiffies(boost_ms));
+		put_online_cpus();
+#else
 		queue_delayed_work_on(s->cpu, cpu_boost_wq,
 			&s->boost_rem, msecs_to_jiffies(boost_ms));
+#endif
 	}
 
 	return 0;
@@ -332,6 +389,9 @@ static int cpu_boost_init(void)
 		INIT_DELAYED_WORK(&s->input_boost_rem, do_input_boost_rem);
 		s->thread = kthread_run(boost_mig_sync_thread, (void *)cpu,
 					"boost_sync/%d", cpu);
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+		kthread_bind(s->thread, cpu);
+#endif
 	}
 	atomic_notifier_chain_register(&migration_notifier_head,
 					&boost_migration_nb);

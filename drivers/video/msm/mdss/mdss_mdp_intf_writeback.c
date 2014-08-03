@@ -16,6 +16,7 @@
 #include "mdss_mdp.h"
 #include "mdss_mdp_rotator.h"
 #include "mdss_panel.h"
+#include <linux/pm_runtime.h>
 
 enum mdss_mdp_writeback_type {
 	MDSS_MDP_WRITEBACK_TYPE_ROTATOR,
@@ -367,6 +368,9 @@ static int mdss_mdp_writeback_stop(struct mdss_mdp_ctl *ctl)
 
 		ctl->priv_data = NULL;
 		ctx->ref_cnt--;
+		
+		if(ctl->mdata != NULL)
+				pm_runtime_put_sync(&ctl->mdata->pdev->dev);
 	}
 
 	return 0;
@@ -496,6 +500,9 @@ int mdss_mdp_writeback_start(struct mdss_mdp_ctl *ctl)
 			return -EBUSY;
 		}
 		ctx->ref_cnt++;
+		/* Stop PM Runtime to switch off MDP Regulator during Writeback */
+		if(ctl->mdata != NULL)	
+			pm_runtime_get_sync(&ctl->mdata->pdev->dev);
 	} else {
 		pr_err("invalid writeback mode %d\n", mem_sel);
 		return -EINVAL;

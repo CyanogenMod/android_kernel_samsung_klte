@@ -474,7 +474,7 @@ config RCU_FANOUT_EXACT
 
 config RCU_FAST_NO_HZ
 	bool "Accelerate last non-dyntick-idle CPU's grace periods"
-	depends on NO_HZ && SMP
+	depends on NO_HZ && SMP && !SEC_FACTORY
 	default n
 	help
 	  This option causes RCU to attempt to accelerate grace periods
@@ -1311,6 +1311,12 @@ config MMAP_ALLOW_UNINITIALIZED
 	  it is normally safe to say Y here.
 
 	  See Documentation/nommu-mmap.txt for more information.
+
+config DEFERRED_INITCALLS
+	bool "Deferred initcalls support"
+	default n
+	help
+	  Say 'y' here to include support for deferred initcalls
 
 config PROFILING
 	bool "Profiling support"

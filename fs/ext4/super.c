@@ -412,6 +412,9 @@ static void __save_error_info(struct super_block *sb, const char *func,
 static void save_error_info(struct super_block *sb, const char *func,
 			    unsigned int line)
 {
+	if (sb->s_flags & MS_RDONLY)
+		return;
+
 	__save_error_info(sb, func, line);
 	ext4_commit_super(sb, 1);
 }
@@ -2942,6 +2945,60 @@ static void ext4_destroy_lazyinit_thread(void)
 
 	kthread_stop(ext4_lazyinit_task);
 }
+void print_block_data(struct super_block *sb, sector_t blocknr
+						, unsigned char *data_to_dump, int start, int len)
+{
+	int i, j;
+	int bh_offset = (start / 16) * 16;
+	char row_data[17] = { 0, };
+	char row_hex[50] = { 0, };
+	char ch;
+
+	printk(KERN_ERR "As EXT4-fs error, printing data in hex\n");
+	printk(KERN_ERR " [partition info] s_id : %s, start block# : %llu\n"
+			, sb->s_id, sb->s_bdev->bd_part->start_sect);
+	printk(KERN_ERR " dump block# : %llu, start offset(byte) :", blocknr);
+	printk(KERN_ERR " %d, length(byte) : %d\n", start, len);
+	printk(KERN_ERR "-------------------------------------------------\n");
+
+	for (i = 0; i < (len + 15) / 16; i++) {
+		for (j = 0; j < 16; j++) {
+			ch = *(data_to_dump + bh_offset + j);
+			if (start <= bh_offset + j
+				&& start + len > bh_offset + j) {
+
+				if (isascii(ch) && isprint(ch))
+					sprintf(row_data + j, "%c", ch);
+				else
+					sprintf(row_data + j, ".");
+
+				sprintf(row_hex + (j * 3), "%2.2x ", ch);
+				} else {
+					sprintf(row_data + j, " ");
+					sprintf(row_hex + (j * 3), "-- ");
+				}
+			}
+
+			printk(KERN_ERR "0x%4.4x : %s | %s\n"
+					, bh_offset, row_hex, row_data);
+			bh_offset += 16;
+		}
+		printk(KERN_ERR "---------------------------------------------------\n");
+}
+/* for debugging */
+
+// debugging code
+void print_bh(struct super_block *sb, struct buffer_head *bh
+				, int start, int len)
+{
+	if (bh) {
+		printk(KERN_ERR " print_bh: bh %p, bh->b_size %u, bh->b_data %p\n",
+			(void *) bh, bh->b_size, (void *) bh->b_data);
+		print_block_data(sb, bh->b_blocknr, bh->b_data, start, len);
+	}
+	else
+		printk(KERN_ERR " print_bh: bh is null!\n");
+}
 
 static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 {
@@ -3673,8 +3730,15 @@ no_journal:
 	return 0;
 
 cantfind_ext4:
+
+	/* If you wanna use the flag 'MS_SILENT', call */
+	/* 'print_bh' function within below 'if'. */
+	printk(KERN_ERR "printing data of superblock-bh\n");
+	print_bh(sb, bh, 0, EXT4_BLOCK_SIZE(sb));
+
 	if (!silent)
 		ext4_msg(sb, KERN_ERR, "VFS: Can't find ext4 filesystem");
+
 	goto failed_mount;
 
 failed_mount7:

@@ -71,11 +71,28 @@ char *mdss_dsi_buf_init(struct dsi_buf *dp)
 
 int mdss_dsi_buf_alloc(struct dsi_buf *dp, int size)
 {
+	int off;
 
-	dp->start = dma_alloc_writecombine(NULL, size, &dp->dmap, GFP_KERNEL);
+	dp->start = kmalloc(size, GFP_KERNEL);
 	if (dp->start == NULL) {
 		pr_err("%s:%u\n", __func__, __LINE__);
 		return -ENOMEM;
+	}
+
+	/* PAGE_SIZE align */
+	if ((u32)dp->start & (SZ_4K - 1)) {
+		kfree(dp->start);
+	dp->start = kmalloc(size * 2, GFP_KERNEL);
+	if (dp->start == NULL) {
+		pr_err("%s:%u\n", __func__, __LINE__);
+		return -ENOMEM;
+	}
+
+	off = (int)dp->start;
+	off &= (SZ_4K - 1);
+	if (off)
+		off = SZ_4K - off;
+		dp->start += off;
 	}
 
 	dp->end = dp->start + size;
@@ -613,6 +630,7 @@ void mdss_dsi_set_tear_on(struct mdss_dsi_ctrl_pdata *ctrl)
 	cmdreq.flags = CMD_REQ_COMMIT;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
+	cmdreq.rbuf = ctrl->rx_buf.data;
 
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
@@ -626,6 +644,7 @@ void mdss_dsi_set_tear_off(struct mdss_dsi_ctrl_pdata *ctrl)
 	cmdreq.flags = CMD_REQ_COMMIT;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
+	cmdreq.rbuf = ctrl->rx_buf.data;
 
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }

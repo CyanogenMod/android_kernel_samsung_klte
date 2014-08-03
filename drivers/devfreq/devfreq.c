@@ -128,6 +128,7 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 	if (freq != devfreq->previous_freq) {
 		prev_lev = devfreq_get_freq_level(devfreq,
 						devfreq->previous_freq);
+		BUG_ON(prev_lev == -EINVAL);
 		devfreq->trans_table[(prev_lev *
 				devfreq->profile->max_state) + lev]++;
 		devfreq->total_trans++;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -54,6 +54,7 @@ extern int msm_fw_debug_mode;
 extern int msm_fw_low_power_mode;
 extern int msm_vp8_low_tier;
 extern int msm_vidc_hw_rsp_timeout;
+extern int msm_vidc_vpe_csc_601_to_709;
 
 #define dprintk(__level, __fmt, arg...)	\
 	do { \

@@ -37,11 +37,13 @@ enum msm_bus_perf_setting {
 	S_EXIT
 };
 
+#if defined(CONFIG_ARCH_MSM8610)
 enum cci_i2c_master_t {
 	MASTER_0,
 	MASTER_1,
 	MASTER_MAX,
 };
+#endif
 
 struct msm_camera_slave_info {
 	uint16_t sensor_slave_addr;
@@ -68,6 +70,19 @@ struct v4l2_subdev_info {
 	uint16_t order;
 };
 
+#if defined(CONFIG_ARCH_MSM8610)
+struct msm_camera_power_ctrl_t {
+	struct device *dev;
+	struct msm_sensor_power_setting *power_setting;
+	uint16_t power_setting_size;
+	struct msm_camera_gpio_conf *gpio_conf;
+	struct camera_vreg_t *cam_vreg;
+	int num_vreg;
+	struct msm_camera_i2c_conf *i2c_conf;
+	struct msm_cam_clk_info *clk_info;
+	uint16_t clk_info_size;
+};
+
 struct msm_camera_sensor_board_info {
 	const char *sensor_name;
 	struct msm_camera_slave_info *slave_info;
@@ -82,6 +97,33 @@ struct msm_camera_sensor_board_info {
 	struct msm_sensor_init_params *sensor_init_params;
 	const char *misc_regulator;
 };
+#else
+struct msm_camera_power_ctrl_t {
+	struct device *dev;
+	struct msm_sensor_power_setting *power_setting;
+	uint16_t power_setting_size;
+	struct msm_sensor_power_setting *power_off_setting;
+	uint16_t power_off_setting_size;
+	struct msm_camera_gpio_conf *gpio_conf;
+	struct camera_vreg_t *cam_vreg;
+	int num_vreg;
+	struct msm_camera_i2c_conf *i2c_conf;
+	struct msm_cam_clk_info *clk_info;
+	uint16_t clk_info_size;
+	bool check_power_on;
+};
+struct msm_camera_sensor_board_info {
+	const char *sensor_name;
+	struct msm_camera_slave_info *slave_info;
+	struct msm_camera_csi_lane_params *csi_lane_params;
+	struct msm_camera_sensor_strobe_flash_data *strobe_flash_data;
+	struct msm_actuator_info *actuator_info;
+	struct msm_sensor_info_t *sensor_info;
+	const char *misc_regulator;
+	struct msm_camera_power_ctrl_t power_info;
+};
+
+#endif
 
 enum msm_camera_i2c_cmd_type {
 	MSM_CAMERA_I2C_CMD_WRITE,
@@ -112,23 +154,26 @@ struct eeprom_map_t {
 	uint32_t delay;
 };
 
+#if defined(CONFIG_ARCH_MSM8610)
 struct eeprom_memory_map_t {
 	struct eeprom_map_t page;
 	struct eeprom_map_t pageen;
 	struct eeprom_map_t poll;
 	struct eeprom_map_t mem;
 };
+#else
+struct msm_eeprom_memory_map_t {
+	struct eeprom_map_t page;
+	struct eeprom_map_t poll;
+	struct eeprom_map_t mem;
+};
+#endif
 
-struct msm_camera_power_ctrl_t {
-	struct device *dev;
-	struct msm_sensor_power_setting *power_setting;
-	uint16_t power_setting_size;
-	struct msm_camera_gpio_conf *gpio_conf;
-	struct camera_vreg_t *cam_vreg;
-	int num_vreg;
-	struct msm_camera_i2c_conf *i2c_conf;
-	struct msm_cam_clk_info *clk_info;
-	uint16_t clk_info_size;
+struct msm_eeprom_memory_block_t {
+	struct msm_eeprom_memory_map_t *map;
+	uint32_t num_map;	/* number of map blocks */
+	uint8_t *mapdata;
+	uint32_t num_data;	/* size of total mapdata */
 };
 
 struct msm_eeprom_board_info {
@@ -140,3 +185,4 @@ struct msm_eeprom_board_info {
 };
 
 #endif
+

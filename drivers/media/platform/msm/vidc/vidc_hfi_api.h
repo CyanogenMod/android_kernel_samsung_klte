@@ -44,6 +44,9 @@
 #define HAL_BUFFERFLAG_READONLY         0x00000200
 #define HAL_BUFFERFLAG_ENDOFSUBFRAME    0x00000400
 #define HAL_BUFFERFLAG_EOSEQ            0x00200000
+/*Start : Qualcomm Local Patch - 20131226 */
+#define HAL_BUFFERFLAG_YUV_601_709_CSC_CLAMP   0x10000000
+/*End : Qualcomm Local Patch - 20131226 */
 #define HAL_BUFFERFLAG_DROP_FRAME       0x20000000
 
 
@@ -177,6 +180,7 @@ enum hal_property {
 	HAL_PARAM_BUFFER_ALLOC_MODE,
 	HAL_PARAM_VDEC_FRAME_ASSEMBLY,
 	HAL_PARAM_VDEC_CONCEAL_COLOR,
+	HAL_PARAM_VPE_COLOR_SPACE_CONVERSION,
 };
 
 enum hal_domain {
@@ -808,6 +812,12 @@ struct hal_h264_vui_timing_info {
 	u32 enable;
 	u32 fixed_frame_rate;
 	u32 time_scale;
+};
+
+struct hal_vpe_color_space_conversion {
+	u32 csc_matrix[9];
+	u32 csc_bias[3];
+	u32 csc_limit[6];
 };
 
 enum vidc_resource_id {

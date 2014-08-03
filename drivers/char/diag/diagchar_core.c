@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -51,7 +51,6 @@ MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
 
-#define MIN_SIZ_ALLOW 4
 #define INIT	1
 #define EXIT	-1
 struct diagchar_dev *driver;
@@ -261,6 +260,11 @@ static int diagchar_close(struct inode *inode, struct file *file)
 
 	if (!driver)
 		return -ENOMEM;
+
+	if(driver->silent_log_pid) {
+		put_pid(driver->silent_log_pid);
+		driver->silent_log_pid = NULL;
+	}
 
 	/* clean up any DCI registrations, if this is a DCI client
 	* This will specially help in case of ungraceful exit of any DCI client
@@ -979,7 +983,7 @@ long diagchar_ioctl(struct file *filp,
 			clear_client_dci_cumulative_log_mask(i);
 			/* send updated log mask to peripherals */
 			result =
-			diag_send_dci_log_mask(&driver->smd_cntl[MODEM_DATA]);
+			diag_send_dci_log_mask(driver->smd_cntl[MODEM_DATA].ch);
 			if (result != DIAG_DCI_NO_ERROR) {
 				mutex_unlock(&driver->dci_mutex);
 				return result;
@@ -989,7 +993,7 @@ long diagchar_ioctl(struct file *filp,
 			/* send updated event mask to peripherals */
 			result =
 			diag_send_dci_event_mask(
-				&driver->smd_cntl[MODEM_DATA]);
+				driver->smd_cntl[MODEM_DATA].ch);
 			if (result != DIAG_DCI_NO_ERROR) {
 				mutex_unlock(&driver->dci_mutex);
 				return result;
@@ -1106,6 +1110,10 @@ long diagchar_ioctl(struct file *filp,
 		result = 1;
 		break;
 	case DIAG_IOCTL_SWITCH_LOGGING:
+		/*
+		 * Get a pid of diag_mdlog(app) and save it.
+		 */
+		driver->silent_log_pid = get_pid(task_pid(current));
 		result = diag_switch_logging(ioarg);
 		break;
 	case DIAG_IOCTL_REMOTE_DEV:
@@ -1118,7 +1126,7 @@ long diagchar_ioctl(struct file *filp,
 	case DIAG_IOCTL_VOTE_REAL_TIME:
 		if (copy_from_user(&rt_vote, (void *)ioarg, sizeof(struct
 							real_time_vote_t)))
-			return -EFAULT;
+			result = -EFAULT;
 		driver->real_time_update_busy++;
 		if (rt_vote.proc == DIAG_PROC_DCI) {
 			diag_dci_set_real_time(current->tgid,
@@ -1156,6 +1164,26 @@ long diagchar_ioctl(struct file *filp,
 	}
 	return result;
 }
+
+/*
+ * silent_log_panic_handler()
+ * If the silent log is enabled for CP and CP is in
+ * trouble, diag_mdlog (APP) should be terminated before
+ * a panic occurs, since it can flush logs to SD card
+ * when it is over. So, please use this function to termimate it.
+ */
+int silent_log_panic_handler(void)
+{
+	int ret = 0;
+	if(driver->silent_log_pid) {
+		pr_info("%s: killing slient log...\n", __func__);
+		kill_pid(driver->silent_log_pid, SIGTERM, 1);
+		driver->silent_log_pid = NULL;
+		ret = 1;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(silent_log_panic_handler);
 
 static int diagchar_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
@@ -1453,10 +1481,6 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	index = 0;
 	/* Get the packet type F3/log/event/Pkt response */
 	err = copy_from_user((&pkt_type), buf, 4);
-	if (err) {
-		pr_alert("diag: copy failed for pkt_type\n");
-		return -EAGAIN;
-	}
 	/* First 4 bytes indicate the type of payload - ignore these */
 	if (count < 4) {
 		pr_err("diag: Client sending short data\n");
@@ -1498,9 +1522,8 @@ static int diagchar_write(struct file *file, const char __user *buf,
 		return err;
 	}
 	if (pkt_type == CALLBACK_DATA_TYPE) {
-		if (payload_size > driver->itemsize ||
-				payload_size <= MIN_SIZ_ALLOW) {
-			pr_err("diag: Dropping packet, invalid packet size. Current payload size %d\n",
+		if (payload_size > driver->itemsize) {
+			pr_err("diag: Dropping packet, packet payload size crosses 4KB limit. Current payload size %d\n",
 				payload_size);
 			driver->dropped_count++;
 			return -EBADMSG;
@@ -1634,11 +1657,6 @@ static int diagchar_write(struct file *file, const char __user *buf,
 			diag_get_remote(*(int *)driver->user_space_data_buf);
 
 		if (remote_proc) {
-			if (payload_size <= MIN_SIZ_ALLOW) {
-				pr_err("diag: Integer underflow in %s, payload size: %d",
-							__func__, payload_size);
-				return -EBADMSG;
-			}
 			token_offset = 4;
 			payload_size -= 4;
 			buf += 4;
@@ -2149,7 +2167,7 @@ static int __init diagchar_init(void)
 			goto fail;
 	} else {
 		printk(KERN_INFO "kzalloc failed\n");
-		goto fail;
+		goto fail2;
 	}
 
 	pr_info("diagchar initialized now");
@@ -2164,6 +2182,8 @@ fail:
 	diag_masks_exit();
 	diag_sdio_fn(EXIT);
 	diagfwd_bridge_fn(EXIT);
+	kfree(driver);
+fail2:
 	return -1;
 }
 

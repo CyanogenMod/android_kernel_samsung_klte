@@ -32,6 +32,10 @@
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9306.h"
 
+#ifdef CONFIG_SND_SOC_ES325
+#include "../codecs/es325-export.h"
+#endif
+
 #define DRV_NAME "msm8226-asoc-tapan"
 
 #define MSM_SLIM_0_RX_MAX_CHANNELS		2
@@ -49,6 +53,13 @@
 #define WCD9XXX_MBHC_DEF_RLOADS 5
 #define TAPAN_EXT_CLK_RATE 9600000
 
+#ifdef CONFIG_SND_SOC_MAX98504
+#define GPIO_TERTIARY_MI2S_SCK    49
+#define GPIO_TERTIARY_MI2S_WS     50
+#define GPIO_TERTIARY_MI2S_DATA0  51
+#define GPIO_TERTIARY_MI2S_DATA1  52
+#else
+#endif
 #define NUM_OF_AUXPCM_GPIOS 4
 
 #define LO_1_SPK_AMP   0x1
@@ -145,10 +156,12 @@ static int msm_btsco_rate = BTSCO_RATE_8KHZ;
 static int msm_btsco_ch = 1;
 
 static struct mutex cdc_mclk_mutex;
+static struct mutex jack_mutex;
 static struct clk *codec_clk;
 static int clk_users;
-static int ext_spk_amp_gpio = -1;
+static int lineout_en_gpio = -1;
 static int vdd_spkr_gpio = -1;
+static struct regulator* earjack_ldo;
 static int msm_proxy_rx_ch = 2;
 static int slim0_rx_bit_format = SNDRV_PCM_FORMAT_S16_LE;
 
@@ -174,6 +187,45 @@ static void param_set_mask(struct snd_pcm_hw_params *p, int n, unsigned bit)
 		m->bits[bit >> 5] |= (1 << (bit & 31));
 	}
 }
+
+//Enabling the MIC Bias Voltage of Earmic
+#ifdef CONFIG_SAMSUNG_JACK
+static struct snd_soc_jack hs_jack;
+#endif
+
+#ifdef CONFIG_SND_SOC_MAX98504
+struct request_gpio {
+	unsigned gpio_no;
+	char *gpio_name;
+};
+
+static struct request_gpio pri_mi2s_gpio[] = {
+	{
+		.gpio_no = GPIO_TERTIARY_MI2S_SCK,
+		.gpio_name = "TERTIARY_MI2S_SCK",
+	},
+	{
+		.gpio_no = GPIO_TERTIARY_MI2S_WS,
+		.gpio_name = "TERTIARY_MI2S_WS",
+	},
+	{
+		.gpio_no = GPIO_TERTIARY_MI2S_DATA0,
+		.gpio_name = "TERTIARY_MI2S_DATA0",
+	},
+	{
+		.gpio_no = GPIO_TERTIARY_MI2S_DATA1,
+		.gpio_name = "TERTIARY_MI2S_DATA1",
+	},
+};
+/* MI2S clock */
+struct mi2s_clk {
+	struct clk *core_clk;
+	struct clk *osr_clk;
+	struct clk *bit_clk;
+	atomic_t mi2s_rsc_ref;
+};
+static struct mi2s_clk pri_mi2s_clk;
+#endif
 
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 					bool dapm)
@@ -239,12 +291,12 @@ static int msm8226_mclk_event(struct snd_soc_dapm_widget *w,
 static void msm8226_ext_spk_power_amp_enable(u32 enable)
 {
 	if (enable) {
-		gpio_direction_output(ext_spk_amp_gpio, enable);
+		gpio_direction_output(lineout_en_gpio, enable);
 		/* time takes enable the external power amplifier */
 		usleep_range(EXT_CLASS_D_EN_DELAY,
 			EXT_CLASS_D_EN_DELAY + EXT_CLASS_D_DELAY_DELTA);
 	} else {
-		gpio_direction_output(ext_spk_amp_gpio, enable);
+		gpio_direction_output(lineout_en_gpio, enable);
 		/* time takes disable the external power amplifier */
 		usleep_range(EXT_CLASS_D_DIS_DELAY,
 			EXT_CLASS_D_DIS_DELAY + EXT_CLASS_D_DELAY_DELTA);
@@ -256,7 +308,7 @@ static void msm8226_ext_spk_power_amp_enable(u32 enable)
 
 static void msm8226_ext_spk_power_amp_on(u32 spk)
 {
-	if (gpio_is_valid(ext_spk_amp_gpio)) {
+	if (gpio_is_valid(lineout_en_gpio)) {
 		if (spk & (LO_1_SPK_AMP | LO_2_SPK_AMP)) {
 			pr_debug("%s:Enable left and right speakers case spk = 0x%x\n",
 				__func__, spk);
@@ -265,7 +317,7 @@ static void msm8226_ext_spk_power_amp_on(u32 spk)
 
 			if ((msm8226_ext_spk_pamp & LO_1_SPK_AMP) &&
 				(msm8226_ext_spk_pamp & LO_2_SPK_AMP))
-				if (ext_spk_amp_gpio >= 0) {
+				if (lineout_en_gpio >= 0) {
 					pr_debug("%s  enable power", __func__);
 					msm8226_ext_spk_power_amp_enable(1);
 				}
@@ -278,7 +330,7 @@ static void msm8226_ext_spk_power_amp_on(u32 spk)
 
 static void msm8226_ext_spk_power_amp_off(u32 spk)
 {
-	if (gpio_is_valid(ext_spk_amp_gpio)) {
+	if (gpio_is_valid(lineout_en_gpio)) {
 		if (spk & (LO_1_SPK_AMP | LO_2_SPK_AMP)) {
 			pr_debug("%s Disable left and right speakers case spk = 0x%08x",
 				__func__, spk);
@@ -286,7 +338,7 @@ static void msm8226_ext_spk_power_amp_off(u32 spk)
 			msm8226_ext_spk_pamp &= ~spk;
 
 			if (!msm8226_ext_spk_pamp) {
-				if (ext_spk_amp_gpio >= 0) {
+				if (lineout_en_gpio >= 0) {
 					pr_debug("%s  disable power", __func__);
 					msm8226_ext_spk_power_amp_enable(0);
 				}
@@ -334,21 +386,20 @@ static int msm8226_vdd_spkr_event(struct snd_soc_dapm_widget *w,
 {
 	pr_debug("%s: event = %d\n", __func__, event);
 
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		if (vdd_spkr_gpio >= 0) {
+	if (SND_SOC_DAPM_EVENT_ON(event)) {
+
+	if (vdd_spkr_gpio >= 0) {
 			gpio_direction_output(vdd_spkr_gpio, 1);
 			pr_debug("%s: Enabled 5V external supply for speaker\n",
 					__func__);
 		}
-		break;
-	case SND_SOC_DAPM_POST_PMD:
+	}else
+	{
 		if (vdd_spkr_gpio >= 0) {
 			gpio_direction_output(vdd_spkr_gpio, 0);
 			pr_debug("%s: Disabled 5V external supply for speaker\n",
 					__func__);
 		}
-		break;
 	}
 	return 0;
 }
@@ -360,6 +411,7 @@ static const struct snd_soc_dapm_widget msm8226_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Sub Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
 
@@ -376,14 +428,14 @@ static const struct snd_soc_dapm_widget msm8226_dapm_widgets[] = {
 	SND_SOC_DAPM_SPK("Lineout_1 amp", msm8226_ext_spkramp_event),
 	SND_SOC_DAPM_SPK("Lineout_2 amp", msm8226_ext_spkramp_event),
 
-	SND_SOC_DAPM_SUPPLY("EXT_VDD_SPKR",  SND_SOC_NOPM, 0, 0,
-	msm8226_vdd_spkr_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SPK("EXT_VDD_SPKR",msm8226_vdd_spkr_event),
 };
 
 static const char *const slim0_rx_ch_text[] = {"One", "Two"};
 static const char *const slim0_tx_ch_text[] = {"One", "Two", "Three", "Four"};
 static const char *const proxy_rx_ch_text[] = {"One", "Two", "Three", "Four",
 	"Five", "Six", "Seven", "Eight"};
+static char const *rx_bit_format_text[] = {"S16_LE", "S24_LE"};
 
 static const struct soc_enum msm_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, slim0_rx_ch_text),
@@ -776,7 +828,46 @@ static const struct soc_enum msm_snd_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, slim0_rx_ch_text),
 	SOC_ENUM_SINGLE_EXT(4, slim0_tx_ch_text),
 	SOC_ENUM_SINGLE_EXT(8, proxy_rx_ch_text),
+	SOC_ENUM_SINGLE_EXT(2, rx_bit_format_text),
 };
+
+#ifdef CONFIG_SEC_MATISSE_PROJECT
+static const char *const cradle_switch_text[] = {"0", "1"};
+
+static const struct soc_enum cradle_switch_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, cradle_switch_text),
+};
+
+static int cradle_switch_enum_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s:\n", __func__);
+	return 0;
+}
+
+static int cradle_switch_enum_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+
+	int val = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: %d\n",__func__,val);
+	if(val == 0 || val == 1)
+	{
+			if (lineout_en_gpio >= 0) {
+				gpio_direction_output(lineout_en_gpio,val);
+					pr_info("%s:Lineout EN GPIO state %d\n",
+							__func__,val);
+			}
+			else
+				pr_err("%s Lineout EN GPIO not defined\n",__func__);
+	}
+	else
+		pr_err("%s Invalid CRADLE Switch Value\n",__func__);
+
+	return 0;
+}
+#endif
 
 static const struct snd_kcontrol_new msm_snd_controls[] = {
 	SOC_ENUM_EXT("SLIM_0_RX Channels", msm_snd_enum[0],
@@ -791,7 +882,10 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			msm_proxy_rx_ch_get, msm_proxy_rx_ch_put),
 	SOC_ENUM_EXT("SLIM_0_RX Format", msm_snd_enum[3],
 			slim0_rx_bit_format_get, slim0_rx_bit_format_put),
-
+#ifdef CONFIG_SEC_MATISSE_PROJECT
+	SOC_ENUM_EXT("CRADLE Switch", cradle_switch_enum[0],
+		     cradle_switch_enum_get, cradle_switch_enum_put),
+#endif
 };
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
@@ -927,6 +1021,21 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_sync(dapm);
 
+#ifdef CONFIG_SAMSUNG_JACK
+// Need to remove this code in future
+// Below lines has been added only because in need to codec ptr in order to enable
+//MIC BIAS2 Internal1 dapm widget of Codec
+
+	err = snd_soc_jack_new(codec, "Ear Jack",
+		(SND_JACK_HEADSET | SND_JACK_OC_HPHL | SND_JACK_OC_HPHR),
+		&hs_jack);
+	if (err) {
+		pr_err("failed to create new jack\n");
+		return err;
+	}
+
+#endif
+
 	codec_clk = clk_get(cpu_dai->dev, "osr_clk");
 	if (codec_clk < 0)
 		pr_err("%s() Failed to get clock for %s\n",
@@ -941,7 +1050,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 			__func__, err);
 		return err;
 	}
-
+#ifndef CONFIG_SAMSUNG_JACK //Comment Disable MBHC
 	/* start mbhc */
 	mbhc_cfg.calibration = def_tapan_mbhc_cal();
 	if (mbhc_cfg.calibration) {
@@ -950,6 +1059,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		err = -ENOMEM;
 		goto out;
 	}
+#endif
 
 	adsp_state_notifier =
 		subsys_notif_register_notifier("adsp",
@@ -963,6 +1073,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	tapan_event_register(msm8226_tapan_event_cb, rtd->codec);
+	
+	tapan_register_mclk_cb(codec, msm_snd_enable_codec_ext_clk);
 	return 0;
 
 out:
@@ -1091,8 +1203,12 @@ static int msm_snd_hw_params(struct snd_pcm_substream *substream,
 			pr_err("%s: failed to get codec chan map\n", __func__);
 			goto end;
 		}
+#ifdef CONFIG_SND_SOC_ES325
 		/* For tabla_tx1 case */
+		if ((codec_dai->id == 1) ||(codec_dai->id == 11))
+#else
 		if (codec_dai->id == 1)
+#endif
 			user_set_tx_ch = msm_slim_0_tx_ch;
 		/* For tabla_tx2 case */
 		else if (codec_dai->id == 3)
@@ -1120,6 +1236,122 @@ static void msm_snd_shutdown(struct snd_pcm_substream *substream)
 		 substream->name, substream->stream);
 }
 
+#ifdef CONFIG_SND_SOC_MAX98504
+static int msm226_pri_mi2s_free_gpios(void)
+{
+	int	i;
+	for (i = 0; i < ARRAY_SIZE(pri_mi2s_gpio); i++)
+                gpio_free(pri_mi2s_gpio[i].gpio_no);
+	return 0;
+}
+
+static struct afe_clk_cfg lpass_mi2s_enable = {
+        AFE_API_VERSION_I2S_CONFIG,
+        Q6AFE_LPASS_IBIT_CLK_1_P536_MHZ,
+        Q6AFE_LPASS_OSR_CLK_12_P288_MHZ,
+        Q6AFE_LPASS_CLK_SRC_INTERNAL,
+        Q6AFE_LPASS_CLK_ROOT_DEFAULT,
+        Q6AFE_LPASS_MODE_BOTH_VALID,
+        0,
+};
+static struct afe_clk_cfg lpass_mi2s_disable = {
+        AFE_API_VERSION_I2S_CONFIG,
+        0,
+        0,
+        Q6AFE_LPASS_CLK_SRC_INTERNAL,
+        Q6AFE_LPASS_CLK_ROOT_DEFAULT,
+        Q6AFE_LPASS_MODE_BOTH_VALID,
+        0,
+};
+
+
+static void msm8226_mi2s_shutdown(struct snd_pcm_substream *substream)
+{
+	
+
+	if (atomic_dec_return(&pri_mi2s_clk.mi2s_rsc_ref) == 0) {
+		int ret =0;
+		pr_err("[MAX98504_DEBUG] %s: free mi2s resources\n", __func__);
+			if(substream->stream==0)
+				ret = afe_set_lpass_clock(AFE_PORT_ID_TERTIARY_MI2S_RX, &lpass_mi2s_disable);	
+			else if(substream->stream==1)
+				ret = afe_set_lpass_clock(AFE_PORT_ID_TERTIARY_MI2S_TX, &lpass_mi2s_disable);		
+       		
+       		if (ret < 0) {	
+      			pr_err("%s: afe_set_lpass_clock failed\n", __func__);	
+       	
+      		}	
+		msm226_pri_mi2s_free_gpios();
+	}
+}
+
+static int msm8226_configure_pri_mi2s_gpio(void)
+{
+	int	rtn;
+	int	i;
+	for (i = 0; i < ARRAY_SIZE(pri_mi2s_gpio); i++) {
+
+		rtn = gpio_request(pri_mi2s_gpio[i].gpio_no,
+				pri_mi2s_gpio[i].gpio_name);
+
+		pr_info("%s: gpio = %d, gpio name = %s, rtn = %d\n", __func__,
+		pri_mi2s_gpio[i].gpio_no, pri_mi2s_gpio[i].gpio_name, rtn);		
+		if (rtn) {
+			pr_err("%s: Failed to request gpio %d\n",
+				   __func__,
+				   pri_mi2s_gpio[i].gpio_no);
+			while( i >= 0) {
+				gpio_free(pri_mi2s_gpio[i].gpio_no);
+				i--;
+			}
+			break;
+		}
+	}
+
+	return rtn;
+}
+static int msm8226_mi2s_startup(struct snd_pcm_substream *substream)
+{
+	int ret = 0;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+
+	pr_err("%s: dai name %s %p\n", __func__, cpu_dai->name, cpu_dai->dev);
+
+	if (atomic_inc_return(&pri_mi2s_clk.mi2s_rsc_ref) == 1) {
+		pr_info("%s: acquire mi2s resources\n", __func__);
+		msm8226_configure_pri_mi2s_gpio();	
+			if(substream->stream==0)
+				ret = afe_set_lpass_clock(AFE_PORT_ID_TERTIARY_MI2S_RX, &lpass_mi2s_enable);	
+			else if(substream->stream==1)
+				ret = afe_set_lpass_clock(AFE_PORT_ID_TERTIARY_MI2S_TX, &lpass_mi2s_enable); 
+       		if (ret < 0) {	
+      			pr_err("%s: afe_set_lpass_clock failed\n", __func__);	
+       		return ret;	
+      		}	
+		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_CBS_CFS);
+		if (ret < 0)
+			dev_err(cpu_dai->dev, "set format for CPU dai"
+				" failed\n");
+
+		ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_CBS_CFS);
+		if (ret < 0)
+			dev_err(codec_dai->dev, "set format for codec dai"
+				 " failed\n");
+
+		ret  = 0;
+	}
+	return ret;
+}
+
+
+
+static struct snd_soc_ops msm8226_mi2s_be_ops = {
+	.startup = msm8226_mi2s_startup,
+	.shutdown = msm8226_mi2s_shutdown
+};
+#endif
 static struct snd_soc_ops msm8226_be_ops = {
 	.startup = msm_snd_startup,
 	.hw_params = msm_snd_hw_params,
@@ -1515,6 +1747,23 @@ static struct snd_soc_dai_link msm8226_common_dai[] = {
 		.be_hw_params_fixup = msm_proxy_tx_be_hw_params_fixup,
 		.ignore_suspend = 1,
 	},
+#ifdef CONFIG_JACK_AUDIO
+	{
+		.name = "MSM8974 JACK LowLatency",
+		.stream_name = "MultiMedia10",
+		.cpu_dai_name   = "MultiMedia10",
+		.platform_name  = "msm-pcm-dsp.1",
+		.dynamic = 1,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		/* this dainlink has playback support */
+		.ignore_pmdown_time = 1,
+		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA10,
+	},
+#endif
 	/* HDMI Hostless */
 	{
 		.name = "HDMI_RX_HOSTLESS",
@@ -1879,6 +2128,33 @@ static struct snd_soc_dai_link msm8226_9302_dai_links[
 				ARRAY_SIZE(msm8226_common_dai) +
 				ARRAY_SIZE(msm8226_9302_dai)];
 
+#ifdef CONFIG_SND_SOC_MAX98504
+static struct snd_soc_dai_link msm8226_max98504_dai[] = {
+	{
+		.name = LPASS_BE_TERT_MI2S_TX,
+		.stream_name = "Tertiary MI2S Capture",
+		.cpu_dai_name = "msm-dai-q6-mi2s.2",
+		.platform_name = "msm-pcm-routing",
+		.codec_name 	= "max98504.6-0031",//"msm-stub-codec.1",
+		.codec_dai_name = "max98504-aif1",//"msm-stub-tx",
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
+		.be_hw_params_fixup = msm_be_hw_params_fixup,
+		.ops = &msm8226_mi2s_be_ops,
+	},
+};
+static struct snd_soc_dai_link msm8226_9306_98504_dai_links[
+				ARRAY_SIZE(msm8226_common_dai) +
+				ARRAY_SIZE(msm8226_9306_dai) +
+				ARRAY_SIZE(msm8226_max98504_dai)];
+
+struct snd_soc_card snd_soc_card_msm8226_new = {
+	.name		= "msm8226-tapan-snd-card",
+	.dai_link	= msm8226_9306_98504_dai_links,
+	.num_links	= ARRAY_SIZE(msm8226_9306_98504_dai_links),
+};
+#endif
+
 struct snd_soc_card snd_soc_card_msm8226 = {
 	.name		= "msm8226-tapan-snd-card",
 	.dai_link	= msm8226_9306_dai_links,
@@ -1958,8 +2234,9 @@ err:
 static int msm8226_prepare_codec_mclk(struct snd_soc_card *card)
 {
 	struct msm8226_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
-	int ret;
+	
 	if (pdata->mclk_gpio) {
+		int ret;
 		ret = gpio_request(pdata->mclk_gpio, "TAPAN_CODEC_PMIC_MCLK");
 		if (ret) {
 			dev_err(card->dev,
@@ -1971,6 +2248,51 @@ static int msm8226_prepare_codec_mclk(struct snd_soc_card *card)
 	return 0;
 }
 
+//Enabling the MIC Bias Voltage of Earmic
+#ifdef CONFIG_SAMSUNG_JACK
+
+static struct snd_soc_jack hs_jack;
+
+void msm8226_enable_ear_micbias(bool state)
+{
+	int nRetVal = 0;
+	struct snd_soc_jack *jack = &hs_jack;
+	struct snd_soc_codec *codec;
+	struct snd_soc_dapm_context *dapm;
+	char *str
+#ifdef CONFIG_EXT_EARMIC_BIAS
+		= "Headset Mic";
+#else
+		= "MIC BIAS2 Power External";
+#endif
+
+	printk("%s : str: %s\n", __func__, str);
+
+	if (jack->codec == NULL) { /* audrx_init not yet called */
+		pr_err("%s codec==NULL\n", __func__);
+		return;
+	}
+	codec = jack->codec;
+	dapm = &codec->dapm;
+	mutex_lock(&jack_mutex);
+
+	if (state == 1) {
+		nRetVal = snd_soc_dapm_force_enable_pin(dapm, str);
+		pr_info("%s enable the codec  pin : %d with state :%d\n"
+				, __func__, nRetVal, state);
+	} else{
+		nRetVal = snd_soc_dapm_disable_pin(dapm, str);
+		pr_info("%s disable the codec  pin : %d with state :%d\n"
+				, __func__, nRetVal, state);
+	}
+	snd_soc_dapm_sync(dapm);
+	mutex_unlock(&jack_mutex);
+}
+
+EXPORT_SYMBOL(msm8226_enable_ear_micbias);
+
+#endif
+#ifndef CONFIG_SAMSUNG_JACK //ms01 mbhc not used
 static bool msm8226_swap_gnd_mic(struct snd_soc_codec *codec)
 {
 	struct snd_soc_card *card = codec->card;
@@ -1982,11 +2304,12 @@ static bool msm8226_swap_gnd_mic(struct snd_soc_codec *codec)
 
 	return true;
 }
-
+#endif //CONFIG_SAMSUNG_JACK
 static int msm8226_setup_hs_jack(struct platform_device *pdev,
 		struct msm8226_asoc_mach_data *pdata)
 {
-	int rc;
+#ifndef CONFIG_SAMSUNG_JACK //ms01 mbhc not used
+	
 
 	pdata->us_euro_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,cdc-us-euro-gpios", 0);
@@ -1996,6 +2319,7 @@ static int msm8226_setup_hs_jack(struct platform_device *pdev,
 			"qcom,cdc-us-euro-gpios", pdev->dev.of_node->full_name,
 			pdata->us_euro_gpio);
 	} else {
+		int rc;
 		rc = gpio_request(pdata->us_euro_gpio,
 						  "TAPAN_CODEC_US_EURO_GPIO");
 		if (rc) {
@@ -2006,6 +2330,7 @@ static int msm8226_setup_hs_jack(struct platform_device *pdev,
 			mbhc_cfg.swap_gnd_mic = msm8226_swap_gnd_mic;
 		}
 	}
+#endif
 	return 0;
 }
 
@@ -2025,12 +2350,36 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 
 	} else {
 
-		card = &snd_soc_card_msm8226;
+#ifdef CONFIG_SND_SOC_MAX98504
+		extern int system_rev;
+#if defined(CONFIG_MACH_MILLETLTE_OPEN)
+		if ( system_rev >= 0 && system_rev < 3)
+#elif defined (CONFIG_MACH_MILLET3G_EUR) || defined (CONFIG_MACH_BERLUTI3G_EUR)
+		if ( system_rev >= 2 && system_rev < 4)
+#elif defined(CONFIG_MACH_MILLETWIFI_OPEN) || defined (CONFIG_MACH_VICTORLTE_CMCC)
+		if ( system_rev >= 0 && system_rev < 5)
+#endif
+		{
+			card = &snd_soc_card_msm8226_new;
 
-		memcpy(msm8226_9306_dai_links, msm8226_common_dai,
-				sizeof(msm8226_common_dai));
-		memcpy(msm8226_9306_dai_links + ARRAY_SIZE(msm8226_common_dai),
-			msm8226_9306_dai, sizeof(msm8226_9306_dai));
+			memcpy(msm8226_9306_98504_dai_links, msm8226_common_dai,
+					sizeof(msm8226_common_dai));
+			memcpy(msm8226_9306_98504_dai_links + ARRAY_SIZE(msm8226_common_dai),
+					msm8226_9306_dai, sizeof(msm8226_9306_dai));
+			memcpy(msm8226_9306_98504_dai_links + ARRAY_SIZE(msm8226_common_dai)+ ARRAY_SIZE(msm8226_9306_dai),
+					msm8226_max98504_dai, sizeof(msm8226_max98504_dai));
+		}
+		else	{
+#endif
+			card = &snd_soc_card_msm8226;
+
+			memcpy(msm8226_9306_dai_links, msm8226_common_dai,
+					sizeof(msm8226_common_dai));
+			memcpy(msm8226_9306_dai_links + ARRAY_SIZE(msm8226_common_dai),
+					msm8226_9306_dai, sizeof(msm8226_9306_dai));
+#ifdef CONFIG_SND_SOC_MAX98504
+		}
+#endif
 	}
 
 	return card;
@@ -2042,6 +2391,7 @@ static __devinit int msm8226_asoc_machine_probe(struct platform_device *pdev)
 	struct msm8226_asoc_mach_data *pdata;
 	int ret;
 	const char *auxpcm_pri_gpio_set = NULL;
+	struct device_node *reg_node = NULL;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "No platform supplied from device tree\n");
@@ -2053,7 +2403,7 @@ static __devinit int msm8226_asoc_machine_probe(struct platform_device *pdev)
 	if (!pdata) {
 		dev_err(&pdev->dev, "Can't allocate msm8226_asoc_mach_data\n");
 		ret = -ENOMEM;
-		goto err;
+		goto err1;
 	}
 
 	card = populate_snd_card_dailinks(&pdev->dev);
@@ -2103,6 +2453,7 @@ static __devinit int msm8226_asoc_machine_probe(struct platform_device *pdev)
 		goto err1;
 
 	mutex_init(&cdc_mclk_mutex);
+	mutex_init(&jack_mutex);
 
 	mbhc_cfg.gpio_level_insert = of_property_read_bool(pdev->dev.of_node,
 					"qcom,headset-jack-type-NC");
@@ -2143,24 +2494,44 @@ static __devinit int msm8226_asoc_machine_probe(struct platform_device *pdev)
 		}
 	}
 
-	ext_spk_amp_gpio = of_get_named_gpio(pdev->dev.of_node,
+	lineout_en_gpio = of_get_named_gpio(pdev->dev.of_node,
 			"qcom,cdc-lineout-spkr-gpios", 0);
-	if (ext_spk_amp_gpio < 0) {
+	if (lineout_en_gpio < 0) {
 		dev_err(&pdev->dev,
 			"Looking up %s property in node %s failed %d\n",
 			"qcom, cdc-lineout-spkr-gpios",
-			pdev->dev.of_node->full_name, ext_spk_amp_gpio);
+			pdev->dev.of_node->full_name, lineout_en_gpio);
 	} else {
-		ret = gpio_request(ext_spk_amp_gpio,
+		ret = gpio_request(lineout_en_gpio,
 				"TAPAN_CODEC_LINEOUT_SPKR");
 		if (ret) {
 			/* GPIO to enable EXT AMP exists, but failed request */
 			dev_err(card->dev,
 				"%s: Failed to request tapan amp spkr gpio %d\n",
-				__func__, ext_spk_amp_gpio);
+				__func__, lineout_en_gpio);
 			goto err_vdd_spkr;
 		}
 	}
+
+	reg_node = of_parse_phandle(pdev->dev.of_node, "vdd-earjack-supply", 0);
+	if(reg_node)
+	{
+		earjack_ldo = regulator_get(&pdev->dev, "vdd-earjack");
+		if (IS_ERR(earjack_ldo)) {
+				pr_err("[%s] could not get earjack_ldo, %ld\n", __func__, PTR_ERR(earjack_ldo));
+		}
+		else
+		{
+			ret = regulator_enable(earjack_ldo);
+			if(ret < 0) {
+				pr_err("%s: Failed to enable regulator.\n",
+					__func__);
+				goto err_reg_enable;
+			} else
+				regulator_set_mode(earjack_ldo, REGULATOR_MODE_NORMAL);
+		}
+	}else
+		pr_err("%s Ear jack LDO node not available\n",__func__);
 
 	msm8226_setup_hs_jack(pdev, pdata);
 
@@ -2187,13 +2558,15 @@ static __devinit int msm8226_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_lineout_spkr;
 	}
-
+#ifdef CONFIG_SND_SOC_MAX98504
+	atomic_set(&pri_mi2s_clk.mi2s_rsc_ref, 0);
+#endif
 	return 0;
 
 err_lineout_spkr:
-	if (ext_spk_amp_gpio >= 0) {
-		gpio_free(ext_spk_amp_gpio);
-		ext_spk_amp_gpio = -1;
+	if (lineout_en_gpio >= 0) {
+		gpio_free(lineout_en_gpio);
+		lineout_en_gpio = -1;
 	}
 
 err_vdd_spkr:
@@ -2211,6 +2584,10 @@ err:
 	}
 err1:
 	devm_kfree(&pdev->dev, pdata);
+
+err_reg_enable:
+	if(earjack_ldo)
+		regulator_put(earjack_ldo);
 	return ret;
 }
 
@@ -2222,13 +2599,24 @@ static int __devexit msm8226_asoc_machine_remove(struct platform_device *pdev)
 	gpio_free(pdata->mclk_gpio);
 	if (vdd_spkr_gpio >= 0)
 		gpio_free(vdd_spkr_gpio);
-	if (ext_spk_amp_gpio >= 0)
-		gpio_free(ext_spk_amp_gpio);
+	if (lineout_en_gpio >= 0)
+		gpio_free(lineout_en_gpio);
 	if (pdata->us_euro_gpio > 0)
 		gpio_free(pdata->us_euro_gpio);
 
+	if(earjack_ldo)
+	{
+		int ret;
+
+		ret = regulator_disable(earjack_ldo);
+		if(ret < 0) {
+				pr_err("%s: Failed to disable regulator.\n",__func__);
+		}
+		regulator_put(earjack_ldo);
+	}
+
 	vdd_spkr_gpio = -1;
-	ext_spk_amp_gpio = -1;
+	lineout_en_gpio = -1;
 	snd_soc_unregister_card(card);
 
 	return 0;

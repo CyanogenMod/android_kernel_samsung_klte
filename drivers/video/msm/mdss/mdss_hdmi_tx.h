@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,6 +36,9 @@ struct hdmi_tx_platform_data {
 	bool primary;
 	struct dss_io_data io[HDMI_TX_MAX_IO];
 	struct dss_module_power power_data[HDMI_TX_MAX_PM];
+#if defined (CONFIG_VIDEO_MHL_V2)
+	bool drm_workaround;
+#endif
 };
 
 struct hdmi_audio {
@@ -55,8 +58,6 @@ struct hdmi_tx_ctrl {
 
 	struct mutex mutex;
 	struct mutex lut_lock;
-	struct mutex cable_notify_mutex;
-	struct list_head cable_notify_handlers;
 	struct kobject *kobj;
 	struct switch_dev sdev;
 	struct switch_dev audio_sdev;
@@ -80,7 +81,6 @@ struct hdmi_tx_ctrl {
 	struct work_struct hpd_int_work;
 
 	struct work_struct power_off_work;
-	struct work_struct cable_notify_work;
 
 	bool hdcp_feature_on;
 	u32 present_hdcp;
@@ -94,6 +94,13 @@ struct hdmi_tx_ctrl {
 	void *downstream_data;
 
 	void *feature_data[HDMI_TX_FEAT_MAX];
+#if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
+	int is_power_enabled[HDMI_TX_MAX_PM];
+#endif
 };
 
+#if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
+void mhl_hpd_handler(bool state);
+int hdmi_hpd_status(void);
+#endif
 #endif /* __MDSS_HDMI_TX_H__ */

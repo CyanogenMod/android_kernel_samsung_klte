@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -518,7 +518,6 @@ static void handle_event_change(enum command_response cmd, void *data)
 					__func__, inst,
 					event_notify->packet_buffer,
 					event_notify->exra_data_buffer);
-
 				if (inst->state == MSM_VIDC_CORE_INVALID ||
 					inst->core->state ==
 						VIDC_CORE_INVALID) {
@@ -1620,6 +1619,7 @@ static enum hal_domain get_hal_domain(int session_type)
 	return domain;
 }
 
+//static enum hal_video_codec get_hal_codec_type(int fourcc)
 enum hal_video_codec get_hal_codec_type(int fourcc)
 {
 	enum hal_video_codec codec;
@@ -1765,9 +1765,11 @@ static int msm_vidc_load_resources(int flipped_state,
 		dprintk(VIDC_ERR, "HW is overloaded, needed: %d max: %d\n",
 			num_mbs_per_sec, inst->core->resources.max_load);
 		msm_vidc_print_running_insts(inst->core);
+#if 0 /* Samsung skips the overloaded error return  */		
 		inst->state = MSM_VIDC_CORE_INVALID;
 		msm_comm_recover_from_session_error(inst);
 		return -ENOMEM;
+#endif		
 	}
 
 	hdev = inst->core->device;
@@ -2435,6 +2437,15 @@ int msm_comm_qbuf(struct vb2_buffer *vb)
 				dprintk(VIDC_DBG,
 					"Received EOS on output capability\n");
 			}
+			/*Start : Qualcomm Local Patch - 20131226 */
+			if (vb->v4l2_buf.flags &
+				V4L2_MSM_BUF_FLAG_YUV_601_709_CLAMP) {
+				frame_data.flags |=
+					HAL_BUFFERFLAG_YUV_601_709_CSC_CLAMP;
+				dprintk(VIDC_DBG,
+					"Received buff with 601to709 clamp\n");
+			}
+			/*End : Qualcomm Local Patch - 20131226 */
 
 			if (vb->v4l2_buf.flags &
 					V4L2_QCOM_BUF_FLAG_CODECCONFIG) {
@@ -2782,7 +2793,7 @@ int msm_comm_try_set_prop(struct msm_vidc_inst *inst,
 
 	mutex_lock(&inst->sync_lock);
 	if (inst->state < MSM_VIDC_OPEN_DONE || inst->state >= MSM_VIDC_CLOSE) {
-		dprintk(VIDC_ERR, "Not in proper state to set property\n");
+		dprintk(VIDC_ERR, "skip set property\n");
 		rc = -EAGAIN;
 		goto exit;
 	}

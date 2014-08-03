@@ -130,12 +130,16 @@ irqreturn_t mdss_mdp_isr(int irq, void *ptr)
 
 
 	isr = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_STATUS);
+	mask = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_EN);
+
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+	xlog(__func__, 0, isr, mask, 0, 0, 0);
+#endif
 
 	if (isr == 0)
 		goto mdp_isr_done;
 
 
-	mask = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_EN);
 	MDSS_MDP_REG_WRITE(MDSS_MDP_REG_INTR_CLEAR, isr);
 
 	pr_debug("%s: isr=%x mask=%x\n", __func__, isr, mask);
@@ -592,9 +596,9 @@ int mdss_mdp_get_img(struct msmfb_data *img, struct mdss_mdp_img_data *data)
 
 int mdss_mdp_calc_phase_step(u32 src, u32 dst, u32 *out_phase)
 {
-	u32 unit, residue, result;
+	u32 unit, residue;
 
-	if (src == 0 || dst == 0)
+	if (dst == 0)
 		return -EINVAL;
 
 	unit = 1 << PHASE_STEP_SHIFT;
@@ -602,13 +606,8 @@ int mdss_mdp_calc_phase_step(u32 src, u32 dst, u32 *out_phase)
 
 	/* check if overflow is possible */
 	if (src > dst) {
-		residue = *out_phase - unit;
-		result = (residue * dst) + residue;
-
-		while (result > (unit + (unit >> 1)))
-			result -= unit;
-
-		if ((result > residue) && (result < unit))
+		residue = *out_phase & (unit - 1);
+		if (residue && ((residue * dst) < (unit - residue)))
 			return -EOVERFLOW;
 	}
 

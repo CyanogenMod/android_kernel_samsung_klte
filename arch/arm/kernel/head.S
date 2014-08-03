@@ -427,7 +427,27 @@ __enable_mmu:
 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+#ifdef CONFIG_TIMA_RKP_30
+	/* TIMA loads TTBR0 */
+	.arch_extension sec
+	mov r5, r0  @ save r0
+	mov r6, r2  @ save r2
+
+	mov r2, r4
+	ldr r0, =0x3f827221
+	smc #1
+
+	mov r0, r5  @ restore r0
+	mov r2, r6  @ restore r2
+
+#ifdef  CONFIG_TIMA_RKP_30
+	/* Flush TLB */
+	mcr    p15, 0, r0, c8, c3, 0
+	dsb
+#endif
+#else
 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
+#endif  /* CONFIG_TIMA_RKP_30 */
 #endif
 	b	__turn_mmu_on
 ENDPROC(__enable_mmu)

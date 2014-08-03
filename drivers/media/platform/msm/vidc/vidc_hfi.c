@@ -44,8 +44,7 @@ void *vidc_hfi_initialize(enum msm_vidc_hfi_type hfi_type, u32 device_id,
 	}
 
 	if (rc) {
-		if (rc != -EPROBE_DEFER)
-			dprintk(VIDC_ERR, "%s device init failed rc = %d",
+		dprintk(VIDC_ERR, "%s device init failed rc = %d",
 				__func__, rc);
 		goto err_hfi_init;
 	}
@@ -54,7 +53,7 @@ void *vidc_hfi_initialize(enum msm_vidc_hfi_type hfi_type, u32 device_id,
 
 err_hfi_init:
 	kfree(hdev);
-	return ERR_PTR(rc);
+	return NULL;
 }
 
 void vidc_hfi_deinitialize(enum msm_vidc_hfi_type hfi_type,

@@ -19,6 +19,11 @@
 #include <linux/sched.h>
 #include <linux/highmem.h>
 #include <linux/perf_event.h>
+#ifdef CONFIG_TIMA_RKP
+#include <linux/io.h>
+#include <linux/slab.h>
+#include <linux/spinlock_types.h>
+#endif
 
 #include <asm/exception.h>
 #include <asm/pgtable.h>
@@ -118,12 +123,15 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 			break;
 
 		pte = pte_offset_map(pmd, addr);
+#ifndef CONFIG_TIMA_RKP
 		printk(", *pte=%08llx", (long long)pte_val(*pte));
 #ifndef CONFIG_ARM_LPAE
 		printk(", *ppte=%08llx",
 		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
 #endif
+#endif
 		pte_unmap(pte);
+
 	} while(0);
 
 	printk("\n");
@@ -132,6 +140,323 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 void show_pte(struct mm_struct *mm, unsigned long addr)
 { }
 #endif					/* CONFIG_MMU */
+
+#ifdef CONFIG_TIMA_RKP
+inline void tima_dump_log2()
+{
+        char *tima_log = (char *)0xde100000, *ptr, *ptr1;
+        int line_ctr=0;
+
+	return; /* WARNING: THIS FUNCTION HAS BEEN DISABLED */
+	/* After the move to the new memory address, there is no virtual address for the log
+	 * This function is disabled pending the availability of the same
+	 */
+        ptr = tima_log;
+        ptr1 = ptr;
+        while(line_ctr<100) {
+                line_ctr++;
+                while(*ptr1 != '\n')
+                        ptr1++;
+                *ptr1 = '\0';
+                printk(KERN_EMERG"%s\n", ptr);
+                *ptr1 = '\n';
+                ptr1++;
+                if(*ptr1 == '\0')
+                        break;
+                ptr = ptr1;
+        }
+}
+
+inline void tima_verify_state(unsigned long pmdp, unsigned long val, unsigned long rd_only, unsigned long caller)
+{
+        unsigned long pmdp_addr = (unsigned long)pmdp;
+        unsigned long init_pgd, pgd_val;
+        unsigned long init_pte;
+        unsigned long pte_val;
+	unsigned long npte_val;
+	static unsigned long call_count = 0;
+
+	return; /* WARNING: THIS FUNCTION HAS BEEN DISABLED BECAUSE SECT_TO_PGT CAN NO LONGER BE ACCESSED
+		   VIA VIRTUAL MEMORY MAPPING */
+
+	if ((pmdp>>24)==0xc0)	return;
+	call_count++;
+	init_pgd = (unsigned long)init_mm.pgd;
+        init_pgd += (pmdp_addr >> 20) << 2;
+
+	pgd_val = (unsigned long)*(unsigned long *)init_pgd;
+	if ((pgd_val & 0x3) != 0x1) {
+		printk(KERN_ERR"TIMA: Entry is not L2 page. VA:%lx, PGD=%lx\n", pmdp, pgd_val);
+		return;
+	}
+
+        init_pte = (unsigned long)__va(pgd_val & (~0x3ff));
+        init_pte += ((pmdp_addr >> 12) & 0xff) << 2;
+
+        pte_val = *(unsigned long *)init_pte;
+        invalidate_caches(init_pte, 4, __pa(init_pte));
+	npte_val = *(unsigned long *)init_pte;
+        if (rd_only) {
+                if ((pte_val & 0x230) != 0x210) { 	/* Page is RO */
+                        printk(KERN_ERR"Page is NOT RO, CALLER=%lx VA=%lx, PTE=%lx FLUSHED PTE=%lx PA=%lx\n", caller, pmdp_addr, pte_val, npte_val, __pa(pmdp_addr));
+			//tima_send_cmd(pmdp_addr, 0x3f80e221);
+			//tima_dump_log2();
+		}
+        } else {
+                if ((pte_val & 0x230) != 0x010) {	/* Page is RW */
+                        printk(KERN_ERR"Page is NOT RW, CALLER=%lx VA=%lx, PTE=%lx FLUSHED PTE=%lx PA=%lx\n", caller, pmdp_addr, pte_val, npte_val, __pa(pmdp_addr));
+			//tima_send_cmd(pmdp_addr, 0x3f80e221);
+			//tima_dump_log2();
+		}
+        }
+}
+
+#ifdef CONFIG_TIMA_RKP_DEBUG
+/* 
+ * Function decides what the response to 
+ * a failure indicated by the debug infrastructure 
+ * should be.
+ * If signal = 0xffffffff, kernel panic.
+ * Else the signal is the command id.
+ */ 
+void tima_debug_signal_failure(unsigned long signal, unsigned long caller)
+{
+	if (signal == 0xffffffff)
+		panic("TIMA debug kernel panic with caller %lx\n", caller);
+	else 
+		tima_send_cmd(caller, signal);
+}
+#if 0
+unsigned long *l2_mmap_ptr = NULL;
+static inline unsigned long pt_walk(unsigned long va)
+{
+	unsigned long pgd;
+	unsigned long pmd;
+	unsigned long pmd_v;
+	unsigned long pte;
+	//unsigned long pa = 0;
+	unsigned long offset;
+	
+	pgd = (unsigned long)cpu_get_pgd();
+	offset = (va & 0xfff00000) >> 20;
+	pmd = *(unsigned long *)(pgd + offset*4);
+	/* Check if pmd is a section. Return if true
+	 */ 
+	if ((pmd & 0x3) != 0x1)
+		return 0;
+	offset = (pmd & 0x000ffc00) >> 2;
+	pmd_v = (unsigned long)(l2_mmap_ptr + offset);
+	offset = (va & 0x000ff000) >> 12;
+	pte = *(unsigned long *)(pmd_v + offset*4);
+
+
+/*
+ * Check if a certain va is made read-only by tima
+ * return: -1 error, 0 writable, 1 readonly
+ */
+	/* Return on empty page
+	 */	
+	if ((pte & 0x3) == 0x0)
+		return 0;
+	
+	//pa = (pte & ~(0xfff));
+	/* return physical address without masking out
+	 * lower 12 bits so that access permission can
+	 * be checked in the caller function
+	 */
+	return pte;
+}
+#endif
+/* 
+ * If debug infra. is enabled, do page walk for
+ * passed in VA to get the correspoding PA
+ * and check the AP bits to verify the 
+ * protection.
+ * Returns: 0 writable, 1 readonly page, -1 on Error
+ * Assumption: For page walk to work for L2,
+ * make sure that the sect_to_pgt region has been
+ * mapped. Currently the mapping is done in 
+ * paging_init().
+ */
+int tima_debug_page_protection(unsigned long va, unsigned long caller, unsigned long readonly)
+{
+#if 0
+	unsigned long pte = 0;
+	if(l2_mmap_ptr)
+		pte = pt_walk(va);
+	if (pte) {
+		if(readonly) {
+			/* Page expected to be read-only
+			 */
+			if ((pte & 0x230) != 0x210) {
+				return 0;
+			}
+			else 
+				return 1;
+		} else	{ 
+			/* Page expected to be writable
+			 */
+			if ((pte & 0x230) != 0x010) { 
+				return 1;
+			}
+			else 
+				return 0;
+		}
+	}
+	/* Error */
+	return -1;
+#endif
+
+	unsigned long par = 0;
+	unsigned long flags;
+	/* 
+	 * Translate the page using priviledged read. 
+	 * Failure implies a translation fault!
+	 * Success implies page might be RO or RW.
+	 */
+	raw_spin_lock_irqsave(&par_lock, flags);
+	__asm__ __volatile__ (
+		"mcr	p15, 0, %1, c7, c8, 0\n"
+		"isb\n"
+		"mrc 	p15, 0, %0, c7, c4, 0\n"
+		:"=r"(par):"r"(va));
+	raw_spin_unlock_irqrestore(&par_lock, flags);
+	if (par & 0x1) {
+		/* Translation failed! */
+		return -1;
+	}
+
+	/* 
+	 * Translate the page using priviledged write.
+	 * Failure implies that the page is read-only.
+	 * Success implies that the page is writable.
+	 */ 
+	raw_spin_lock_irqsave(&par_lock, flags);
+	__asm__ __volatile__ (
+		"mcr	p15, 0, %1, c7, c8, 1\n"
+		"isb\n"
+		"mrc 	p15, 0, %0, c7, c4, 0\n"
+		:"=r"(par):"r"(va));
+	raw_spin_unlock_irqrestore(&par_lock, flags);
+	if (par & 0x1) {
+		/* Translation failed */
+		return 1;
+	}
+
+	return 0; /* Page is writable */
+}
+#endif /* CONFIG_TIMA_RKP_DEBUG */ 
+
+/*
+ * Check if a certain va is made read-only by tima
+ * return: -1 error, 0 writable, 1 readonly
+ */
+extern unsigned long tima_switch_count;
+#ifdef	CONFIG_TIMA_RKP_30
+extern unsigned long pgt_bit_array[];
+int tima_is_pg_protected(unsigned long va)
+{
+        unsigned long paddr = __pa(va);
+        unsigned long index = paddr >> PAGE_SHIFT;
+        unsigned long *p = (unsigned long *)pgt_bit_array;
+        unsigned long tmp = index>>5;
+        unsigned long rindex;
+        unsigned long val;
+
+        if(!p)
+                return -1;
+        p += (tmp);
+#ifndef	CONFIG_TIMA_RKP_COHERENT_TT
+	asm volatile("mcr     p15, 0, %0, c7, c6, 1\n"
+	"dsb\n"
+	"isb\n"
+	: : "r" (p));
+#endif        
+        rindex = index % 32;
+
+        val = (*p) & (1 << rindex)?1:0;
+        return val;
+}
+#else
+static DEFINE_RAW_SPINLOCK(par_lock);
+int tima_is_pg_protected(unsigned long va)
+{
+	unsigned long  par;
+	unsigned long flags;
+
+	/* Translate the page use writable priv.
+	Failing means a read-only page 
+	(tranlation was confirmed by previous step)*/
+	raw_spin_lock_irqsave(&par_lock, flags);
+	__asm__ __volatile__ (
+		"mcr	p15, 0, %1, c7, c8, 1\n"
+		"dsb\n"
+		"isb\n"
+		"mrc 	p15, 0, %0, c7, c4, 0\n"
+		:"=r"(par):"r"(va));
+	raw_spin_unlock_irqrestore(&par_lock, flags);
+	if (par & 0x1) {
+		return 1;
+	}
+
+	return 0;
+}
+#endif	/* CONFIG_TIMA_RKP_30 */
+EXPORT_SYMBOL(tima_is_pg_protected);
+#endif
+
+#ifdef	CONFIG_TIMA_RKP_30
+#define INS_STR_R1	0xe5801000
+#define INS_STR_R3	0xe5a03800
+extern void* cpu_v7_set_pte_ext_proc_end;
+static unsigned int rkp_fixup(unsigned long addr, struct pt_regs *regs) {
+	
+	unsigned long inst = *((unsigned long*) regs->ARM_pc);
+	unsigned long reg_val = 0;
+	unsigned long emulate = 0;
+	
+	if (regs->ARM_pc <  (long) cpu_v7_set_pte_ext 
+		|| regs->ARM_pc > (long) &cpu_v7_set_pte_ext_proc_end) {
+		printk(KERN_ERR
+			"RKP -> Inst %lx out of cpu_v7_set_pte_ext range from %lx to %lx\n",
+			(unsigned long) regs->ARM_pc, (long) cpu_v7_set_pte_ext,
+			(long) &cpu_v7_set_pte_ext_proc_end);
+		return false;
+	}
+	if (inst == INS_STR_R1)
+	{
+		reg_val = regs->ARM_r1;
+		emulate = 1;
+	}
+	else if (inst == INS_STR_R3)
+	{
+		reg_val = regs->ARM_r3;
+		emulate = 1;
+	}
+	if (emulate) {
+		printk(KERN_ERR"Emulating RKP instruction %lx at %p\n", 
+		inst, (unsigned long*) regs->ARM_pc);
+#ifndef	CONFIG_TIMA_RKP_COHERENT_TT
+		asm volatile("mcr     p15, 0, %0, c7, c14, 1\n"
+		"dsb\n"
+                "isb\n"
+		: : "r" (addr));
+#endif
+		tima_send_cmd2(__pa(addr), reg_val, 0x3f808221);
+#ifndef	CONFIG_TIMA_RKP_COHERENT_TT
+		asm volatile("mcr     p15, 0, %0, c7, c6, 1\n" 
+		"dsb\n"
+                "isb\n"
+		: : "r" (addr));
+#endif
+		regs->ARM_pc += 4;
+		return true;
+	}
+	printk(KERN_ERR"CANNOT Emulate RKP instruction %lx at %p\n", 
+		inst, (unsigned long*) regs->ARM_pc);
+	return false;		
+}
+#endif
 
 /*
  * Oops.  The kernel tried to access some page that wasn't present.
@@ -145,6 +470,30 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 */
 	if (fixup_exception(regs))
 		return;
+#ifdef	CONFIG_TIMA_RKP
+#ifdef  CONFIG_TIMA_RKP_30
+	if (addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
+		if (rkp_fixup(addr, regs)) {
+			return;
+		}
+	}
+#else
+	printk(KERN_ERR"TIMA:====> %lx, [%lx]\n", addr, tima_switch_count);
+	if (addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
+		printk(KERN_ERR"TIMA:==> Handling fault for %lx\n", addr);
+		tima_send_cmd(addr, 0x3f821221);
+		__asm__ ("mcr    p15, 0, %0, c8, c3, 0\n"
+			"isb"
+			::"r"(0));
+		if (tima_is_pg_protected(addr) == 1) {
+			/* Is the page still read-only even after we free it */
+			printk(KERN_ERR"TIMA ==> Err freeing page %lx\n", addr);
+		} else {
+			return;
+		}
+	}
+#endif	
+#endif
 
 	/*
 	 * No handler, we'll have to terminate things with extreme prejudice.
@@ -156,6 +505,12 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		"paging request", addr);
 
 	show_pte(mm, addr);
+#ifdef CONFIG_TIMA_RKP
+	if (tima_is_pg_protected(addr) == 1) {
+		printk(KERN_ERR"RKP ==> Address %lx is RO by RKP\n", addr);
+	}
+	tima_send_cmd(addr, 0x3f80e221);
+#endif
 	die("Oops", regs, fsr);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);

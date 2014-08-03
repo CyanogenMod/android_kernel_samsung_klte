@@ -43,6 +43,8 @@ static DEFINE_IDR(ctrl_idr);
 static struct device_type slim_dev_type;
 static struct device_type slim_ctrl_type;
 
+extern unsigned int system_rev;
+
 static const struct slim_device_id *slim_match(const struct slim_device_id *id,
 					const struct slim_device *slim_dev)
 {
@@ -316,6 +318,19 @@ static void slim_report(struct work_struct *work)
 	if (sbdev->notified)
 		return;
 	ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &laddr);
+
+#if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_MTR)
+	if (system_rev == 0xd) {
+		pr_info("%s : system rev = %d\n", __func__, system_rev);
+		if ((ret == -ENXIO) &&
+			((sbdev->e_addr[4] == 0xbe) && (sbdev->e_addr[2] == 0x83))) {
+			pr_info("%s : es704 fail to assign retry to assign the es705\n", __func__);
+			sbdev->e_addr[2] = 0x03;
+			ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &laddr);		
+		}
+	}
+#endif
+
 	if (!ret) {
 		if (sbdrv)
 			sbdev->notified = true;
@@ -648,36 +663,6 @@ void slim_report_absent(struct slim_device *sbdev)
 	queue_work(ctrl->wq, &sbdev->wd);
 }
 EXPORT_SYMBOL(slim_report_absent);
-
-/*
- * slim_framer_booted: This function is called by controller after the active
- * framer has booted (using Bus Reset sequence, or after it has shutdown and has
- * come back up). Components, devices on the bus may be in undefined state,
- * and this function triggers their drivers to do the needful
- * to bring them back in Reset state so that they can acquire sync, report
- * present and be operational again.
- */
-void slim_framer_booted(struct slim_controller *ctrl)
-{
-	struct slim_device *sbdev;
-	struct list_head *pos, *next;
-	if (!ctrl)
-		return;
-	mutex_lock(&ctrl->m_ctrl);
-	list_for_each_safe(pos, next, &ctrl->devs) {
-		struct slim_driver *sbdrv;
-		sbdev = list_entry(pos, struct slim_device, dev_list);
-		mutex_unlock(&ctrl->m_ctrl);
-		if (sbdev && sbdev->dev.driver) {
-			sbdrv = to_slim_driver(sbdev->dev.driver);
-			if (sbdrv->reset_device)
-				sbdrv->reset_device(sbdev);
-		}
-		mutex_lock(&ctrl->m_ctrl);
-	}
-	mutex_unlock(&ctrl->m_ctrl);
-}
-EXPORT_SYMBOL(slim_framer_booted);
 
 /*
  * slim_msg_response: Deliver Message response received from a device to the

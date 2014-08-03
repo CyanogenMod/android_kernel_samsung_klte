@@ -2,7 +2,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Author: Brian Swetland <swetland@google.com>
- * Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -25,6 +25,9 @@
 #include <linux/wakelock.h>
 #include <linux/pm_qos.h>
 #include <linux/hrtimer.h>
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include <linux/host_notify.h>
+#endif
 #include <linux/power_supply.h>
 #include <linux/cdev.h>
 /*
@@ -250,6 +253,9 @@ struct msm_otg_platform_data {
 	unsigned int mpm_dmshv_int;
 	bool mhl_enable;
 	bool disable_reset_on_disconnect;
+#ifdef CONFIG_USB_HOST_NOTIFY
+	int ovp_ctrl_gpio;
+#endif
 	bool pnoc_errata_fix;
 	bool enable_lpm_on_dev_suspend;
 	bool core_clk_always_on_workaround;
@@ -346,6 +352,7 @@ struct msm_otg_platform_data {
  * @chg_check_timer: The timer used to implement the workaround to detect
  *               very slow plug in of wall charger.
  * @ui_enabled: USB Intterupt is enabled or disabled.
+ * @pm_done: Indicates whether USB is PM resumed
  */
 struct msm_otg {
 	struct usb_phy phy;
@@ -397,6 +404,10 @@ struct msm_otg {
 	unsigned mA_port;
 	struct timer_list id_timer;
 	unsigned long caps;
+#ifdef CONFIG_USB_HOST_NOTIFY
+	struct delayed_work late_power_work;
+	int smartdock;
+#endif
 	struct msm_xo_voter *xo_handle;
 	uint32_t bus_perf_client;
 	bool mhl_enabled;
@@ -462,6 +473,7 @@ struct msm_otg {
 	bool ext_chg_active;
 	struct completion ext_chg_wait;
 	int ui_enabled;
+	bool pm_done;
 };
 
 struct ci13xxx_platform_data {

@@ -70,6 +70,13 @@ struct w1_slave
 	u32			flags;
 	int			ttl;
 
+	u32 id_min;
+	u32 id_max;
+	u32 id_default;
+	u32 color_min;
+	u32 color_max;
+	u32 color_default;
+
 	struct w1_master	*master;
 	struct w1_family	*family;
 	void			*family_data;
@@ -153,6 +160,9 @@ struct w1_bus_master
 	 */
 	void		(*search)(void *, struct w1_master *,
 		u8, w1_slave_found_callback);
+
+	/* add for sending uevent */
+	struct input_dev *input;
 };
 
 struct w1_master

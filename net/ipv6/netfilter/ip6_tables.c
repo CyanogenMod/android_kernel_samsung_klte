@@ -347,13 +347,9 @@ ip6t_do_table(struct sk_buff *skb,
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
 
 	local_bh_disable();
+	get_reader(&(table->private_lock));
 	addend = xt_write_recseq_begin();
 	private = table->private;
-	/*
-	 * Ensure we load private-> members after we've fetched the base
-	 * pointer.
-	 */
-	smp_read_barrier_depends();
 	cpu        = smp_processor_id();
 	table_base = private->entries[cpu];
 	jumpstack  = (struct ip6t_entry **)private->jumpstack[cpu];
@@ -438,6 +434,7 @@ ip6t_do_table(struct sk_buff *skb,
 	*stackptr = origptr;
 
  	xt_write_recseq_end(addend);
+	put_reader(&(table->private_lock));
  	local_bh_enable();
 
 #ifdef DEBUG_ALLOW_ALL

@@ -77,6 +77,18 @@ int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 	struct scatterlist *sg;
 	int i;
 
+#ifdef CONFIG_TIMA_RKP
+        if (buffer->size) {
+        /* iommu optimization- needs to be turned ON from
+         * the tz side.
+         */
+                cpu_v7_tima_iommu_opt(vma->vm_start, vma->vm_end, (unsigned long)vma->vm_mm->pgd);
+                __asm__ __volatile__ (
+                "mcr    p15, 0, r0, c8, c3, 0\n"
+                "dsb\n"
+                "isb\n");
+        }
+#endif
 	for_each_sg(table->sgl, sg, table->nents, i) {
 		struct page *page = sg_page(sg);
 		unsigned long remainder = vma->vm_end - addr;
@@ -108,7 +120,8 @@ int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
  *
  * Note that the `pages' array should be composed of all 4K pages.
  */
-int ion_heap_pages_zero(struct page **pages, int num_pages)
+int ion_heap_pages_zero(struct page **pages, int num_pages,
+				bool should_invalidate)
 {
 	int i, j, k, npages_to_vmap;
 	void *ptr = NULL;
@@ -142,17 +155,19 @@ int ion_heap_pages_zero(struct page **pages, int num_pages)
 			return -ENOMEM;
 
 		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
-		/*
-		 * invalidate the cache to pick up the zeroing
-		 */
-		for (k = 0; k < npages_to_vmap; k++) {
-			void *p = kmap_atomic(pages[i + k]);
-			phys_addr_t phys = page_to_phys(
-				pages[i + k]);
+		if (should_invalidate) {
+			/*
+			 * invalidate the cache to pick up the zeroing
+			 */
+			for (k = 0; k < npages_to_vmap; k++) {
+				void *p = kmap_atomic(pages[i + k]);
+				phys_addr_t phys = page_to_phys(
+							pages[i + k]);
 
-			dmac_inv_range(p, p + PAGE_SIZE);
-			outer_inv_range(phys, phys + PAGE_SIZE);
-			kunmap_atomic(p);
+				dmac_inv_range(p, p + PAGE_SIZE);
+				outer_inv_range(phys, phys + PAGE_SIZE);
+				kunmap_atomic(p);
+			}
 		}
 		vunmap(ptr);
 	}
@@ -193,7 +208,8 @@ static void ion_heap_free_pages_mem(struct pages_mem *pages_mem)
 	pages_mem->free_fn(pages_mem->pages);
 }
 
-int ion_heap_high_order_page_zero(struct page *page, int order)
+int ion_heap_high_order_page_zero(struct page *page,
+				int order, bool should_invalidate)
 {
 	int i, ret;
 	struct pages_mem pages_mem;
@@ -206,7 +222,8 @@ int ion_heap_high_order_page_zero(struct page *page, int order)
 	for (i = 0; i < (1 << order); ++i)
 		pages_mem.pages[i] = page + i;
 
-	ret = ion_heap_pages_zero(pages_mem.pages, npages);
+	ret = ion_heap_pages_zero(pages_mem.pages, npages,
+				should_invalidate);
 	ion_heap_free_pages_mem(&pages_mem);
 	return ret;
 }
@@ -235,7 +252,8 @@ int ion_heap_buffer_zero(struct ion_buffer *buffer)
 			pages_mem.pages[npages++] = page + j;
 	}
 
-	ret = ion_heap_pages_zero(pages_mem.pages, npages);
+	ret = ion_heap_pages_zero(pages_mem.pages, npages,
+				ion_buffer_cached(buffer));
 	ion_heap_free_pages_mem(&pages_mem);
 	return ret;
 }
@@ -313,27 +331,31 @@ size_t ion_heap_freelist_size(struct ion_heap *heap)
 static size_t _ion_heap_freelist_drain(struct ion_heap *heap, size_t size,
 				bool skip_pools)
 {
-	struct ion_buffer *buffer, *tmp;
+	struct ion_buffer *buffer;
 	size_t total_drained = 0;
 
 	if (ion_heap_freelist_size(heap) == 0)
 		return 0;
 
-	rt_mutex_lock(&heap->lock);
 	if (size == 0)
-		size = heap->free_list_size;
-
-	list_for_each_entry_safe(buffer, tmp, &heap->free_list, list) {
-		if (total_drained >= size)
+		size = ion_heap_freelist_size(heap);
+	
+	while (true) {
+		rt_mutex_lock(&heap->lock);
+		if (list_empty(&heap->free_list) || total_drained >= size ) {
+			rt_mutex_unlock(&heap->lock);
 			break;
+		}
+		buffer = list_first_entry(&heap->free_list, struct ion_buffer,
+				  list);
 		list_del(&buffer->list);
-		ion_buffer_destroy(buffer);
 		heap->free_list_size -= buffer->size;
+		total_drained += buffer->size;
 		if (skip_pools)
 			buffer->flags |= ION_FLAG_FREED_FROM_SHRINKER;
-		total_drained += buffer->size;
+		rt_mutex_unlock(&heap->lock);
+		ion_buffer_destroy(buffer);
 	}
-	rt_mutex_unlock(&heap->lock);
 
 	return total_drained;
 }
@@ -345,6 +367,7 @@ size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
 
 size_t ion_heap_freelist_drain_from_shrinker(struct ion_heap *heap, size_t size)
 {
+	
 	return _ion_heap_freelist_drain(heap, size, true);
 }
 

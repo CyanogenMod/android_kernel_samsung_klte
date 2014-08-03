@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/mutex.h>
 #include <linux/cpu.h>
+#include <linux/qpnp/pin.h>
 #include <linux/of.h>
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
@@ -29,10 +30,21 @@
 #include <mach/cpuidle.h>
 #include <mach/event_timer.h>
 #include "pm.h"
-#include "ext-buck-support.h"
 #include "rpm-notifier.h"
 #include "spm.h"
 #include "idle.h"
+#include "clock.h"
+
+#include <mach/gpiomux.h>
+#include <linux/regulator/consumer.h>
+
+#ifdef CONFIG_SEC_GPIO_DVS
+#include <linux/secgpio_dvs.h>
+#endif
+
+#ifdef CONFIG_GPIO_PCAL6416A
+#include <linux/i2c/pcal6416a.h>
+#endif
 
 #define SCLK_HZ (32768)
 
@@ -123,6 +135,10 @@ module_param_named(
 static int msm_pm_sleep_time_override;
 module_param_named(sleep_time_override,
 	msm_pm_sleep_time_override, int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+static int msm_pm_sleep_sec_debug;
+module_param_named(secdebug,
+	msm_pm_sleep_sec_debug, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 static int num_powered_cores;
 static struct hrtimer lpm_hrtimer;
@@ -342,7 +358,12 @@ static void lpm_system_prepare(struct lpm_system_state *system_state,
 	const struct cpumask *nextcpu;
 
 	spin_lock(&system_state->sync_lock);
-	if (num_powered_cores != system_state->num_cores_in_sync) {
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+	if (index < 0 || num_powered_cores != system_state->num_cores_in_sync)
+#else
+	if (num_powered_cores != system_state->num_cores_in_sync)
+#endif
+	{
 		spin_unlock(&system_state->sync_lock);
 		return;
 	}
@@ -419,8 +440,14 @@ static void lpm_system_unprepare(struct lpm_system_state *system_state,
 			system_lvl->num_cpu_votes--;
 	}
 
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+	if (!first_core_up || index < 0)
+#else
 	if (!first_core_up)
+#endif
+	{
 		goto unlock_and_return;
+	}
 
 	if (default_l2_mode != system_state->system_level[index].l2_mode)
 		lpm_set_l2_mode(system_state, default_l2_mode);
@@ -430,6 +457,9 @@ static void lpm_system_unprepare(struct lpm_system_state *system_state,
 		msm_mpm_exit_sleep(from_idle);
 	}
 unlock_and_return:
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+	system_state->last_entered_cluster_index = -1;
+#endif
 	spin_unlock(&system_state->sync_lock);
 }
 
@@ -727,8 +757,12 @@ static void lpm_enter_low_power(struct lpm_system_state *system_state,
 
 	idx = lpm_system_select(system_state, cpu_index, from_idle);
 
+#if !(defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO))
 	if (idx >= 0)
+#endif
+	{
 		lpm_system_prepare(system_state, idx, from_idle);
+	}
 
 	msm_cpu_pm_enter_sleep(cpu_level->mode, from_idle);
 
@@ -773,6 +807,7 @@ static int lpm_suspend_enter(suspend_state_t state)
 	if (i < 0)
 		return -EINVAL;
 
+	clock_debug_print_enabled();
 	lpm_enter_low_power(&sys_state, i,  false);
 
 	return 0;
@@ -782,6 +817,26 @@ static int lpm_suspend_prepare(void)
 {
 	suspend_in_progress = true;
 	msm_mpm_suspend_prepare();
+	regulator_showall_enabled();
+
+#ifdef CONFIG_SEC_GPIO_DVS
+	/************************ Caution !!! ****************************
+	 * This functiongit a must be located in appropriate SLEEP position
+	 * in accordance with the specification of each BB vendor.
+	 ************************ Caution !!! ****************************/
+	gpio_dvs_check_sleepgpio();
+#endif
+
+#ifdef CONFIG_SEC_PM_DEBUG
+	if (msm_pm_sleep_sec_debug) {
+		msm_gpio_print_enabled();
+		qpnp_debug_suspend_show();
+#ifdef CONFIG_GPIO_PCAL6416A
+		expander_print_all();
+#endif
+	}
+#endif
+
 	return 0;
 }
 
@@ -941,7 +996,6 @@ static int lpm_system_probe(struct platform_device *pdev)
 	int num_levels = 0;
 	struct device_node *node;
 	char *key;
-	bool ext_buck;
 	int ret;
 
 	for_each_child_of_node(pdev->dev.of_node, node)
@@ -952,7 +1006,7 @@ static int lpm_system_probe(struct platform_device *pdev)
 
 	if (!level)
 		return -ENOMEM;
-	ext_buck = msm_get_ext_buck_presence();
+
 	l = &level[0];
 	for_each_child_of_node(pdev->dev.of_node, node) {
 
@@ -971,13 +1025,10 @@ static int lpm_system_probe(struct platform_device *pdev)
 			goto fail;
 		}
 
-		if (ext_buck && l->l2_mode ==
-				MSM_SPM_L2_MODE_POWER_COLLAPSE) {
+		if (l->l2_mode == MSM_SPM_L2_MODE_GDHS ||
+				l->l2_mode == MSM_SPM_L2_MODE_POWER_COLLAPSE)
 			l->notify_rpm = true;
-		} else if (l->l2_mode == MSM_SPM_L2_MODE_GDHS ||
-				l->l2_mode == MSM_SPM_L2_MODE_POWER_COLLAPSE) {
-			l->notify_rpm = true;
-		}
+
 		if (l->l2_mode >= MSM_SPM_L2_MODE_GDHS)
 			l->sync = true;
 
@@ -1018,6 +1069,9 @@ static int lpm_system_probe(struct platform_device *pdev)
 	}
 	sys_state.system_level = level;
 	sys_state.num_system_levels = num_levels;
+#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+	sys_state.last_entered_cluster_index = -1;
+#endif
 	return ret;
 fail:
 	kfree(level);
@@ -1079,6 +1133,10 @@ static int lpm_probe(struct platform_device *pdev)
 	get_cpu();
 	on_each_cpu(setup_broadcast_timer, (void *)true, 1);
 	put_cpu();
+	if (num_online_cpus() == 1)
+		allowed_l2_mode = MSM_SPM_L2_MODE_POWER_COLLAPSE;
+	else
+		allowed_l2_mode = default_l2_mode;
 
 	register_hotcpu_notifier(&lpm_cpu_nblk);
 

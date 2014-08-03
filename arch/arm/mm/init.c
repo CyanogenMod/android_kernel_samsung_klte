@@ -497,6 +497,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 	if (mdesc->reserve)
 		mdesc->reserve();
 
+#if 1 //def CONFIG_SEC_DEBUG
+#ifndef CONFIG_SECURE_MPU_LOCK
+	/* Debugging code for ext4 panic issue during eMBMS service(H KT)
+	   This will be backed out later */
+	memblock_reserve(0x0, PAGE_SIZE);
+#endif
+#endif
+
 	/*
 	 * reserve memory for DMA contigouos allocations,
 	 * must come from DMA area inside low memory

@@ -435,6 +435,9 @@ void msm_gpio_show_resume_irq(void)
 	unsigned long irq_flags;
 	int i, irq, intstat;
 	int ngpio = msm_gpio.gpio_chip.ngpio;
+#ifdef CONFIG_SEC_PM_DEBUG
+	struct irq_desc *desc;
+#endif
 
 	if (!msm_show_resume_irq_mask)
 		return;
@@ -444,8 +447,15 @@ void msm_gpio_show_resume_irq(void)
 		intstat = __msm_gpio_get_intr_status(i);
 		if (intstat) {
 			irq = msm_gpio_to_irq(&msm_gpio.gpio_chip, i);
-			pr_warning("%s: %d triggered\n",
-				__func__, irq);
+#ifdef CONFIG_SEC_PM_DEBUG
+			desc = irq_to_desc(irq);
+			if (desc && desc->action && desc->action->name)
+				pr_warning("%s: %d(%s) gpio-%d\n", __func__,
+						irq, desc->action->name, i);
+			else
+#endif
+				pr_warning("%s: %d(gpio-%d) triggered\n",
+						__func__, irq, i);
 		}
 	}
 	spin_unlock_irqrestore(&tlmm_lock, irq_flags);

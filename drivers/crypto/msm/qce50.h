@@ -113,10 +113,6 @@ struct qce_cmdlistptr_ops {
 	struct qce_cmdlist_info aead_hmac_sha1_ecb_3des;
 	struct qce_cmdlist_info aead_aes_128_ccm;
 	struct qce_cmdlist_info aead_aes_256_ccm;
-	struct qce_cmdlist_info f8_kasumi;
-	struct qce_cmdlist_info f8_snow3g;
-	struct qce_cmdlist_info f9_kasumi;
-	struct qce_cmdlist_info f9_snow3g;
 	struct qce_cmdlist_info unlock_all_pipes;
 };
 
@@ -144,8 +140,6 @@ struct qce_ce_cfg_reg_setting {
 
 	uint32_t encr_cfg_3des_cbc;
 	uint32_t encr_cfg_3des_ecb;
-	uint32_t encr_cfg_kasumi;
-	uint32_t encr_cfg_snow3g;
 
 	uint32_t auth_cfg_cmac_128;
 	uint32_t auth_cfg_cmac_256;
@@ -160,8 +154,7 @@ struct qce_ce_cfg_reg_setting {
 	uint32_t auth_cfg_aes_ccm_256;
 	uint32_t auth_cfg_aead_sha1_hmac;
 	uint32_t auth_cfg_aead_sha256_hmac;
-	uint32_t auth_cfg_kasumi;
-	uint32_t auth_cfg_snow3g;
+
 };
 
 /* DM data structure with buffers, commandlists & commmand pointer lists */

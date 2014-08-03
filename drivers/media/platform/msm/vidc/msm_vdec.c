@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,12 +21,21 @@
 
 #define MSM_VDEC_DVC_NAME "msm_vdec_8974"
 #define MIN_NUM_OUTPUT_BUFFERS 4
+#if defined(CONFIG_MACH_KLTE_DCM)
+//Kishore MSM Patch https://www.codeaurora.org/cgit/quic/la//kernel/msm/commit/?id=0b07789494d4d3a96bba5d60e6783ae6ea69ecf5
+#define MAX_NUM_OUTPUT_BUFFERS VIDEO_MAX_FRAME
+#else
 #define MAX_NUM_OUTPUT_BUFFERS 6
+#endif /* defined(CONFIG_MACH_KLTE_DCM) */
 #define DEFAULT_VIDEO_CONCEAL_COLOR_BLACK 0x8080
 
+#define TZ_INFO_GET_FEATURE_VERSION_ID 0x3
 #define TZ_DYNAMIC_BUFFER_FEATURE_ID 12
 #define TZ_FEATURE_VERSION(major, minor, patch) \
 	(((major & 0x3FF) << 22) | ((minor & 0x3FF) << 12) | (patch & 0xFFF))
+struct tz_get_feature_version {
+	u32 feature_id;
+};
 
 enum msm_vdec_ctrl_cluster {
 	MSM_VDEC_CTRL_CLUSTER_MAX = 1 << 0,
@@ -574,15 +583,7 @@ int msm_vdec_release_buf(struct msm_vidc_inst *inst,
 				core);
 		goto exit;
 	}
-	if (!inst->in_reconfig) {
-		rc = msm_comm_try_state(inst, MSM_VIDC_RELEASE_RESOURCES_DONE);
-		if (rc) {
-			dprintk(VIDC_ERR,
-				"Failed to move inst: %p to relase res done\n",
-				inst);
-			goto exit;
-		}
-	}
+
 	switch (b->type) {
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
 		break;
@@ -684,8 +685,6 @@ int msm_vdec_reqbufs(struct msm_vidc_inst *inst, struct v4l2_requestbuffers *b)
 	mutex_lock(&q->lock);
 	rc = vb2_reqbufs(&q->vb2_bufq, b);
 	mutex_unlock(&q->lock);
-	if (rc)
-		dprintk(VIDC_ERR, "Failed to get reqbufs, %d\n", rc);
 	return rc;
 }
 
@@ -1531,16 +1530,17 @@ static inline enum buffer_mode_type get_buf_type(int val)
 static int check_tz_dynamic_buffer_support(void)
 {
 	int rc = 0;
-	int version = scm_get_feat_version(TZ_DYNAMIC_BUFFER_FEATURE_ID);
+	struct tz_get_feature_version tz_feature_id;
+	unsigned int resp = 0;
 
-	/*
-	 * if the version is < 1.1.0 then dynamic buffer allocation is
-	 * not supported
-	 */
-	if (version < TZ_FEATURE_VERSION(1, 1, 0)) {
+	tz_feature_id.feature_id = TZ_DYNAMIC_BUFFER_FEATURE_ID;
+	rc = scm_call(SCM_SVC_INFO,
+		  TZ_INFO_GET_FEATURE_VERSION_ID, &tz_feature_id,
+		  sizeof(tz_feature_id), &resp, sizeof(resp));
+	if ((rc) || (resp != TZ_FEATURE_VERSION(1, 1, 0))) {
 		dprintk(VIDC_DBG,
-			"Dynamic buffer mode not supported, tz version is : %u vs required : %u\n",
-			version, TZ_FEATURE_VERSION(1, 1, 0));
+			"Dyamic buffer mode not supported, failed to get tz feature version id : %u, rc : %d, response : %u\n",
+			tz_feature_id.feature_id, rc, resp);
 		rc = -ENOTSUPP;
 	}
 	return rc;
@@ -1743,17 +1743,17 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 					"Failed :Disabling OUTPUT port : %d\n",
 					rc);
 			break;
+		case V4L2_CID_MPEG_VIDC_VIDEO_CONCEAL_COLOR:
+			property_id = HAL_PARAM_VDEC_CONCEAL_COLOR;
+			property_val = ctrl->val;
+			pdata = &property_val;
+			break;				
 		default:
 			dprintk(VIDC_ERR,
 				"Failed : Unsupported multi stream setting\n");
 			rc = -ENOTSUPP;
 			break;
 		}
-		break;
-	case V4L2_CID_MPEG_VIDC_VIDEO_CONCEAL_COLOR:
-		property_id = HAL_PARAM_VDEC_CONCEAL_COLOR;
-		property_val = ctrl->val;
-		pdata = &property_val;
 		break;
 	default:
 		break;

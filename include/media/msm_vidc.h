@@ -7,8 +7,8 @@
 #include <linux/videodev2.h>
 
 enum core_id {
-	MSM_VIDC_CORE_VENUS = 0,
-	MSM_VIDC_CORE_Q6,
+	MSM_VIDC_CORE_0 = 0,
+	MSM_VIDC_CORE_1,      /* for Q6 core */
 	MSM_VIDC_CORES_MAX,
 };
 
@@ -23,20 +23,20 @@ enum session_type {
  * in arch/arm/boot/dts/<arch>.dtsi
  */
 enum hal_buffer {
-	HAL_BUFFER_INPUT = 0x1,
-	HAL_BUFFER_OUTPUT = 0x2,
-	HAL_BUFFER_OUTPUT2 = 0x4,
-	HAL_BUFFER_EXTRADATA_INPUT = 0x8,
-	HAL_BUFFER_EXTRADATA_OUTPUT = 0x10,
-	HAL_BUFFER_EXTRADATA_OUTPUT2 = 0x20,
-	HAL_BUFFER_INTERNAL_SCRATCH = 0x40,
-	HAL_BUFFER_INTERNAL_SCRATCH_1 = 0x80,
-	HAL_BUFFER_INTERNAL_SCRATCH_2 = 0x100,
-	HAL_BUFFER_INTERNAL_PERSIST = 0x200,
-	HAL_BUFFER_INTERNAL_PERSIST_1 = 0x400,
-	HAL_BUFFER_INTERNAL_CMD_QUEUE = 0x800,
+		HAL_BUFFER_INPUT = 0x1,
+		HAL_BUFFER_OUTPUT = 0x2,
+		HAL_BUFFER_OUTPUT2 = 0x4,
+		HAL_BUFFER_EXTRADATA_INPUT = 0x8,
+		HAL_BUFFER_EXTRADATA_OUTPUT = 0x10,
+		HAL_BUFFER_EXTRADATA_OUTPUT2 = 0x20,
+		HAL_BUFFER_INTERNAL_SCRATCH = 0x40,
+		HAL_BUFFER_INTERNAL_SCRATCH_1 = 0x80,
+		HAL_BUFFER_INTERNAL_SCRATCH_2 = 0x100,
+		HAL_BUFFER_INTERNAL_PERSIST = 0x200,
+		HAL_BUFFER_INTERNAL_PERSIST_1 = 0x400,
+		HAL_BUFFER_INTERNAL_CMD_QUEUE = 0x800,
 };
-
+		
 struct msm_smem {
 	int mem_type;
 	size_t size;
@@ -89,7 +89,7 @@ void msm_vidc_smem_free(void *instance, struct msm_smem *mem);
 int msm_vidc_smem_cache_operations(void *instance,
 		struct msm_smem *mem, enum smem_cache_ops);
 struct msm_smem *msm_vidc_smem_user_to_kernel(void *instance,
-			int fd, u32 offset, enum hal_buffer buffer_type);
+					int fd, u32 offset, enum hal_buffer buffer_type);
 int msm_vidc_smem_get_domain_partition(void *instance,
 		u32 flags, enum hal_buffer buffer_type,
 		int *domain_num, int *partition_num);
@@ -160,7 +160,6 @@ struct msm_vidc_s3d_frame_packing_payload {
 	unsigned int fpa_repetition_period;
 	unsigned int fpa_extension_flag;
 };
-
 enum msm_vidc_extradata_type {
 	EXTRADATA_NONE = 0x00000000,
 	EXTRADATA_MB_QUANTIZATION = 0x00000001,

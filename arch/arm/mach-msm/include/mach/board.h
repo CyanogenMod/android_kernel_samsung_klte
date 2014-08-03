@@ -183,7 +183,7 @@ struct msm_gpio_set_tbl {
 };
 
 struct msm_camera_gpio_num_info {
-	uint16_t gpio_num[7];
+	uint16_t gpio_num[13];
 };
 
 struct msm_camera_gpio_conf {
@@ -513,10 +513,6 @@ struct msm_mhl_platform_data {
 /**
  * msm_i2c_platform_data: i2c-qup driver configuration data
  *
- * @clk_ctl_xfer : When true, the clocks's state (prepare_enable/
- *       unprepare_disable) is controlled by i2c-transaction's begining and
- *       ending. When false, the clock's state is controlled by runtime-pm
- *       events.
  * @active_only when set, votes when system active and removes the vote when
  *       system goes idle (optimises for performance). When unset, voting using
  *       runtime pm (optimizes for power).
@@ -525,7 +521,6 @@ struct msm_mhl_platform_data {
  */
 struct msm_i2c_platform_data {
 	int clk_freq;
-	bool clk_ctl_xfer;
 	uint32_t rmutex;
 	const char *rsl_id;
 	uint32_t pm_lat;
@@ -675,5 +670,18 @@ void msm_snddev_tx_route_deconfig(void);
 
 extern phys_addr_t msm_shared_ram_phys; /* defined in arch/arm/mach-msm/io.c */
 
+#if defined(CONFIG_BT_BCM4335) || defined(CONFIG_BT_BCM4339)
+void msm8974_bt_init(void);
+#endif
+
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || \
+    defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) || \
+    defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE)
+int brcm_wlan_init(void);
+int brcm_wifi_status_register(
+	void (*callback)(int card_present, void *dev_id),
+	void *dev_id, void *mmc_host);
+unsigned int brcm_wifi_status(struct device *dev);
+#endif
 
 #endif

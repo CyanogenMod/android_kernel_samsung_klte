@@ -9,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define SEC_FEATURE_USE_RT_MUTEX
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -28,7 +29,9 @@
 #include <mach/rpm-smd.h>
 #include <mach/rpm-regulator-smd.h>
 #include <mach/socinfo.h>
-
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+#include <linux/rtmutex.h>
+#endif
 /* Debug Definitions */
 
 enum {
@@ -160,9 +163,14 @@ struct rpm_vreg {
 	int			hpm_min_load;
 	int			enable_time;
 	struct spinlock		slock;
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	struct rt_mutex		mlock;
+#else
 	struct mutex		mlock;
+#endif
 	unsigned long		flags;
 	bool			sleep_request_sent;
+	bool			apps_only;
 	struct msm_rpm_request	*handle_active;
 	struct msm_rpm_request	*handle_sleep;
 };
@@ -220,7 +228,11 @@ static inline void rpm_vreg_lock(struct rpm_vreg *rpm_vreg)
 	if (rpm_vreg->allow_atomic)
 		spin_lock_irqsave(&rpm_vreg->slock, rpm_vreg->flags);
 	else
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+		rt_mutex_lock(&rpm_vreg->mlock);
+#else
 		mutex_lock(&rpm_vreg->mlock);
+#endif
 }
 
 static inline void rpm_vreg_unlock(struct rpm_vreg *rpm_vreg)
@@ -228,7 +240,11 @@ static inline void rpm_vreg_unlock(struct rpm_vreg *rpm_vreg)
 	if (rpm_vreg->allow_atomic)
 		spin_unlock_irqrestore(&rpm_vreg->slock, rpm_vreg->flags);
 	else
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+		rt_mutex_unlock(&rpm_vreg->mlock);
+#else
 		mutex_unlock(&rpm_vreg->mlock);
+#endif
 }
 
 static inline bool rpm_vreg_active_or_sleep_enabled(struct rpm_vreg *rpm_vreg)
@@ -238,6 +254,16 @@ static inline bool rpm_vreg_active_or_sleep_enabled(struct rpm_vreg *rpm_vreg)
 				& BIT(RPM_REGULATOR_PARAM_ENABLE)))
 	    || ((rpm_vreg->aggr_req_sleep.param[RPM_REGULATOR_PARAM_ENABLE])
 				&& (rpm_vreg->aggr_req_sleep.valid
+					& BIT(RPM_REGULATOR_PARAM_ENABLE)));
+}
+
+static inline bool rpm_vreg_shared_active_or_sleep_enabled_valid
+						(struct rpm_vreg *rpm_vreg)
+{
+	return !rpm_vreg->apps_only &&
+		((rpm_vreg->aggr_req_active.valid
+					& BIT(RPM_REGULATOR_PARAM_ENABLE))
+		 || (rpm_vreg->aggr_req_sleep.valid
 					& BIT(RPM_REGULATOR_PARAM_ENABLE)));
 }
 
@@ -660,7 +686,8 @@ static int rpm_vreg_set_voltage(struct regulator_dev *rdev, int min_uV,
 	 * if the regulator has been configured to always send voltage updates.
 	 */
 	if (reg->always_send_voltage
-	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg))
+	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg)
+	    || rpm_vreg_shared_active_or_sleep_enabled_valid(reg->rpm_vreg))
 		rc = rpm_vreg_aggregate_requests(reg);
 
 	if (rc) {
@@ -719,7 +746,8 @@ static int rpm_vreg_set_voltage_corner(struct regulator_dev *rdev, int min_uV,
 	 * updates.
 	 */
 	if (reg->always_send_voltage
-	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg))
+	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg)
+	    || rpm_vreg_shared_active_or_sleep_enabled_valid(reg->rpm_vreg))
 		rc = rpm_vreg_aggregate_requests(reg);
 
 	if (rc) {
@@ -774,7 +802,8 @@ static int rpm_vreg_set_voltage_floor_corner(struct regulator_dev *rdev,
 	 * voltage updates.
 	 */
 	if (reg->always_send_voltage
-	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg))
+	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg)
+	    || rpm_vreg_shared_active_or_sleep_enabled_valid(reg->rpm_vreg))
 		rc = rpm_vreg_aggregate_requests(reg);
 
 	if (rc) {
@@ -829,7 +858,8 @@ static int rpm_vreg_set_mode(struct regulator_dev *rdev, unsigned int mode)
 	 * current updates.
 	 */
 	if (reg->always_send_current
-	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg))
+	    || rpm_vreg_active_or_sleep_enabled(reg->rpm_vreg)
+	    || rpm_vreg_shared_active_or_sleep_enabled_valid(reg->rpm_vreg))
 		rc = rpm_vreg_aggregate_requests(reg);
 
 	if (rc) {
@@ -1579,6 +1609,7 @@ static int __devinit rpm_vreg_resource_probe(struct platform_device *pdev)
 	of_property_read_u32(node, "qcom,enable-time", &rpm_vreg->enable_time);
 	of_property_read_u32(node, "qcom,hpm-min-load",
 		&rpm_vreg->hpm_min_load);
+	rpm_vreg->apps_only = of_property_read_bool(node, "qcom,apps-only");
 
 	rpm_vreg->handle_active = msm_rpm_create_request(RPM_SET_ACTIVE,
 		resource_type, rpm_vreg->resource_id, RPM_REGULATOR_PARAM_MAX);
@@ -1604,7 +1635,11 @@ static int __devinit rpm_vreg_resource_probe(struct platform_device *pdev)
 	if (rpm_vreg->allow_atomic)
 		spin_lock_init(&rpm_vreg->slock);
 	else
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+		rt_mutex_init(&rpm_vreg->mlock);
+#else
 		mutex_init(&rpm_vreg->mlock);
+#endif
 
 	platform_set_drvdata(pdev, rpm_vreg);
 

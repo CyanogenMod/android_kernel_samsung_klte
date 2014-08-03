@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,7 +10,13 @@
  * GNU General Public License for more details.
  */
 
+#define SEC_FEATURE_USE_RT_MUTEX
+
 #define pr_fmt(fmt) "AXI: %s(): " fmt, __func__
+
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_MILLETLTE_COMMON)
+#define DEBUG_MSM_BUS_ARB_REQ
+#endif
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -21,6 +27,12 @@
 #include <linux/clk.h>
 #include <mach/msm_bus.h>
 #include "msm_bus_core.h"
+#ifdef DEBUG_MSM_BUS_ARB_REQ
+#include <asm/arch_timer.h>
+#endif
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+#include <linux/rtmutex.h>
+#endif
 
 #define INDEX_MASK 0x0000FFFF
 #define PNODE_MASK 0xFFFF0000
@@ -42,7 +54,11 @@
 #define IS_SLAVE_VALID(slv) \
 	(((slv >= MSM_BUS_SLAVE_FIRST) && (slv <= MSM_BUS_SLAVE_LAST)) ? 1 : 0)
 
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+static DEFINE_RT_MUTEX(msm_bus_lock);
+#else
 static DEFINE_MUTEX(msm_bus_lock);
+#endif
 
 /* This function uses shift operations to divide 64 bit value for higher
  * efficiency. The divisor expected are number of ports or bus-width.
@@ -297,6 +313,7 @@ static int getpath(int src, int dest)
 	return CREATE_PNODE_ID(src, pnode_num);
 }
 
+#ifdef CONFIG_BW_LIMITER_FIX
 static uint64_t get_node_maxib(struct msm_bus_inode_info *info)
 {
 	int i, ctx;
@@ -308,10 +325,11 @@ static uint64_t get_node_maxib(struct msm_bus_inode_info *info)
 	}
 
 	MSM_BUS_DBG("%s: Node %d numpnodes %d maxib %llu", __func__,
-		info->num_pnodes, info->node_info->id, maxib);
+	info->num_pnodes, info->node_info->id, maxib);
+
 	return maxib;
 }
-
+#endif
 /**
  * update_path() - Update the path with the bandwidth and clock values, as
  * requested by the client.
@@ -359,6 +377,17 @@ static int update_path(int curr, int pnode, uint64_t req_clk, uint64_t req_bw,
 		return -ENXIO;
 	}
 
+#ifndef CONFIG_BW_LIMITER_FIX
+	/**
+	 * If master supports dual configuration, check if
+	 * the configuration needs to be changed based on
+	 * incoming requests
+	 */
+	if (info->node_info->dual_conf)
+		fabdev->algo->config_master(fabdev, info,
+			req_clk, req_bw);
+#endif
+
 	info->link_info.sel_bw = &info->link_info.bw[ctx];
 	info->link_info.sel_clk = &info->link_info.clk[ctx];
 	*info->link_info.sel_bw += add_bw;
@@ -372,20 +401,22 @@ static int update_path(int curr, int pnode, uint64_t req_clk, uint64_t req_bw,
 	info->pnode[index].sel_clk = &info->pnode[index].clk[ctx &
 		cl_active_flag];
 	*info->pnode[index].sel_bw += add_bw;
+
+#ifdef CONFIG_BW_LIMITER_FIX
 	*info->pnode[index].sel_clk = req_clk;
 
 	/**
-	 * If master supports dual configuration, check if
-	 * the configuration needs to be changed based on
-	 * incoming requests
-	 */
+	* If master supports dual configuration, check if
+	* the configuration needs to be changed based on
+	* incoming requests
+	*/
 	if (info->node_info->dual_conf) {
 		uint64_t node_maxib = 0;
 		node_maxib = get_node_maxib(info);
 		fabdev->algo->config_master(fabdev, info,
 			node_maxib, req_bw);
 	}
-
+#endif
 	info->link_info.num_tiers = info->node_info->num_tiers;
 	info->link_info.tier = info->node_info->tier;
 	master_tiers = info->node_info->tier;
@@ -532,7 +563,11 @@ uint32_t msm_bus_scale_register_client(struct msm_bus_scale_pdata *pdata)
 		return 0;
 	}
 
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_lock(&msm_bus_lock);
+#else
 	mutex_lock(&msm_bus_lock);
+#endif
 	client->pdata = pdata;
 	client->curr = -1;
 	for (i = 0; i < pdata->usecase->num_paths; i++) {
@@ -588,17 +623,36 @@ uint32_t msm_bus_scale_register_client(struct msm_bus_scale_pdata *pdata)
 	}
 	msm_bus_dbg_client_data(client->pdata, MSM_BUS_DBG_REGISTER,
 		(uint32_t)client);
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_unlock(&msm_bus_lock);
+#else
 	mutex_unlock(&msm_bus_lock);
+#endif
 	MSM_BUS_DBG("ret: %u num_paths: %d\n", (uint32_t)client,
 		pdata->usecase->num_paths);
 	return (uint32_t)(client);
 err:
 	kfree(client->src_pnode);
 	kfree(client);
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_unlock(&msm_bus_lock);
+#else
 	mutex_unlock(&msm_bus_lock);
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(msm_bus_scale_register_client);
+
+#ifdef DEBUG_MSM_BUS_ARB_REQ
+static struct log_Ab_Ib{
+	int src;
+	int dst;
+	uint64_t ab;
+	uint64_t ib;
+	uint64_t cnt;
+	char name[20];
+}log_req[1001];
+#endif
 
 /**
  * msm_bus_scale_client_update_request() - Update the request for bandwidth
@@ -615,13 +669,19 @@ int msm_bus_scale_client_update_request(uint32_t cl, unsigned index)
 	int pnode, src, curr, ctx;
 	uint64_t req_clk, req_bw, curr_clk, curr_bw;
 	struct msm_bus_client *client = (struct msm_bus_client *)cl;
+#ifdef DEBUG_MSM_BUS_ARB_REQ
+	static int log_cnt = 0;
+#endif
 	if (IS_ERR_OR_NULL(client)) {
 		MSM_BUS_ERR("msm_bus_scale_client update req error %d\n",
 				(uint32_t)client);
 		return -ENXIO;
 	}
-
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_lock(&msm_bus_lock);
+#else
 	mutex_lock(&msm_bus_lock);
+#endif
 	if (client->curr == index)
 		goto err;
 
@@ -662,6 +722,28 @@ int msm_bus_scale_client_update_request(uint32_t cl, unsigned index)
 		pnode = client->src_pnode[i];
 		req_clk = client->pdata->usecase[index].vectors[i].ib;
 		req_bw = client->pdata->usecase[index].vectors[i].ab;
+
+#ifdef DEBUG_MSM_BUS_ARB_REQ
+		//Debug code to collect client info
+		{
+			struct msm_bus_fabric_device *fabdev_d = msm_bus_get_fabric_device(GET_FABID(src));
+			if (MSM_BUS_FAB_APPSS  == fabdev_d->id)
+			{
+				if (log_cnt >= 1000)
+					log_cnt = 0;
+				
+				log_req[log_cnt].ab = client->pdata->usecase[index].vectors[i].ab;
+				log_req[log_cnt].ib = client->pdata->usecase[index].vectors[i].ib;
+				log_req[log_cnt].src = client->pdata->usecase[index].vectors[i].src;
+				log_req[log_cnt].dst = client->pdata->usecase[index].vectors[i].dst;
+				log_req[log_cnt].cnt = arch_counter_get_cntpct(); 
+				strncpy(log_req[log_cnt].name, client->pdata->name, 19);
+				log_cnt++;
+				//printk("*** cl: %s ab: %llu ib: %llu\n", client->pdata->name, req_bw, req_clk);
+			}
+		}
+#endif
+
 		if (curr < 0) {
 			curr_clk = 0;
 			curr_bw = 0;
@@ -694,7 +776,11 @@ int msm_bus_scale_client_update_request(uint32_t cl, unsigned index)
 	bus_for_each_dev(&msm_bus_type, NULL, NULL, msm_bus_commit_fn);
 
 err:
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_unlock(&msm_bus_lock);
+#else
 	mutex_unlock(&msm_bus_lock);
+#endif
 	return ret;
 }
 EXPORT_SYMBOL(msm_bus_scale_client_update_request);
@@ -834,10 +920,18 @@ void msm_bus_scale_unregister_client(uint32_t cl)
 		msm_bus_scale_client_update_request(cl, 0);
 
 	MSM_BUS_DBG("Unregistering client %d\n", cl);
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_lock(&msm_bus_lock);
+#else
 	mutex_lock(&msm_bus_lock);
+#endif
 	msm_bus_scale_client_reset_pnodes(cl);
 	msm_bus_dbg_client_data(client->pdata, MSM_BUS_DBG_UNREGISTER, cl);
+#ifdef SEC_FEATURE_USE_RT_MUTEX
+	rt_mutex_unlock(&msm_bus_lock);
+#else
 	mutex_unlock(&msm_bus_lock);
+#endif
 	kfree(client->src_pnode);
 	kfree(client);
 }

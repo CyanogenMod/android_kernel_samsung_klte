@@ -204,6 +204,11 @@ int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 	int i = 0, rc = 0;
 	if (enable) {
 		for (i = 0; i < num_vreg; i++) {
+#ifdef CONFIG_MACH_MONDRIAN
+			if(!strncmp(in_vreg[i].vreg_name, "vdd", 4)) {
+				continue;
+			}
+#endif
 			rc = PTR_RET(in_vreg[i].vreg);
 			if (rc) {
 				DEV_ERR("%pS->%s: %s regulator error. rc=%d\n",
@@ -234,6 +239,11 @@ int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 	} else {
 		for (i = num_vreg-1; i >= 0; i--)
 			if (regulator_is_enabled(in_vreg[i].vreg)) {
+#ifdef CONFIG_MACH_MONDRIAN
+			if(!strncmp(in_vreg[i].vreg_name, "vdd", 4)) {
+				continue;
+			}
+#endif
 				if (in_vreg[i].pre_off_sleep)
 					msleep(in_vreg[i].pre_off_sleep);
 				regulator_set_optimum_mode(in_vreg[i].vreg,

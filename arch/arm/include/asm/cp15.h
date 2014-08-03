@@ -52,6 +52,94 @@ static inline unsigned int get_cr(void)
 	return val;
 }
 
+#ifdef CONFIG_TIMA_RKP
+#ifdef CONFIG_TIMA_RKP_DEBUG
+//extern unsigned long *l2_mmap_ptr;
+int tima_debug_page_protection(unsigned long va, unsigned long caller, unsigned long readonly);
+void tima_debug_signal_failure(unsigned long signal, unsigned long caller);
+#endif 
+void tima_dump_log2(void);
+void tima_verify_state(unsigned long pmdp, unsigned long val, unsigned long rd_only, unsigned long caller);
+int tima_is_pg_protected(unsigned long va);
+
+static inline void tima_send_cmd (unsigned int r2val, unsigned int cmdid)
+{
+	asm volatile (
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        ".arch_extension sec\n"
+#endif	
+	    "stmfd   sp!, {r0-r3, r11}\n"
+        "mov     r11, r0\n"
+        "mov     r2, %0\n" 
+		"mov     r0, %1\n"
+		"smc     #1\n" 
+        "ldmfd   sp!, {r0-r3, r11}" : : "r" (r2val), "r" (cmdid) : "r0","r2","cc");
+}
+static inline void tima_send_cmd2 (unsigned int p1, unsigned int p2, unsigned int cmdid)
+{
+	asm volatile (
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        ".arch_extension sec\n"
+#endif	
+	"stmfd   sp!, {r0-r3, r11}\n"
+        "mov     r11, r0\n"
+        "mov     r2, %0\n"
+	"mov     r3, %1\n"  
+	"mov     r0, %2\n"
+	"smc     #1\n" 
+        "ldmfd   sp!, {r0-r3, r11}" : : "r" (p1), "r" (p2), "r" (cmdid) : "r0","r2","r3","cc");
+}
+static inline void tima_send_cmd3 (unsigned int p1, unsigned int p2, unsigned int p3, unsigned int cmdid)
+{
+	asm volatile (
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        ".arch_extension sec\n"
+#endif	
+	"stmfd   sp!, {r0-r4, r11}\n"
+        "mov     r11, r0\n"
+        "mov     r2, %0\n"
+	"mov     r3, %1\n"  
+	"mov     r4, %2\n"  
+	"mov     r0, %3\n"
+	"smc     #1\n" 
+        "ldmfd   sp!, {r0-r4, r11}" : : "r" (p1), "r" (p2), "r" (p3), "r" (cmdid) : "r0","r2","r3","r4","cc");
+}
+static inline void tima_send_cmd4 (unsigned int p1, unsigned int p2, unsigned int p3, unsigned int p4, unsigned int cmdid)
+{
+	asm volatile (
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        ".arch_extension sec\n"
+#endif	
+	"stmfd   sp!, {r0-r5, r11}\n"
+        "mov     r11, r0\n"
+        "mov     r2, %0\n"
+	"mov     r3, %1\n"  
+	"mov     r4, %2\n"  
+	"mov     r5, %3\n"  
+	"mov     r0, %4\n"
+	"smc     #1\n" 
+        "ldmfd   sp!, {r0-r5, r11}" : : "r" (p1), "r" (p2), "r" (p3), "r" (p4), "r" (cmdid) : "r0","r2","r3","r4","r5","cc");
+}
+
+static inline void tima_send_cmd5 (unsigned int p1, unsigned int p2, unsigned int p3, unsigned int p4, unsigned int p5,unsigned int cmdid)
+{
+	asm volatile (
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
+        ".arch_extension sec\n"
+#endif	
+	"stmfd   sp!, {r0-r6, r11}\n"
+        "mov     r11, r0\n"
+        "mov     r2, %0\n"
+	"mov     r3, %1\n"  
+	"mov     r4, %2\n"  
+	"mov     r5, %3\n"  
+	"mov     r6, %4\n"  
+	"mov     r0, %5\n"
+	"smc     #1\n" 
+        "ldmfd   sp!, {r0-r6, r11}" : : "r" (p1), "r" (p2), "r" (p3), "r" (p4), "r" (p5),"r" (cmdid) : "r0","r2","r3","r4","r5","r6","cc");
+}
+
+#endif	/* CONFIG_TIMA_RKP */
 static inline void set_cr(unsigned int val)
 {
 	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"

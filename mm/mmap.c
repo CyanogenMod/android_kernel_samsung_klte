@@ -37,6 +37,9 @@
 #include <asm/mmu_context.h>
 
 #include "internal.h"
+#ifdef CONFIG_SDCARD_FS
+#include "../fs/sdcardfs/sdcardfs.h"
+#endif
 
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
@@ -963,6 +966,11 @@ static unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	int error;
 	unsigned long reqprot = prot;
 
+#ifdef CONFIG_SDCARD_FS
+	if (file && (file->f_path.mnt->mnt_sb->s_magic == SDCARDFS_SUPER_MAGIC))
+		file = sdcardfs_lower_file(file);
+#endif
+
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?
 	 *
@@ -1358,6 +1366,43 @@ munmap_back:
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 	file = vma->vm_file;
 
+#ifdef CONFIG_TIMA_RKP
+	if(file && (strcmp(current->comm, "zygote") == 0)){
+		char *tmp;
+		char *pathname;
+		struct path path;
+
+		path = file->f_path;
+		path_get(&file->f_path);
+
+		tmp = (char *)__get_free_page(GFP_TEMPORARY);
+
+		if (!tmp) {
+			path_put(&path);
+			return -ENOMEM;
+		}
+
+		pathname = d_path(&path, tmp, PAGE_SIZE);
+		path_put(&path);
+
+		if (IS_ERR(pathname)) {
+			free_page((unsigned long)tmp);
+			return PTR_ERR(pathname);
+		}
+		
+		if (strstr(pathname, "dalvik-heap") != NULL 
+				|| strstr(pathname, "dalvik-bitmap") != NULL
+				|| strstr(pathname, "dalvik-LinearAlloc") != NULL 
+				|| strstr(pathname, "dalvik-mark-stack") != NULL
+				|| strstr(pathname, "dalvik-card-table") != NULL) {
+			//printk("PROC %s\tFILE %s\tSTART %lx\tLEN %lx\n", current->comm, pathname, addr, len);
+			tima_send_cmd2(addr, len, 0x3f830221);
+		}
+
+		/* do something here with pathname */
+		free_page((unsigned long)tmp);
+	}
+#endif
 	/* Once vma denies write, undo our temporary denial count */
 	if (correct_wcount)
 		atomic_inc(&inode->i_writecount);

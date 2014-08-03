@@ -505,6 +505,7 @@ struct hid_device {							/* device report descriptor */
 
 	struct list_head inputs;					/* The list of inputs */
 	void *hiddev;							/* The hiddev structure */
+	void *hidovr;
 	void *hidraw;
 	int minor;							/* Hiddev minor number */
 

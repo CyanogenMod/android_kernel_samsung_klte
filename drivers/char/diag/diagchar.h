@@ -398,6 +398,8 @@ struct diagchar_dev {
 	int logging_process_id;
 	struct task_struct *socket_process;
 	struct task_struct *callback_process;
+	/* pid for diag_mdlog(CP silent log app) */
+	struct pid *silent_log_pid;
 #ifdef CONFIG_DIAG_SDIO_PIPE
 	unsigned char *buf_in_sdio;
 	unsigned char *usb_buf_mdm_out;

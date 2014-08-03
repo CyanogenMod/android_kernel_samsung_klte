@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -90,10 +90,16 @@
 #define Q_REG_SRC_SEL_MASK		0xE
 #define Q_REG_MODE_SEL_SHIFT		4
 #define Q_REG_MODE_SEL_MASK		0x70
+#define Q_REG_INVERT_SHIFT		Q_REG_OUT_INVERT_SHIFT
+#define Q_REG_INVERT_MASK		Q_REG_OUT_INVERT_MASK
+#define Q_REG_MODE_SHIFT		Q_REG_MODE_SEL_SHIFT
+#define Q_REG_MODE_MASK			Q_REG_MODE_SEL_MASK
 
 /* control reg: dig_vin */
 #define Q_REG_VIN_SHIFT			0
 #define Q_REG_VIN_MASK			0x7
+#define Q_REG_VIN_SEL_SHIFT		Q_REG_VIN_SHIFT
+#define Q_REG_VIN_SEL_MASK		Q_REG_VIN_MASK
 
 /* control reg: dig_pull */
 #define Q_REG_PULL_SHIFT		0
@@ -104,6 +110,8 @@
 #define Q_REG_OUT_STRENGTH_MASK		0x3
 #define Q_REG_OUT_TYPE_SHIFT		4
 #define Q_REG_OUT_TYPE_MASK		0x30
+#define Q_REG_OUTPUT_TYPE_SHIFT		Q_REG_OUT_TYPE_SHIFT
+#define Q_REG_OUTPUT_TYPE_MASK		Q_REG_OUT_TYPE_MASK
 
 /* control reg: en */
 #define Q_REG_MASTER_EN_SHIFT		7
@@ -627,27 +635,10 @@ static int qpnp_pin_to_irq(struct gpio_chip *gpio_chip, unsigned offset)
 {
 	struct qpnp_pin_chip *q_chip = dev_get_drvdata(gpio_chip->dev);
 	struct qpnp_pin_spec *q_spec;
-	u32 intspec[3];
 
 	q_spec = qpnp_chip_gpio_get_spec(q_chip, offset);
 	if (!q_spec)
 		return -EINVAL;
-
-	/* if we have mapped this pin previously return the virq */
-	if (q_spec->irq)
-		return q_spec->irq;
-
-	/* call into irq_domain to get irq mapping */
-	intspec[0] = q_chip->spmi->sid;
-	intspec[1] = (q_spec->offset >> 8) & 0xFF;
-	intspec[2] = 0;
-	q_spec->irq = irq_create_of_mapping(q_chip->int_ctrl, intspec, 3);
-	if (!q_spec->irq) {
-		dev_err(&q_chip->spmi->dev, "%s: invalid irq for gpio %u\n",
-						__func__, q_spec->pmic_pin);
-		WARN_ON(1);
-		return -EINVAL;
-	}
 
 	return q_spec->irq;
 }
@@ -893,11 +884,16 @@ static int qpnp_pin_apply_config(struct qpnp_pin_chip *q_chip,
 static int qpnp_pin_free_chip(struct qpnp_pin_chip *q_chip)
 {
 	struct spmi_device *spmi = q_chip->spmi;
+	struct qpnp_pin_spec *q_spec = NULL;
 	int rc, i;
 
 	if (q_chip->chip_gpios)
-		for (i = 0; i < spmi->num_dev_node; i++)
+		for (i = 0; i < spmi->num_dev_node; i++) {
+			q_spec = qpnp_chip_gpio_get_spec(q_chip, i);
+			if (q_spec)
+				kfree(q_spec);
 			kfree(q_chip->chip_gpios[i]);
+		}
 
 	mutex_lock(&qpnp_pin_chips_lock);
 	list_del(&q_chip->chip_list);
@@ -1124,10 +1120,193 @@ dfs_err:
 	debugfs_remove_recursive(q_chip->dfs_dir);
 	return -ENFILE;
 }
+
+static const char * const qpnp_mode_str[] = {
+	"D_IN",
+	"D_OUT",
+	"D_INOUT",
+	"D_BI",
+	"A_IN",
+	"A_OUT",
+	"C_SINK",
+	"NA",
+};
+static const char * const qpnp_output_type_str[] = {
+	"CMOS",
+	"nMOS",
+	"pMOS",
+	"NA",
+};
+static const char * const qpnp_invert_str[] = {
+	"NORMAL",
+	"INVERT",
+};
+static const char * const qpnp_pull_str[] = {
+	"P_UP30",
+	"P_UP15",
+	"P_UP31",
+	"P_UPMAX",
+	"P_DOWN",
+	"NO_PULL",
+	"NA",
+	"NA",
+};
+static const char * const qpnp_vin_sel_str[] = {
+	"VIN0",
+	"VIN1",
+	"VIN2",
+	"VIN3",
+	"VIN4",
+	"VIN5",
+	"VIN6",
+	"VIN7",
+};
+static const char * const qpnp_out_strength_str[] = {
+	"NA",
+	"STR_LOW",
+	"STR_MID",
+	"STR_HIGH",
+};
+static const char * const qpnp_src_sel_str[] = {
+	"GND",
+	"PAIRED",
+	"FUNC1",
+	"FUNC2",
+	"DTEST1",
+	"DTEST2",
+	"DTEST3",
+	"DTEST4",
+};
+static const char * const qpnp_master_en_str[] = {
+	"HIGH-Z",
+	"GPIO",
+};
+static const char * const qpnp_aout_ref_str[] = {
+	"VREF1V25",
+	"NA", "NA", "NA", "NA", "NA", "NA", "NA",
+};
+static const char * const qpnp_ain_route_str[] = {
+	"HKADC5",
+	"HKADC6",
+	"HKADC7",
+	"HKADC8",
+	"NA", "NA", "NA", "NA",
+};
+static const char * const qpnp_cs_out_str[] = {
+	"SINK5",
+	"SINK10",
+	"SINK15",
+	"SINK20",
+	"SINK25",
+	"SINK30",
+	"SINK35",
+	"SINK40",
+};
+
+#define QPNP_PRINT_PARAM(m, q_spec, name, name2, val)	\
+	if (qpnp_pin_check_config(Q_PIN_CFG_##name, q_spec, 0) != -ENXIO) {	\
+		qpnp_pin_debugfs_get(&(q_spec->params[Q_PIN_CFG_##name]), &val);	\
+		if (val <= (Q_REG_##name##_MASK >> Q_REG_##name##_SHIFT))	\
+			seq_printf(m, "%10s", qpnp_##name2##_str[val]);	\
+		else	\
+			seq_printf(m, "%10s", "ERR");	\
+	}
+
+static int qpnp_debug_showall(struct seq_file *m, void *unused)
+{
+	int i;
+	u64 val;
+	struct qpnp_pin_chip *q_chip;
+	struct qpnp_pin_spec *q_spec = NULL;
+
+	mutex_lock(&qpnp_pin_chips_lock);
+	list_for_each_entry(q_chip, &qpnp_pin_chips, chip_list) {
+		for (i = 0; i < q_chip->spmi->num_dev_node; i++) {
+			q_spec = qpnp_chip_gpio_get_spec(q_chip, i);
+			seq_printf(m, "%s-%02d", q_chip->gpio_chip.label, i + 1);
+
+			QPNP_PRINT_PARAM(m, q_spec, MODE, mode, val);
+			QPNP_PRINT_PARAM(m, q_spec, OUTPUT_TYPE, output_type, val);
+			QPNP_PRINT_PARAM(m, q_spec, INVERT, invert, val);
+			QPNP_PRINT_PARAM(m, q_spec, PULL, pull, val);
+			QPNP_PRINT_PARAM(m, q_spec, VIN_SEL, vin_sel, val);
+			QPNP_PRINT_PARAM(m, q_spec, OUT_STRENGTH, out_strength, val);
+			QPNP_PRINT_PARAM(m, q_spec, SRC_SEL, src_sel, val);
+			QPNP_PRINT_PARAM(m, q_spec, MASTER_EN, master_en, val);
+			QPNP_PRINT_PARAM(m, q_spec, AOUT_REF, aout_ref, val);
+			QPNP_PRINT_PARAM(m, q_spec, AIN_ROUTE, ain_route, val);
+			QPNP_PRINT_PARAM(m, q_spec, CS_OUT, cs_out, val);
+
+			seq_printf(m, "\n");
+		}
+		seq_printf(m, "\n");
+	}
+	mutex_unlock(&qpnp_pin_chips_lock);
+
+	return 0;
+}
+
+static int qpnp_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, qpnp_debug_showall, inode->i_private);
+}
+
+static const struct file_operations qpnp_debug_fops = {
+	.open		= qpnp_debug_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+#define QPNP_PRINT_PARAM2(q_spec, name, name2, val)	\
+	if (qpnp_pin_check_config(Q_PIN_CFG_##name, q_spec, 0) != -ENXIO) {	\
+		qpnp_pin_debugfs_get(&(q_spec->params[Q_PIN_CFG_##name]), &val);	\
+		if (val <= (Q_REG_##name##_MASK >> Q_REG_##name##_SHIFT))	\
+			pr_cont("%10s", qpnp_##name2##_str[val]);	\
+		else	\
+			pr_cont("%10s", "ERR");	\
+	}
+
+void qpnp_debug_suspend_show(void)
+{
+	int i;
+	u64 val;
+	struct qpnp_pin_chip *q_chip;
+	struct qpnp_pin_spec *q_spec = NULL;
+
+	mutex_lock(&qpnp_pin_chips_lock);
+	list_for_each_entry(q_chip, &qpnp_pin_chips, chip_list) {
+		for (i = 0; i < q_chip->spmi->num_dev_node; i++) {
+			q_spec = qpnp_chip_gpio_get_spec(q_chip, i);
+			pr_cont("%s-%02d", q_chip->gpio_chip.label, i + 1);
+
+			QPNP_PRINT_PARAM2(q_spec, MODE, mode, val);
+			QPNP_PRINT_PARAM2(q_spec, OUTPUT_TYPE, output_type, val);
+			QPNP_PRINT_PARAM2(q_spec, INVERT, invert, val);
+			QPNP_PRINT_PARAM2(q_spec, PULL, pull, val);
+			QPNP_PRINT_PARAM2(q_spec, VIN_SEL, vin_sel, val);
+			QPNP_PRINT_PARAM2(q_spec, OUT_STRENGTH, out_strength, val);
+			QPNP_PRINT_PARAM2(q_spec, SRC_SEL, src_sel, val);
+			QPNP_PRINT_PARAM2(q_spec, MASTER_EN, master_en, val);
+			QPNP_PRINT_PARAM2(q_spec, AOUT_REF, aout_ref, val);
+			QPNP_PRINT_PARAM2(q_spec, AIN_ROUTE, ain_route, val);
+			QPNP_PRINT_PARAM2(q_spec, CS_OUT, cs_out, val);
+
+			pr_cont("\n");
+		}
+	}
+	mutex_unlock(&qpnp_pin_chips_lock);
+
+	return;
+}
 #else
 static int qpnp_pin_debugfs_create(struct qpnp_pin_chip *q_chip)
 {
 	return 0;
+}
+void qpnp_debug_suspend_show(void)
+{
+	return;
 }
 #endif
 
@@ -1161,7 +1340,7 @@ static int qpnp_pin_probe(struct spmi_device *spmi)
 	struct spmi_resource *d_node;
 	int i, rc;
 	int lowest_gpio = UINT_MAX, highest_gpio = 0;
-	u32 gpio;
+	u32 intspec[3], gpio;
 	char version[Q_REG_SUBTYPE - Q_REG_DIG_MAJOR_REV + 1];
 	const char *dev_name;
 
@@ -1296,6 +1475,18 @@ static int qpnp_pin_probe(struct spmi_device *spmi)
 		if (rc)
 			goto err_probe;
 
+		/* call into irq_domain to get irq mapping */
+		intspec[0] = q_chip->spmi->sid;
+		intspec[1] = (q_spec->offset >> 8) & 0xFF;
+		intspec[2] = 0;
+		q_spec->irq = irq_create_of_mapping(q_chip->int_ctrl,
+							intspec, 3);
+		if (!q_spec->irq) {
+			dev_err(&spmi->dev, "%s: invalid irq for gpio %u\n",
+								__func__, gpio);
+			rc = -EINVAL;
+			goto err_probe;
+		}
 		/* initialize lookup table params */
 		qpnp_pmic_pin_set_spec(q_chip, gpio, q_spec);
 		qpnp_chip_gpio_set_spec(q_chip, i, q_spec);
@@ -1392,6 +1583,9 @@ static int __init qpnp_pin_init(void)
 	driver_dfs_dir = debugfs_create_dir("qpnp_pin", NULL);
 	if (driver_dfs_dir == NULL)
 		pr_err("Cannot register top level debugfs directory\n");
+
+	debugfs_create_file("all", S_IRUGO,
+			driver_dfs_dir, NULL, &qpnp_debug_fops);
 #endif
 
 	return spmi_driver_register(&qpnp_pin_driver);

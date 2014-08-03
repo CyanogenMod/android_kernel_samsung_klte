@@ -26,23 +26,25 @@ struct msm_actuator_ctrl_t;
 
 struct msm_actuator_func_tbl {
 	int32_t (*actuator_i2c_write_b_af)(struct msm_actuator_ctrl_t *,
-			uint8_t,
-			uint8_t);
+					   uint8_t,
+					   uint8_t);
 	int32_t (*actuator_init_step_table)(struct msm_actuator_ctrl_t *,
-		struct msm_actuator_set_info_t *);
+					    struct msm_actuator_set_info_t *);
 	int32_t (*actuator_init_focus)(struct msm_actuator_ctrl_t *,
-		uint16_t, enum msm_actuator_data_type, struct reg_settings_t *);
+				       uint16_t, enum msm_actuator_data_type, struct reg_settings_t *);
 	int32_t (*actuator_set_default_focus) (struct msm_actuator_ctrl_t *,
-			struct msm_actuator_move_params_t *);
+					       struct msm_actuator_move_params_t *);
 	int32_t (*actuator_move_focus) (struct msm_actuator_ctrl_t *,
-			struct msm_actuator_move_params_t *);
+					struct msm_actuator_move_params_t *);
 	void (*actuator_parse_i2c_params)(struct msm_actuator_ctrl_t *,
-			int16_t, uint32_t, uint16_t);
+					  int16_t, uint32_t, uint16_t);
 	void (*actuator_write_focus)(struct msm_actuator_ctrl_t *,
-			uint16_t,
-			struct damping_params_t *,
-			int8_t,
-			int16_t);
+				     uint16_t,
+				     struct damping_params_t *,
+				     int8_t,
+				     int16_t);
+	int32_t (*actuator_set_position)(struct msm_actuator_ctrl_t *,
+					 struct msm_actuator_set_position_t *);
 };
 
 struct msm_actuator {
@@ -81,6 +83,7 @@ struct msm_actuator_ctrl_t {
 	uint16_t i2c_tbl_index;
 	enum cci_i2c_master_t cci_master;
 	uint32_t subdev_id;
+	struct msm_camera_gpio_conf *gpio_conf;
 };
 
 #endif

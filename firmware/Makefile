@@ -30,6 +30,7 @@ fw-shipped-$(CONFIG_3C359) += 3com/3C359.bin
 fw-shipped-$(CONFIG_ACENIC) += $(acenic-objs)
 fw-shipped-$(CONFIG_ADAPTEC_STARFIRE) += adaptec/starfire_rx.bin \
 					 adaptec/starfire_tx.bin
+fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH) += abov/abov_tk.fw
 fw-shipped-$(CONFIG_ATARI_DSP56K) += dsp56k/bootstrap.bin
 fw-shipped-$(CONFIG_ATM_AMBASSADOR) += atmsar11.fw
 fw-shipped-$(CONFIG_BNX2X) += bnx2x/bnx2x-e1-6.2.9.0.fw \
@@ -141,7 +142,60 @@ fw-shipped-$(CONFIG_USB_VICAM) += vicam/firmware.fw
 fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
 
+# for IR LED FPGA
+fw-shipped-$(CONFIG_SEC_FPGA_ICE40XX) += ice40xx/i2c_top_bitmap_1.fw
+fw-shipped-$(CONFIG_SEC_FPGA_ICE40XX) += ice40xx/i2c_top_bitmap_2.fw
+
+# for TouchScreen
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_ij.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/mms252_el.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS144) += tsp_melfas/s3/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS144) += tsp_melfas/s3/PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS144) += tsp_melfas/s3/PUBL.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS134S) += tsp_melfas/kanas_mms134s_old.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS134S) += tsp_melfas/kanas_mms134s_new.fw
+
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_G)    += tsp_synaptics/synaptics_s5100_k_a2_fhd.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_G)    += tsp_synaptics/synaptics_s5100_k_a3.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)      += tsp_synaptics/synaptics_s5050_h.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= tsp_synaptics/synaptics_s5707.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= tsp_synaptics/synaptics_s5708.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_S5000) += tsp_synaptics/synaptics_b0_5_1.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_S5000) += tsp_synaptics/synaptics_b0_5_1_fac.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)      += tsp_synaptics/synaptics_s5050_f.fw
+
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S) += tsp_atmel/mXT1664S_v.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S) += tsp_atmel/mXT1664S_v2.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S) += tsp_atmel/mXT1664S_n.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S.fw
+
+fw-shipped-$(CONFIG_TOUCHSCREEN_FTS) += tsp_stm/stm.fw tsp_stm/stm_de.fw tsp_stm/stm_sync.fw
+
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY_H) += tkey/hlte_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY_C) += tkey/berluti_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY) += tkey/semco_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY) += tkey/semco02_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY) += tkey/semco04_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TOUCHKEY) += tkey/dtech_cypress_tkey.fw
+fw-shipped-$(CONFIG_KEYBOARD_CYPRESS_TKEY_HL) += tkey/fresco_n_cypress_tkey.fw
+
+fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9007A_0330.bin
+fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9007_0200.bin
+fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9007A_0267.bin
+fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9010_0174.bin
+fw-shipped-$(CONFIG_INPUT_WACOM) += epen/W9010_0208.bin
+fw-shipped-$(CONFIG_INPUT_WACOM_HL) += epen/W9001_fresco.bin
+
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
+
+#for sensorhub
+fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw ssp_rev03.fw
+ifndef CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE
+fw-shipped-$(CONFIG_SENSORS_SSP_STM) += ssp_stm.fw ssp_stm_rvs.fw ssp_stm_88921.fw ssp_stm_w2014.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_STM_32F) += ssp_stm32f.fw
+endif
+fw-shipped-$(CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE) += ssp_stm_bf.fw
+fw-shipped-$(CONFIG_SENSORS_SSP) += ssp_crashed.fw
 
 # Directories which we _might_ need to create, so we have a rule for them.
 firmware-dirs := $(sort $(addprefix $(objtree)/$(obj)/,$(dir $(fw-external-y) $(fw-shipped-all))))

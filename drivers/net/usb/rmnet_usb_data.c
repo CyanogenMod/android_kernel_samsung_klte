@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -362,9 +362,12 @@ static struct sk_buff *rmnet_usb_tx_fixup(struct usbnet *dev,
 	return skb;
 }
 
-static __be16 rmnet_ip_type_trans(struct sk_buff *skb)
+static __be16 rmnet_ip_type_trans(struct sk_buff *skb,
+	struct net_device *dev)
 {
 	__be16	protocol = 0;
+
+	skb->dev = dev;
 
 	switch (skb->data[0] & 0xf0) {
 	case 0x40:
@@ -401,6 +404,7 @@ static void rmnet_usb_rx_complete(struct urb *rx_urb)
 			/*map urb to actual network iface based on mux id*/
 			unet_id = unet_offset + mux_id;
 			skb->dev = unet_list[unet_id]->net;
+			entry->dev = unet_list[unet_id];
 		}
 	}
 
@@ -410,7 +414,7 @@ static void rmnet_usb_rx_complete(struct urb *rx_urb)
 static int rmnet_usb_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 {
 	if (test_bit(RMNET_MODE_LLP_IP, &dev->data[0]))
-		skb->protocol = rmnet_ip_type_trans(skb);
+		skb->protocol = rmnet_ip_type_trans(skb, dev->net);
 	else /*set zero for eth mode*/
 		skb->protocol = 0;
 

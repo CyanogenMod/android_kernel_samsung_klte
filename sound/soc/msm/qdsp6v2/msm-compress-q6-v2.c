@@ -409,11 +409,7 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 	case FORMAT_MPEG4_AAC:
 		memset(&aac_cfg, 0x0, sizeof(struct asm_aac_cfg));
 		aac_cfg.aot = AAC_ENC_MODE_EAAC_P;
-		if (prtd->codec_param.codec.format ==
-					SND_AUDIOSTREAMFORMAT_MP4ADTS)
-			aac_cfg.format = 0x0;
-		else
-			aac_cfg.format = 0x03;
+		aac_cfg.format = 0x03;
 		aac_cfg.ch_cfg = prtd->num_channels;
 		aac_cfg.sample_rate = prtd->sample_rate;
 		ret = q6asm_stream_media_format_block_aac(prtd->audio_client,
@@ -1565,7 +1561,7 @@ static int msm_compr_add_volume_control(struct snd_soc_pcm_runtime *rtd)
 		 rtd->pcm->device, suffix);
 	fe_volume_control[0].name = mixer_str;
 	fe_volume_control[0].private_value = rtd->dai_link->be_id;
-	pr_debug("Registering new mixer ctl %s", mixer_str);
+	pr_debug("Registering new mixer ctl %s\n", mixer_str);
 	snd_soc_add_platform_controls(rtd->platform, fe_volume_control,
 				      ARRAY_SIZE(fe_volume_control));
 	kfree(mixer_str);
@@ -1685,7 +1681,6 @@ static struct snd_soc_platform_driver msm_soc_platform = {
 	.pcm_new	= msm_compr_new,
 	.controls       = msm_compr_gapless_controls,
 	.num_controls   = ARRAY_SIZE(msm_compr_gapless_controls),
-
 };
 
 static __devinit int msm_compr_dev_probe(struct platform_device *pdev)

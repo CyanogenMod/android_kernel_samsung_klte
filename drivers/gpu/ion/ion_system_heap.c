@@ -355,16 +355,18 @@ static void ion_system_heap_destroy_pools(struct ion_page_pool **pools)
  * nothing. If it succeeds you'll eventually need to use
  * ion_system_heap_destroy_pools to destroy the pools.
  */
-static int ion_system_heap_create_pools(struct ion_page_pool **pools)
+static int ion_system_heap_create_pools(struct ion_page_pool **pools,
+					bool should_invalidate)
 {
 	int i;
 	for (i = 0; i < num_orders; i++) {
 		struct ion_page_pool *pool;
 		gfp_t gfp_flags = low_order_gfp_flags;
 
-		if (orders[i] > 4)
+		if (orders[i] > 0)
 			gfp_flags = high_order_gfp_flags;
-		pool = ion_page_pool_create(gfp_flags, orders[i]);
+		pool = ion_page_pool_create(gfp_flags, orders[i],
+					should_invalidate);
 		if (!pool)
 			goto err_create_pool;
 		pools[i] = pool;
@@ -395,10 +397,10 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *unused)
 	if (!heap->cached_pools)
 		goto err_alloc_cached_pools;
 
-	if (ion_system_heap_create_pools(heap->uncached_pools))
+	if (ion_system_heap_create_pools(heap->uncached_pools, false))
 		goto err_create_uncached_pools;
 
-	if (ion_system_heap_create_pools(heap->cached_pools))
+	if (ion_system_heap_create_pools(heap->cached_pools, true))
 		goto err_create_cached_pools;
 
 	heap->heap.shrinker.shrink = ion_system_heap_shrink;

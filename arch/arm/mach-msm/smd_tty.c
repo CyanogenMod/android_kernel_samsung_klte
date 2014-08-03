@@ -820,8 +820,11 @@ static int smd_tty_core_init(void)
 			/*
 			 * use legacy mode for 8660 Standalone (subtype 0)
 			 */
-			legacy_ds |= cpu_is_msm8x60() &&
+			legacy_ds |= (cpu_is_msm8x60() || soc_class_is_msm8974()) &&
 					(socinfo_get_platform_subtype() == 0x0);
+
+			/* Samsung request for all project */
+			legacy_ds = 1;
 
 			if (!legacy_ds)
 				continue;

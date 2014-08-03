@@ -45,10 +45,6 @@
 #undef MODULE_PARAM_PREFIX
 #define MODULE_PARAM_PREFIX "kgsl."
 
-#ifndef arch_mmap_check
-#define arch_mmap_check(addr, len, flags)	(0)
-#endif
-
 static int kgsl_pagetable_count = KGSL_PAGETABLE_COUNT;
 static char *ksgl_mmu_type;
 module_param_named(ptcount, kgsl_pagetable_count, int, 0);
@@ -1117,7 +1113,7 @@ err_stop:
 	if (device->open_count == 0) {
 		/* make sure power is on to stop the device */
 		kgsl_pwrctrl_enable(device);
-		device->ftbl->stop(device);
+		result = device->ftbl->stop(device);
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_INIT);
 		atomic_dec(&device->active_cnt);
 	}
@@ -1379,8 +1375,8 @@ static long kgsl_ioctl_device_setproperty(struct kgsl_device_private *dev_priv,
 
 	if (dev_priv->device->ftbl->setproperty)
 		result = dev_priv->device->ftbl->setproperty(
-			dev_priv->device, param->type,
-			param->value, param->sizebytes);
+			dev_priv, param->type, param->value,
+			param->sizebytes);
 
 	return result;
 }
@@ -3739,6 +3735,18 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_private_data = entry;
 
+#ifdef CONFIG_TIMA_RKP
+	if (vma->vm_end - vma->vm_start) {
+		/* iommu optimization- needs to be turned ON from
+		* the tz side.
+		*/
+		cpu_v7_tima_iommu_opt(vma->vm_start, vma->vm_end, (unsigned long)vma->vm_mm->pgd);
+		__asm__ __volatile__ (
+		"mcr    p15, 0, r0, c8, c3, 0\n"
+		"dsb\n"
+		"isb\n");
+	}
+#endif
 	/* Determine user-side caching policy */
 
 	cache = kgsl_memdesc_get_cachemode(&entry->memdesc);
@@ -3925,6 +3933,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		if (res == NULL) {
 			KGSL_DRV_ERR(device,
 			"Shader memory: platform_get_resource_byname failed\n");
+			status = -ENODEV;
+			goto error_pwrctrl_close;
 		}
 
 		else {
@@ -3937,6 +3947,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 					device->shader_mem_len,
 						device->name)) {
 			KGSL_DRV_ERR(device, "request_mem_region_failed\n");
+			status = -ENODEV;
+			goto error_pwrctrl_close;
 		}
 	}
 

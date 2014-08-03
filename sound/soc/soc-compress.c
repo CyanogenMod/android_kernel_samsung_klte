@@ -475,17 +475,13 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 	struct snd_soc_pcm_runtime *fe = cstream->private_data;
 	struct snd_pcm_substream *fe_substream = fe->pcm->streams[0].substream;
 	struct snd_soc_platform *platform = fe->platform;
-	struct snd_pcm_hw_params *hw_params;
+
 	int ret = 0, stream;
 
 	if (cstream->direction == SND_COMPRESS_PLAYBACK)
 		stream = SNDRV_PCM_STREAM_PLAYBACK;
 	else
 		stream = SNDRV_PCM_STREAM_CAPTURE;
-
-	hw_params = kzalloc(sizeof(*hw_params), GFP_KERNEL);
-	if (hw_params == NULL)
-		return -ENOMEM;
 
 	mutex_lock(&fe->card->dpcm_mutex);
 	/* first we call set_params for the platform driver
@@ -506,7 +502,7 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 			goto out;
 	}
 
-	memcpy(&fe->dpcm[fe_substream->stream].hw_params, params,
+	memset(&fe->dpcm[fe_substream->stream].hw_params, 0,
 			sizeof(struct snd_pcm_hw_params));
 
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_FE;

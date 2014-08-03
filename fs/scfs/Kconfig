@@ -1,0 +1,10 @@
+config SCFS
+	tristate "SCFS layer support (EXPERIMENTAL)"
+	help
+	  SCFS on the VFS layer.
+	  See <file:Documentation/filesystems/scfs.txt> for more info.
+
+config SYSTEM_COMPRESSED 
+	tristate "Flag to check system partition state"
+	help
+	 Flag to check system partition state 

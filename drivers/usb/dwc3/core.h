@@ -631,7 +631,6 @@ struct dwc3_request {
 
 	u8			epnum;
 	struct dwc3_trb		*trb;
-	struct dwc3_trb		*ztrb;
 	dma_addr_t		trb_dma;
 
 	unsigned		direction:1;
@@ -781,6 +780,12 @@ struct dwc3 {
 	/* Indicate if software connect was issued by the usb_gadget_driver */
 	bool			softconnect;
 	void (*notify_event) (struct dwc3 *, unsigned);
+#if defined(CONFIG_SEC_H_PROJECT) || defined(CONFIG_SEC_F_PROJECT) || defined(CONFIG_SEC_K_PROJECT)
+	enum usb_device_speed	speed_limit;
+	struct work_struct reconnect_work;
+	int			ss_host_avail;
+	bool		reconnect;
+#endif
 	int			tx_fifo_size;
 	bool			tx_fifo_reduced;
 };

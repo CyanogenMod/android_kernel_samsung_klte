@@ -79,6 +79,11 @@ static int dwc3_otg_set_suspend(struct usb_phy *phy, int suspend)
 	struct usb_otg *otg = phy->otg;
 	struct dwc3_otg *dotg = container_of(otg, struct dwc3_otg, otg);
 
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(otg->phy->dev, "%s host_bus_suspend=%d suspend=%d\n",
+		__func__, dotg->host_bus_suspend, suspend);
+#endif
+
 	if (dotg->host_bus_suspend == suspend)
 		return 0;
 
@@ -183,6 +188,7 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 	if (!dwc->xhci)
 		return -EINVAL;
 
+#ifdef CONFIG_CHARGER_PM8941
 	if (!dotg->vbus_otg) {
 		dotg->vbus_otg = devm_regulator_get(dwc->dev->parent,
 							"vbus_dwc3");
@@ -193,9 +199,14 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 			return ret;
 		}
 	}
+#endif
 
 	if (on) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(otg->phy->dev, "%s: turn on host\n", __func__);
+#else
 		dev_dbg(otg->phy->dev, "%s: turn on host\n", __func__);
+#endif
 
 		/*
 		 * This should be revisited for more testing post-silicon.
@@ -226,24 +237,32 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 		}
 
 		dwc3_otg_notify_host_mode(otg, on);
+#ifdef CONFIG_CHARGER_PM8941
 		ret = regulator_enable(dotg->vbus_otg);
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
 			platform_device_del(dwc->xhci);
 			return ret;
 		}
+#endif
 
 		/* re-init OTG EVTEN register as XHCI reset clears it */
 		if (ext_xceiv && !ext_xceiv->otg_capability)
 			dwc3_otg_reset(dotg);
 	} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(otg->phy->dev, "%s: turn off host\n", __func__);
+#else
 		dev_dbg(otg->phy->dev, "%s: turn off host\n", __func__);
+#endif
 
+#ifdef CONFIG_CHARGER_PM8941
 		ret = regulator_disable(dotg->vbus_otg);
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to disable vbus_otg\n");
 			return ret;
 		}
+#endif
 		dwc3_otg_notify_host_mode(otg, on);
 
 		platform_device_del(dwc->xhci);
@@ -315,9 +334,13 @@ static int dwc3_otg_start_peripheral(struct usb_otg *otg, int on)
 		return -EINVAL;
 
 	if (on) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(otg->phy->dev, "%s: turn on gadget %s\n",
+					__func__, otg->gadget->name);
+#else
 		dev_dbg(otg->phy->dev, "%s: turn on gadget %s\n",
 					__func__, otg->gadget->name);
-
+#endif
 		/* Core reset is not required during start peripheral. Only
 		 * DBM reset is required, hence perform only DBM reset here */
 		if (ext_xceiv && ext_xceiv->otg_capability &&
@@ -328,8 +351,13 @@ static int dwc3_otg_start_peripheral(struct usb_otg *otg, int on)
 		dwc3_otg_set_peripheral_regs(dotg);
 		usb_gadget_vbus_connect(otg->gadget);
 	} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+		dev_info(otg->phy->dev, "%s: turn off gadget %s\n",
+					__func__, otg->gadget->name);
+#else
 		dev_dbg(otg->phy->dev, "%s: turn off gadget %s\n",
 					__func__, otg->gadget->name);
+#endif
 		usb_gadget_vbus_disconnect(otg->gadget);
 		dwc3_otg_set_hsphy_auto_suspend(dotg, false);
 	}
@@ -430,7 +458,11 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 		if (!pm_runtime_status_suspended(phy->dev)) {
 			dev_warn(phy->dev, "PHY_RESUME event out of LPM!!!!\n");
 		} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+			dev_info(phy->dev, "ext PHY_RESUME event received\n");
+#else
 			dev_dbg(phy->dev, "ext PHY_RESUME event received\n");
+#endif
 			/* ext_xceiver would have taken h/w out of LPM by now */
 			ret = pm_runtime_get(phy->dev);
 			if ((phy->state == OTG_STATE_A_HOST) &&
@@ -454,18 +486,34 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 				dev_warn(phy->dev, "pm_runtime_get failed!!\n");
 		}
 		if (ext_xceiv->id == DWC3_ID_FLOAT) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+			dev_info(phy->dev, "XCVR: ID set\n");
+#else
 			dev_dbg(phy->dev, "XCVR: ID set\n");
+#endif
 			set_bit(ID, &dotg->inputs);
 		} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+			dev_info(phy->dev, "XCVR: ID clear\n");
+#else
 			dev_dbg(phy->dev, "XCVR: ID clear\n");
+#endif
 			clear_bit(ID, &dotg->inputs);
 		}
 
 		if (ext_xceiv->bsv) {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+			dev_info(phy->dev, "XCVR: BSV set\n");
+#else
 			dev_dbg(phy->dev, "XCVR: BSV set\n");
+#endif
 			set_bit(B_SESS_VLD, &dotg->inputs);
 		} else {
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+			dev_info(phy->dev, "XCVR: BSV clear\n");
+#else
 			dev_dbg(phy->dev, "XCVR: BSV clear\n");
+#endif
 			clear_bit(B_SESS_VLD, &dotg->inputs);
 		}
 
@@ -522,6 +570,9 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	static int power_supply_type;
 	struct dwc3_otg *dotg = container_of(phy->otg, struct dwc3_otg, otg);
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	return 0;
+#endif
 
 	if (!dotg->psy || !dotg->charger) {
 		dev_err(phy->dev, "no usb power supply/charger registered\n");
@@ -698,14 +749,18 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 	unsigned long delay = 0;
 
 	pm_runtime_resume(phy->dev);
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(phy->dev, "%s state-->\n", otg_state_string(phy->state));
+#else
 	dev_dbg(phy->dev, "%s state\n", otg_state_string(phy->state));
+#endif
 
 	/* Check OTG state */
 	switch (phy->state) {
 	case OTG_STATE_UNDEFINED:
 		dwc3_otg_init_sm(dotg);
 		if (!dotg->psy) {
-			dotg->psy = power_supply_get_by_name("usb");
+			dotg->psy = power_supply_get_by_name("dwc-usb");
 
 			if (!dotg->psy)
 				dev_err(phy->dev,
@@ -841,6 +896,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			dotg->vbus_retry_count = 0;
 			work = 1;
 		} else {
+#ifdef CONFIG_MACH_MONDRIAN
+			pm_runtime_get_noresume(phy->dev);
+#endif
 			phy->state = OTG_STATE_A_HOST;
 			ret = dwc3_otg_start_host(&dotg->otg, 1);
 			if ((ret == -EPROBE_DEFER) &&
@@ -849,6 +907,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				 * Get regulator failed as regulator driver is
 				 * not up yet. Will try to start host after 1sec
 				 */
+#ifdef CONFIG_MACH_MONDRIAN
+				pm_runtime_put_noidle(phy->dev);
+#endif
 				phy->state = OTG_STATE_A_IDLE;
 				dev_dbg(phy->dev, "Unable to get vbus regulator. Retrying...\n");
 				delay = VBUS_REG_CHECK_DELAY;
@@ -859,6 +920,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 				 * Probably set_host was not called yet.
 				 * We will re-try as soon as it will be called
 				 */
+#ifdef CONFIG_MACH_MONDRIAN
+				pm_runtime_put_noidle(phy->dev);
+#endif
 				dev_dbg(phy->dev, "enter lpm as\n"
 					"unable to start A-device\n");
 				phy->state = OTG_STATE_A_IDLE;
@@ -875,6 +939,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			phy->state = OTG_STATE_B_IDLE;
 			dotg->vbus_retry_count = 0;
 			work = 1;
+#ifdef CONFIG_MACH_MONDRIAN
+			pm_runtime_put_noidle(phy->dev);
+#endif
 		}
 		break;
 
@@ -882,6 +949,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		dev_err(phy->dev, "%s: invalid otg-state\n", __func__);
 
 	}
+#ifdef CONFIG_USB_DEBUG_DETEAILED_LOG
+	dev_info(phy->dev, "-->%s state\n", otg_state_string(phy->state));
+#endif
 
 	if (work)
 		queue_delayed_work(system_nrt_wq, &dotg->sm_work, delay);
@@ -996,6 +1066,9 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	dotg->otg.phy->dev = dwc->dev;
 	dotg->otg.phy->set_power = dwc3_otg_set_power;
 	dotg->otg.phy->set_suspend = dwc3_otg_set_suspend;
+#ifdef CONFIG_USB_HOST_NOTIFY
+	dotg->otg.phy->set_suspend = NULL;
+#endif
 
 	ret = usb_set_transceiver(dotg->otg.phy);
 	if (ret) {

@@ -277,3 +277,4 @@ enum msm_hs_regs {
 #define UARTDM_RX_TOTAL_SNAP_ADDR 0x38
 
 #endif /* MSM_SERIAL_HS_HWREG_H */
+
