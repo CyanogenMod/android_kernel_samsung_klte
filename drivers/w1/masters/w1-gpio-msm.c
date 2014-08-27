@@ -303,10 +303,13 @@ static u8 w1_gpio_read_block(void *data, u8 *buf, int len)
  */
 static u8 w1_gpio_reset_bus(void *data)
 {
-	int result;
+	int result = 1,i;
 	struct w1_gpio_msm_platform_data *pdata = data;
 	void	(*write_bit)(void *, u8);
 	unsigned long irq_flags;
+	int temp_read[15]={1, 1, 1, 1, 1,
+			   1, 1, 1, 1, 1,
+			   1, 1, 1, 1, 1};
 
 	if (pdata->is_open_drain) {
 		write_bit = w1_gpio_write_bit_val;
@@ -316,20 +319,23 @@ static u8 w1_gpio_reset_bus(void *data)
 
 	spin_lock_irqsave(&w1_gpio_msm_lock, irq_flags);
 	write_bit(data, 0);
-		/* minimum 480, max ? us
+		/* minimum 48, max 80 us(In DS Documnet)
 		 * be nice and sleep, except 18b20 spec lists 960us maximum,
 		 * so until we can sleep with microsecond accuracy, spin.
 		 * Feel free to come up with some other way to give up the
 		 * cpu for such a short amount of time AND get it back in
 		 * the maximum amount of time.
 		 */
-	(pdata->slave_speed == 0)? w1_delay(480) : w1_delay(48);
+	(pdata->slave_speed == 0)? w1_delay(500) : w1_delay(50);
 	write_bit(data, 1);
 
-	(pdata->slave_speed == 0)? w1_delay(70) : w1_delay(7);
+	(pdata->slave_speed == 0)? w1_delay(60) : w1_delay(6);
 
-	result = w1_gpio_read_bit_val(data) & 0x1;
+	for(i=0;i<15;i++)
+		temp_read[i] = gpio_get_value_msm(pdata->pin);
 
+	for(i=0;i<15;i++)
+		result &= temp_read[i];
 	/* minmum 70 (above) + 410 = 480 us
 	 * There aren't any timing requirements between a reset and
 	 * the following transactions.  Sleeping is safe here.
@@ -533,6 +539,9 @@ static int w1_gpio_msm_suspend(struct platform_device *pdev, pm_message_t state)
 
 	gpio_tlmm_config(GPIO_CFG(pdata->pin, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 	gpio_direction_input(pdata->pin);
+#ifdef CONFIG_W1_WORKQUEUE
+	cancel_delayed_work_sync(&w1_gdev->w1_dwork);
+#endif
 	return 0;
 }
 
@@ -545,6 +554,9 @@ static int w1_gpio_msm_resume(struct platform_device *pdev)
 
 	gpio_tlmm_config(GPIO_CFG(pdata->pin, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 	gpio_direction_output(pdata->pin, 1);
+#ifdef CONFIG_W1_WORKQUEUE
+	schedule_delayed_work(&w1_gdev->w1_dwork, HZ * 2);
+#endif
 	return 0;
 }
 

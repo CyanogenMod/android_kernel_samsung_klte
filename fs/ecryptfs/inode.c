@@ -36,6 +36,10 @@
 #include <asm/unaligned.h>
 #include "ecryptfs_kernel.h"
 
+#ifdef CONFIG_SDP
+#include "ecryptfs_dek.h"
+#endif
+
 static struct dentry *lock_parent(struct dentry *dentry)
 {
 	struct dentry *dir;
@@ -452,9 +456,15 @@ static int ecryptfs_i_size_read(struct dentry *dentry, struct inode *inode)
 	rc = ecryptfs_read_and_validate_header_region(inode);
 	ecryptfs_put_lower_file(inode);
 	if (rc) {
+#ifdef CONFIG_SDP
+		if (ecryptfs_inode_to_private(inode)->sdp_id < 0) {
+#endif
 		rc = ecryptfs_read_and_validate_xattr_region(dentry, inode);
 		if (!rc)
 			crypt_stat->flags |= ECRYPTFS_METADATA_IN_XATTR;
+#ifdef CONFIG_SDP
+		}
+#endif
 	}
 
 	/* Must return 0 to allow non-eCryptfs files to be looked up, too */
@@ -1212,14 +1222,27 @@ ecryptfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 	struct dentry *lower_dentry;
 
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
-	if (!lower_dentry->d_inode->i_op->setxattr) {
-		rc = -EOPNOTSUPP;
-		goto out;
-	}
 
-	rc = vfs_setxattr(lower_dentry, name, value, size, flags);
-	if (!rc)
-		fsstack_copy_attr_all(dentry->d_inode, lower_dentry->d_inode);
+#ifdef CONFIG_SDP
+	if (name != NULL && strcmp(name,ECRYPTFS_DEK_XATTR_NAME) == 0) {
+		ecryptfs_encrypt_and_replace_sdp_dek(dentry,
+				ecryptfs_parse_xattr_is_sensitive(value, size));
+	}
+	else{
+#endif
+		if (!lower_dentry->d_inode->i_op->setxattr) {
+			ecryptfs_printk(KERN_INFO, "EOPNOTSUPP\n");
+			rc = -EOPNOTSUPP;
+			goto out;
+		}
+
+		rc = vfs_setxattr(lower_dentry, name, value, size, flags);
+		if (!rc){
+			fsstack_copy_attr_all(dentry->d_inode, lower_dentry->d_inode);
+		}
+#ifdef CONFIG_SDP
+	}
+#endif
 out:
 	return rc;
 }
@@ -1234,10 +1257,32 @@ ecryptfs_getxattr_lower(struct dentry *lower_dentry, const char *name,
 		rc = -EOPNOTSUPP;
 		goto out;
 	}
-	mutex_lock(&lower_dentry->d_inode->i_mutex);
-	rc = lower_dentry->d_inode->i_op->getxattr(lower_dentry, name, value,
-						   size);
-	mutex_unlock(&lower_dentry->d_inode->i_mutex);
+
+#ifdef CONFIG_SDP
+	if (name != NULL && strcmp(name,ECRYPTFS_DEK_XATTR_NAME) == 0) {
+		mutex_lock(&lower_dentry->d_inode->i_mutex);
+		rc = lower_dentry->d_inode->i_op->getxattr(lower_dentry, name, value,
+				size);
+		mutex_unlock(&lower_dentry->d_inode->i_mutex);
+#if ECRYPTFS_DEK_DEBUG
+		ecryptfs_printk(KERN_INFO, "getxattr result is [%d]\n", rc); 
+#endif
+		if (rc < 0) {
+			rc = vfs_getxattr(lower_dentry, name, value, size);
+#if ECRYPTFS_DEK_DEBUG
+			ecryptfs_printk(KERN_INFO, "vfs_getxattr result is [%d]\n", rc);
+#endif
+		}
+	}
+    else{
+#endif
+		mutex_lock(&lower_dentry->d_inode->i_mutex);
+		rc = lower_dentry->d_inode->i_op->getxattr(lower_dentry, name, value,
+							   size);
+		mutex_unlock(&lower_dentry->d_inode->i_mutex);
+#ifdef CONFIG_SDP
+	}
+#endif
 out:
 	return rc;
 }

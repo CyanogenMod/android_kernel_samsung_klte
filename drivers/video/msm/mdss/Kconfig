@@ -27,7 +27,7 @@ config BACKLIGHT_KTD2801
 
 config MDNIE_VIDEO_ENHANCED
 bool "MDNIE VIDEO ENHANCED"
-	default n	
+	default n
 
 config FB_MSM_MDSS_DSI_CTRL_STATUS
 	tristate "DSI controller status check feature"
@@ -50,7 +50,7 @@ config FB_MSM_MDSS_DBG_SEQ_TICK
 
 config FB_MSM_MDSS_DSI_DBG
 	bool "DSI dbg support"
-	default n	
+	default n
 
 config SAMSUNG_CMC624
 	bool "Support for integrated LCD controller in msm89XX"
@@ -80,6 +80,10 @@ config FB_MSM_MIPI_NOVATEK_VIDEO_HD_PT_PANEL
 
 config MDNIE_LITE_TUNING
 	bool "MDNIe lite panel tuning"
+	default n
+
+config MDNIE_ENHENCED_LOCAL_CE
+	bool "MDNIe lite panel tuning for enhenced local ce"
 	default n
 
 config MDNIE_TFT_MSM8X26
@@ -226,10 +230,10 @@ config LCD_CONNECTION_CHECK
 	bool "check if LCD connected or not and detect panel vendor"
 	default n
 
-config SAMSUNG_DEBUG_DISPLAY 
+config SAMSUNG_DEBUG_DISPLAY
 	bool "Add Samsung Debugging code"
 	default n
-	
+
 config FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL
 	bool "TOSHIBA DSI2LVDS CONVERTER"
 	default n
@@ -243,7 +247,7 @@ config TC358764_I2C_CONTROL
 	The TOSHIBA I2C CONTROLLER support
 config LCD_FORCE_VIDEO_MODE
 	bool "forcing video mode on cmd panle"
-	default n	
+	default n
 
 config FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL
 	bool "Support SAMSUNG TFT Video WQXGA Panel"
@@ -252,7 +256,7 @@ config FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL
 config FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL
 	bool "Support Magna OCTA Video 720P (EA8061) Panel"
 	default n
-	
+
 config EDP_EXTERNAL_POWER
 	bool "Support EDP external power"
 	default n

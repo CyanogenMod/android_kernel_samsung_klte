@@ -2473,6 +2473,7 @@ static int lkmauth(Elf_Ehdr *hdr, int len)
 		kreq->cmd_id, (int)kreq, (int)krsp, kreq->module_addr_start, kreq->module_len);
 
 	qseecom_set_bandwidth(qhandle, true);
+	flush_cache_all();
 	qsee_ret = qseecom_send_command(qhandle, kreq, req_len, krsp, rsp_len);
 	qseecom_set_bandwidth(qhandle, false);
 

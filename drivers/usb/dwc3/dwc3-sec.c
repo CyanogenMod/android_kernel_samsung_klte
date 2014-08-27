@@ -405,6 +405,7 @@ static struct sec_cable support_cable_list[] = {
 	{ .cable_type = EXTCON_SMARTDOCK_TA, },
 	{ .cable_type = EXTCON_SMARTDOCK_USB, },
 	{ .cable_type = EXTCON_JIG_USBON, },
+	{ .cable_type = EXTCON_CHARGE_DOWNSTREAM, },
 };
 
 #ifdef CONFIG_USB_HOST_NOTIFY
@@ -447,12 +448,13 @@ static void sec_cable_event_worker(struct work_struct *work)
 	case EXTCON_USB:
 	case EXTCON_SMARTDOCK_USB:
 	case EXTCON_JIG_USBON:
+	case EXTCON_CHARGE_DOWNSTREAM:
 		sec_usb_work(cable->cable_state);
 		break;
-	case EXTCON_USB_HOST: 
+	case EXTCON_USB_HOST:
 		if (cable->cable_state)
 			sec_otg_notify(HNOTIFY_ID);
-		else	
+		else
 			sec_otg_notify(HNOTIFY_ID_PULL);
 		break;
 	case EXTCON_TA: break;

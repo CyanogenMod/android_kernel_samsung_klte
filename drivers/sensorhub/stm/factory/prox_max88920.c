@@ -32,6 +32,14 @@
 #define LDI_GRAY	'1'
 #define LDI_WHITE	'2'
 
+#if defined(CONFIG_SEC_KACTIVE_PROJECT)
+#define CAL_SKIP_ADC	52
+#define CAL_FAIL_ADC	80
+#else
+#define CAL_SKIP_ADC	55
+#define CAL_FAIL_ADC	90
+#endif
+
 /*************************************************************************/
 /* factory Sysfs                                                         */
 /*************************************************************************/
@@ -125,17 +133,17 @@ static ssize_t proximity_raw_data_show(struct device *dev,
 
 static int get_proximity_threshold(struct ssp_data *data)
 {
-	if (data->uCrosstalk < 55) {
+	if (data->uCrosstalk < CAL_SKIP_ADC) {
 		data->uProxCanc = 0;
 		data->uProxCalResult = 2;
-		pr_info("[SSP] crosstalk <= 45, skip calibration\n");
-	} else if (data->uCrosstalk <= 90) {
+		pr_info("[SSP] crosstalk < %d, skip calibration\n", CAL_SKIP_ADC);
+	} else if (data->uCrosstalk <= CAL_FAIL_ADC) {
 		data->uProxCanc = data->uCrosstalk * 5 / 10;
 		data->uProxCalResult = 1;
 	} else {
 		data->uProxCanc = 0;
 		data->uProxCalResult = 0;
-		pr_info("[SSP] crosstalk > 90, calibration failed\n");
+		pr_info("[SSP] crosstalk > %d, calibration failed\n", CAL_FAIL_ADC);
 		return ERROR;
 	}
 	data->uProxHiThresh = data->uProxHiThresh_default + data->uProxCanc;

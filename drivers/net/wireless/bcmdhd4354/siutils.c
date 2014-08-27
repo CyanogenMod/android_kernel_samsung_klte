@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils.c 434466 2013-11-06 12:34:26Z $
+ * $Id: siutils.c 475454 2014-05-05 20:54:58Z $
  */
 
 #include <bcm_cfg.h>
@@ -1293,6 +1293,7 @@ si_chip_hostif(si_t *sih)
 
 	case BCM4350_CHIP_ID:
 	case BCM4354_CHIP_ID:
+	case BCM4356_CHIP_ID:
 	case BCM43556_CHIP_ID:
 	case BCM43558_CHIP_ID:
 	case BCM43566_CHIP_ID:
@@ -2641,6 +2642,7 @@ si_is_sprom_available(si_t *sih)
 			!(sih->chipst & CST4335_SFLASH_MASK));
 	case BCM4350_CHIP_ID:
 	case BCM4354_CHIP_ID:
+	case BCM4356_CHIP_ID:
 	case BCM43556_CHIP_ID:
 	case BCM43558_CHIP_ID:
 	case BCM43566_CHIP_ID:

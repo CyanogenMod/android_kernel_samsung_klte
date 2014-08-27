@@ -136,12 +136,6 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 #if __GNUC__ >= 4 && __GNUC_MINOR__ >= 6
         __asm__ __volatile__(".arch_extension sec");
 #endif
-	if (tima_is_pg_protected((unsigned long) pmdp) == 0) {
-		pmdp[0] = __pmd(pmdval);
-#ifndef CONFIG_ARM_LPAE
-		pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
-#endif
-	} else {
 	clean_dcache_area(pmdp, 8);
 	__asm__ __volatile__ (
 		"stmfd  sp!,{r0, r8-r11}\n"
@@ -179,7 +173,6 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 			tima_debug_signal_failure(0x3f80f221, 8);
 		}
 	#endif
-	}
 #else
 	pmdp[0] = __pmd(pmdval);
 #ifndef CONFIG_ARM_LPAE

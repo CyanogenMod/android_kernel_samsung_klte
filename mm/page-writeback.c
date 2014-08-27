@@ -267,6 +267,20 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 	else
 		background = (dirty_background_ratio * available_memory) / 100;
 
+#if defined(CONFIG_MIN_DIRTY_THRESH_PAGES) && CONFIG_MIN_DIRTY_THRESH_PAGES > 0
+	if (!vm_dirty_bytes && dirty < CONFIG_MIN_DIRTY_THRESH_PAGES) {
+		dirty = CONFIG_MIN_DIRTY_THRESH_PAGES;
+		if (!dirty_background_bytes) {
+			unsigned long min_background;
+
+			min_background = dirty * dirty_background_ratio * 100 /
+				vm_dirty_ratio / 100;
+			if (background < min_background)
+				background = min_background;
+		}
+	}
+#endif
+
 	if (background >= dirty)
 		background = dirty / 2;
 	tsk = current;
@@ -330,6 +344,17 @@ static unsigned long zone_dirty_limit(struct zone *zone)
 	else
 		dirty = vm_dirty_ratio * zone_memory / 100;
 
+#if defined(CONFIG_MIN_DIRTY_THRESH_PAGES) && CONFIG_MIN_DIRTY_THRESH_PAGES > 0
+	if (!vm_dirty_bytes) {
+		unsigned long min_zone_dirty;
+
+		min_zone_dirty = CONFIG_MIN_DIRTY_THRESH_PAGES *
+				zone_memory / global_dirtyable_memory();
+		if (dirty < min_zone_dirty)
+			dirty = min_zone_dirty;
+	}
+#endif
+
 	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk))
 		dirty += dirty / 4;
 
@@ -366,6 +391,11 @@ static int calc_period_shift(void)
 	else
 		dirty_total = (vm_dirty_ratio * global_dirtyable_memory()) /
 				100;
+#if defined(CONFIG_MIN_DIRTY_THRESH_PAGES) && CONFIG_MIN_DIRTY_THRESH_PAGES > 0
+	if (!vm_dirty_bytes && dirty_total < CONFIG_MIN_DIRTY_THRESH_PAGES) 
+		dirty_total = CONFIG_MIN_DIRTY_THRESH_PAGES;
+#endif
+
 	return 2 + ilog2(dirty_total - 1);
 }
 

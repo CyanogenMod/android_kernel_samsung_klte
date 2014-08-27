@@ -943,6 +943,15 @@ config NFC_PN547_8226_USE_BBCLK2
 	  It is used by many services. NFC is fully controlled using I2C
 	  to communicate the AP chip.
 
+config NFC_N5_PMC8974_CLK_REQ
+	bool "LSI SENN5 NFC Controller Driver"
+	depends on I2C
+	default n
+	help
+	  PM8941 Clock request for NXP N5 Near Field
+	  Communication controller support.
+	  This option enables d1 clock for NFC.
+
 config NFC_I2C_OVERWRITE
 	bool "I2C gpio overwrite"
 	depends on I2C

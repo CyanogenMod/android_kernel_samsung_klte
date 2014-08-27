@@ -86,6 +86,21 @@
 #define USE_DETECTION_FLAG2
 #define USE_EDGE_EXCLUSION
 
+#elif defined(CONFIG_SEC_KSPORTS_PROJECT)
+#define PROXIMITY
+#define EDGE_SWIPE
+#define SIDE_TOUCH
+#define USE_HOVER_REZERO
+#define GLOVE_MODE
+#define USE_SHUTDOWN_CB
+#define CHECK_BASE_FIRMWARE
+#define USE_ACTIVE_REPORT_RATE
+#define USE_F51_OFFSET_CALCULATE
+#define SYNAPTICS_DEVICE_NAME	"G860"
+#define USE_STYLUS
+#define USE_DETECTION_FLAG2
+#define USE_EDGE_EXCLUSION
+
 #elif defined(CONFIG_SEC_H_PROJECT)
 #define PROXIMITY
 #define EDGE_SWIPE
@@ -200,6 +215,7 @@
 #define FW_IMAGE_NAME_S5050_H		"tsp_synaptics/synaptics_s5050_h.fw"
 #define FW_IMAGE_NAME_S5100_K_A2_FHD	"tsp_synaptics/synaptics_s5100_k_a2_fhd.fw"
 #define FW_IMAGE_NAME_S5100_K_A3	"tsp_synaptics/synaptics_s5100_k_a3.fw"
+#define FW_IMAGE_NAME_S5100_K_ACTIVE	"tsp_synaptics/synaptics_s5100_k_active.fw"
 #define FW_IMAGE_NAME_S5707		"tsp_synaptics/synaptics_s5707.fw"
 #define FW_IMAGE_NAME_S5708		"tsp_synaptics/synaptics_s5708.fw"
 #define FW_IMAGE_NAME_S5050		"tsp_synaptics/synaptics_s5050.fw"
@@ -955,6 +971,7 @@ struct synaptics_rmi_f1a_button_map {
  * @ sub_pmic : sensor power supply : 3.3V, enabled by subp_mic MAX77826
  * @ irq_gpio : interrupt GPIO PIN defined device tree files(dtsi)
  * @ project : project name string for Firmware name
+ * @ sub-project : project name string for Firmware name by sub project
  */
 
 struct synaptics_rmi4_device_tree_data {
@@ -975,6 +992,7 @@ struct synaptics_rmi4_device_tree_data {
 	struct synaptics_rmi_f1a_button_map *f1a_button_map;
 
 	const char *project;
+	const char *sub_project;
 
 	int num_of_supply;
 	const char **name_of_supply;

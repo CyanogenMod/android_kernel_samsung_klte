@@ -151,6 +151,13 @@ enum zone_stat_item {
 #endif
 	NR_ANON_TRANSPARENT_HUGEPAGES,
 	NR_FREE_CMA_PAGES,
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	NR_CMA_INACTIVE_ANON,
+	NR_CMA_ACTIVE_ANON,
+	NR_CMA_INACTIVE_FILE,
+	NR_CMA_ACTIVE_FILE,
+	NR_CMA_UNEVICTABLE,
+#endif
 	NR_VM_ZONE_STAT_ITEMS };
 
 /*
@@ -212,8 +219,6 @@ struct lruvec {
 #define ISOLATE_ASYNC_MIGRATE	((__force isolate_mode_t)0x4)
 /* Isolate unevictable pages */
 #define ISOLATE_UNEVICTABLE	((__force isolate_mode_t)0x8)
-/* Isolate non-CMA pages */
-#define ISOLATE_NO_CMA		((__force isolate_mode_t)0x10)
 
 /* LRU Isolation modes. */
 typedef unsigned __bitwise__ isolate_mode_t;

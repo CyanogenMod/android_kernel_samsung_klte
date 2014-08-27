@@ -566,7 +566,7 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		dep->stream_capable = true;
 	}
 
-	if (usb_endpoint_xfer_isoc(desc))
+	if (!usb_endpoint_xfer_control(desc))
 		params.param1 |= DWC3_DEPCFG_XFER_IN_PROGRESS_EN;
 
 	/*
@@ -915,9 +915,14 @@ static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 	} else {
 		if (chain)
 			trb->ctrl |= DWC3_TRB_CTRL_CHN;
+		trb->ctrl |= DWC3_TRB_CTRL_CSP;
+	}
 
+	if (!usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
 		if (last)
 			trb->ctrl |= DWC3_TRB_CTRL_LST;
+		else if (!req->request.no_interrupt)
+			trb->ctrl |= DWC3_TRB_CTRL_IOC;
 	}
 
 	if (usb_endpoint_xfer_bulk(dep->endpoint.desc) && dep->stream_capable)
@@ -2237,7 +2242,6 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 		if (!usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
 			dev_dbg(dwc->dev, "%s is not an Isochronous endpoint\n",
 					dep->name);
-			return;
 		}
 
 		dwc3_endpoint_transfer_complete(dwc, dep, event, 0);
@@ -2960,7 +2964,8 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.ops			= &dwc3_gadget_ops;
 #if defined(CONFIG_SEC_LT03_PROJECT) || defined(CONFIG_SEC_MONDRIAN_PROJECT)\
 	|| defined(CONFIG_SEC_KS01_PROJECT) || defined(CONFIG_SEC_PICASSO_PROJECT)\
-	|| defined(CONFIG_SEC_KACTIVE_PROJECT)
+	|| defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_FRESCO_PROJECT)\
+	|| defined(CONFIG_SEC_KSPORTS_PROJECT)
 	dwc->gadget.max_speed		= USB_SPEED_HIGH;
 #else
 	dwc->gadget.max_speed		= USB_SPEED_SUPER;

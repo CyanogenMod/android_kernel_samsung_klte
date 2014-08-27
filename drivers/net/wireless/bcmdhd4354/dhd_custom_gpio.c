@@ -20,7 +20,7 @@
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
 *
-* $Id: dhd_custom_gpio.c 447089 2014-01-08 04:05:58Z $
+* $Id: dhd_custom_gpio.c 466835 2014-04-01 20:44:55Z $
 */
 
 #include <typedefs.h>
@@ -51,7 +51,7 @@ int __attribute__ ((weak)) wifi_get_fw_nv_path(char *fw, char *nv) { return 0;};
 extern int sdioh_mmc_irq(int irq);
 #endif /* (BCMLXSDMMC)  */
 
-#if defined(CUSTOMER_HW3) || defined(PLATFORM_MPS)
+#if defined(CUSTOMER_HW3)
 #include <mach/gpio.h>
 #endif
 
@@ -76,7 +76,7 @@ int dhd_customer_oob_irq_map(void *adapter, unsigned long *irq_flags_ptr)
 {
 	int  host_oob_irq = 0;
 
-#if (defined(CUSTOMER_HW2) || defined(CUSTOMER_HW4)) && !defined(PLATFORM_MPS)
+#if defined(CUSTOMER_HW2) || defined(CUSTOMER_HW4)
 	host_oob_irq = wifi_platform_get_irq_number(adapter, irq_flags_ptr);
 
 #else
@@ -95,11 +95,11 @@ int dhd_customer_oob_irq_map(void *adapter, unsigned long *irq_flags_ptr)
 	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n",
 	         __FUNCTION__, dhd_oob_gpio_num));
 
-#if defined CUSTOMER_HW3 || defined(PLATFORM_MPS)
+#if defined(CUSTOMER_HW3)
 	gpio_request(dhd_oob_gpio_num, "oob irq");
 	host_oob_irq = gpio_to_irq(dhd_oob_gpio_num);
 	gpio_direction_input(dhd_oob_gpio_num);
-#endif /* defined CUSTOMER_HW3 || defined(PLATFORM_MPS) */
+#endif /* defined CUSTOMER_HW3 */
 #endif /* CUSTOMER_HW2 || CUSTOMER_HW4 */
 
 	return (host_oob_irq);

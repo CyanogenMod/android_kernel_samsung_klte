@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.c 451649 2014-01-27 17:23:38Z $
+ * $Id: linux_osl.c 476208 2014-05-08 05:18:26Z $
  */
 
 #define LINUX_PORT
@@ -377,6 +377,9 @@ static struct sk_buff *osl_alloc_skb(osl_t *osh, unsigned int len)
 	gfp_t flags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC : GFP_KERNEL;
 #if defined(CONFIG_SPARSEMEM) && defined(CONFIG_ZONE_DMA)
 	flags |= GFP_ATOMIC;
+#endif
+#if defined(CUSTOMER_HW4)
+	flags = GFP_ATOMIC;
 #endif
 	skb = __dev_alloc_skb(len, flags);
 #else

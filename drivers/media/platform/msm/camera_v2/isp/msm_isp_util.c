@@ -841,7 +841,9 @@ static void msm_isp_process_overflow_irq(
 
 	if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id == 0 &&
 	    vfe_dev->axi_data.src_info[VFE_RAW_0].frame_id == 0) {
-		pr_err("%s abhishek first frame. Skip \n", __func__);
+		pr_err("%s first frame. Skip \n", __func__);
+		pr_err("%s: First frame irq_status0 0x%X irq_status1 0x%X\n",
+			__func__, *irq_status0, *irq_status1);
 	}
 
 	/*Mask out all other irqs if recovery is started*/
@@ -869,18 +871,18 @@ static void msm_isp_process_overflow_irq(
 	 */
 	if (overflow_mask) {
 		struct msm_isp_event_data error_event;
-		pr_err("%s: abhishek Bus overflow detected: 0x%x\n",
+		pr_err("%s: Bus overflow detected: 0x%x\n",
 		       __func__, overflow_mask);
 		atomic_set(&vfe_dev->error_info.overflow_state,
 			   OVERFLOW_DETECTED);
-		pr_err("%s: abhishek Start bus overflow recovery\n", __func__);
+		pr_err("%s: Start bus overflow recovery\n", __func__);
 		/*Store current IRQ mask*/
 		vfe_dev->hw_info->vfe_ops.core_ops.get_irq_mask(vfe_dev,
 								&vfe_dev->error_info.overflow_recover_irq_mask0,
 								&vfe_dev->error_info.overflow_recover_irq_mask1);
 		/*Halt the hardware & Clear all other IRQ mask*/
 		vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 0);
-		pr_err("%s abhishek HALT vfe_dev %p \n", __func__, vfe_dev);
+		pr_err("%s HALT vfe_dev %p \n", __func__, vfe_dev);
 		/*Stop CAMIF Immediately*/
 		vfe_dev->hw_info->vfe_ops.core_ops.
 		update_camif_state(vfe_dev, DISABLE_CAMIF_IMMEDIATELY);
@@ -891,7 +893,7 @@ static void msm_isp_process_overflow_irq(
 		*irq_status1 = 0;
 
 //  overflow_mask &= ~(rdi_wm_mask << 9);
-		pr_err("%s: abhishek Error! RDI overflow detected. Notify ISPIF to reset overflow_mask 0x%x\n",
+		pr_err("%s: Error! RDI overflow detected. Notify ISPIF to reset overflow_mask 0x%x\n",
 		       __func__, overflow_mask);
 		/* frame id should be of src_info[overflow RDI WM]. For now take RAW_0 since RAW_0 *
 		 * will be the first to be allocated anyway */

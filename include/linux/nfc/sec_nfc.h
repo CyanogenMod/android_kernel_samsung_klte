@@ -53,8 +53,13 @@
 struct sec_nfc_platform_data {
 	unsigned int irq;
 	unsigned int ven;
+#ifdef CONFIG_NFC_N5_PMC8974_CLK_REQ
+	int firm;
+	int wake;
+#else
 	unsigned int firm;
 	unsigned int wake;
+#endif
 	unsigned int tvdd;
 	unsigned int avdd;
 #ifdef CONFIG_SEC_NFC_CLK_REQ
@@ -65,7 +70,7 @@ struct sec_nfc_platform_data {
 	unsigned int clk_enable;
 #endif
 #endif
-#ifdef CONFIG_SEC_NFC_USE_8226_BBCLK2
+#if defined(CONFIG_NFC_N5_PMC8974_CLK_REQ) || defined(CONFIG_SEC_NFC_USE_8226_BBCLK2)
 	struct clk *nfc_clk;
 #endif
 	void (*cfg_gpio)(void);

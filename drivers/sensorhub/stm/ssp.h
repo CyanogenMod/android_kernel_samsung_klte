@@ -395,12 +395,21 @@ struct hw_offset_data {
 #define SSP_INDEX_MASK		(8191 << SSP_INDEX)	/* dump index mask. Index is up to 8191 */
 
 /* proximity sensor threshold */
+#if defined(CONFIG_SEC_KACTIVE_PROJECT)
+#define DEFUALT_HIGH_THRESHOLD	110
+#define DEFUALT_LOW_THRESHOLD	85
+#define TBD_HIGH_THRESHOLD	110
+#define TBD_LOW_THRESHOLD	85
+#define WHITE_HIGH_THRESHOLD	110
+#define WHITE_LOW_THRESHOLD	85
+#else
 #define DEFUALT_HIGH_THRESHOLD	130
 #define DEFUALT_LOW_THRESHOLD	90
 #define TBD_HIGH_THRESHOLD	130
 #define TBD_LOW_THRESHOLD	90
 #define WHITE_HIGH_THRESHOLD	130
 #define WHITE_LOW_THRESHOLD	90
+#endif
 
 struct ssp_msg {
 	u8 cmd;

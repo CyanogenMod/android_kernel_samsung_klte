@@ -109,7 +109,13 @@ enum pageflags {
 	PG_compound_lock,
 #endif
 	PG_readahead,		/* page in a readahead window */
+#ifdef CONFIG_SDP
+	PG_sensitive,
+#endif
 	__NR_PAGEFLAGS,
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	PG_cma,			/* page in CMA area */
+#endif
 
 	/* Filesystems */
 	PG_checked = PG_owner_priv_1,
@@ -275,7 +281,30 @@ PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
 #endif
 
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+PAGEFLAG(CMA, cma)
+#endif
+
 u64 stable_page_flags(struct page *page);
+
+#ifdef CONFIG_SDP
+static inline int PageSensitive(struct page *page)
+{
+	int ret = test_bit(PG_sensitive, &(page)->flags);
+	if (ret)
+		smp_rmb();
+
+	return ret;
+}
+
+static inline void SetPageSensitive(struct page *page)
+{
+	smp_wmb();
+	__set_bit(PG_sensitive, &(page)->flags);
+}
+
+CLEARPAGEFLAG(Sensitive, sensitive)
+#endif
 
 static inline int PageUptodate(struct page *page)
 {

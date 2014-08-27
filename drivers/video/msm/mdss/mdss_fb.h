@@ -267,6 +267,16 @@ void mdss_dbg_tick_save(int op_name);
 
 #endif
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+enum TE_SETTING {
+	TE_SET_INIT = -1,
+	TE_SET_READY,
+	TE_SET_START,
+	TE_SET_DONE,
+	TE_SET_FAIL,
+};
+#endif
+
 extern int boot_mode_lpm, boot_mode_recovery;
 int mdss_fb_get_phys_info(unsigned long *start, unsigned long *len, int fb_num);
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl);

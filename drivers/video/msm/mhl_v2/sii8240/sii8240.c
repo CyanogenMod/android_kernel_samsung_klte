@@ -1690,7 +1690,7 @@ static int sii8240_init_regs(struct sii8240_data *sii8240)
 	}
 
 	ret = mhl_modify_reg(hdmi, 0x82, BIT_MHLTX_CTL3_DAMPING_SEL_MASK,
-		BIT_MHLTX_CTL3_DAMPING_SEL_OFF);
+		sii8240->pdata->damping);
 	if (unlikely(ret < 0)) {
 		pr_err("[ERROR] sii8240: %s():%d Fail to write register\n",
 			__func__, __LINE__);

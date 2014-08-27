@@ -492,3 +492,13 @@ config USE_USER_ACCESSIBLE_TIMERS
 	  interface code in the main kernel.  However, there are
 	  architecture-specific code that will need to be enabled
 	  separately.
+
+config MIN_DIRTY_THRESH_PAGES
+	int "The lower bound of VM dirty_thresh value in number of pages"
+	default 0
+	help
+	  Setting this to certain positive number guaranttees
+	  the VM Dirty-Thresh valus is always larger than that value.
+	  It is only effective when dirty_ratio is used. (Setting dirty_bytes
+	  disables this option.)
+	  Do not use it if you unsure.

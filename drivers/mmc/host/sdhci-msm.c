@@ -2908,10 +2908,11 @@ static void sdhci_msm_status_notify(int card_present, void *dev_id)
 	struct sdhci_host *host = (struct sdhci_host *)dev_id;
 	unsigned long flags;
 
-	host->mmc->rescan_disable=0;
-	pr_err("%s: %s: rescan_disable : %d\n",mmc_hostname(host->mmc), __func__, host->mmc->rescan_disable);
-
 	if (host) {
+		host->mmc->rescan_disable=0;
+		pr_err("%s: %s: rescan_disable : %d\n",mmc_hostname(host->mmc),
+			__func__, host->mmc->rescan_disable);
+
 		spin_lock_irqsave(&host->lock, flags);
 		if (card_present) {
 			pr_err("%s: card inserted.\n", mmc_hostname(host->mmc));

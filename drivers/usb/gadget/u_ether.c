@@ -467,7 +467,7 @@ static void process_rx_w(struct work_struct *work)
 			if(!strcmp(dev->port_usb->func.name,"ncm")) {
 				if (status < 0
 					|| ETH_HLEN > skb->len
-					|| skb->len > dev->net->mtu) {
+					|| skb->len > (dev->net->mtu + ETH_HLEN)) {
 					printk(KERN_ERR "usb: %s  drop incase of NCM rx length %d\n",__func__,skb->len);
 				} else {
 					printk(KERN_ERR "usb: %s  Dont drop incase of NCM rx length %d\n",__func__,skb->len);

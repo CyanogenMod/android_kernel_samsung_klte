@@ -1197,7 +1197,6 @@
 #define WL_SRSCAN_VAL		0x02000000
 
 #define WL_WNM_VAL		0x04000000
-#define WL_AWDL_VAL		0x08000000
 #define WL_PWRSEL_VAL		0x10000000
 #define WL_NET_DETECT_VAL	0x20000000
 #define WL_PCIE_VAL		0x40000000
@@ -1863,27 +1862,6 @@
 #define ND_MULTIHOMING_MAX 10	/* Maximum local host IP addresses */
 #define ND_REQUEST_MAX		5	/* Max set of offload params */
 
-/* AWDL AF flags for awdl_oob_af iovar */
-#define AWDL_OOB_AF_FILL_TSF_PARAMS			0x00000001
-#define AWDL_OOB_AF_FILL_SYNC_PARAMS		0x00000002
-#define AWDL_OOB_AF_FILL_ELECT_PARAMS		0x00000004
-#define AWDL_OOB_AF_PARAMS_SIZE 38
-
-#define AWDL_OPMODE_AUTO	0
-#define AWDL_OPMODE_FIXED	1
-
-#define AWDL_PEER_STATE_OPEN	0
-#define AWDL_PEER_STATE_CLOSE	1
-
-#define SYNC_ROLE_SLAVE			0
-#define SYNC_ROLE_NE_MASTER		1	/* Non-election master */
-#define SYNC_ROLE_MASTER		2
-
-/* peer opcode */
-#define AWDL_PEER_OP_ADD	0
-#define AWDL_PEER_OP_DEL	1
-#define AWDL_PEER_OP_INFO	2
-#define AWDL_PEER_OP_UPD	3
 
 /* AOAC wake event flag */
 #define WAKE_EVENT_NLO_DISCOVERY_BIT		1

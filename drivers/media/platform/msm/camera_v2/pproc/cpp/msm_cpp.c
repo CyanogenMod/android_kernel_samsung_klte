@@ -916,7 +916,12 @@ static void cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin)
 				"Failed to locate blob %s from device %p, Error: %d\n",
 				fw_name_bin, dev, rc);
 		}
-		if (NULL != fw)
+		if (fw == NULL)
+		{
+			pr_err("fw is null\n");
+			return;
+		}
+		else
 			ptr_bin = (uint32_t*)fw->data;
 
 		msm_camera_io_w(0x1, cpp_dev->base +
@@ -926,7 +931,7 @@ static void cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin)
 
 		/*Start firmware loading*/
 		msm_cpp_write(MSM_CPP_CMD_FW_LOAD, cpp_dev->base);
-		msm_cpp_write(fw->size, cpp_dev->base);
+		msm_cpp_write(MSM_CPP_END_ADDRESS, cpp_dev->base);
 		msm_cpp_write(MSM_CPP_START_ADDRESS, cpp_dev->base);
 
 		if (ptr_bin) {

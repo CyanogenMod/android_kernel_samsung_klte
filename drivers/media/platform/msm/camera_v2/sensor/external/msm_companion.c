@@ -789,6 +789,7 @@ static int msm_companion_fw_write(struct companion_device *companion_dev)
 		pr_err("[syscamera][%s::%d][crc_cal = 0x%08X, expected = 0x%08X]\n", __FUNCTION__, __LINE__, crc_cal, *(uint32_t*)(&isp_vbuf[isp_size - 4]));
 		if (crc_cal != *(uint32_t*)(&isp_vbuf[isp_size - 4])) {
 			pr_err("[syscamera][%s::%d][Err::CRC32 is not correct. iter = %d(max=3)]\n", __FUNCTION__, __LINE__, iter);
+			msm_camera_fw_check('F', 1); //F: Fail
  isp_filp_ferr_iter:
 			if (isp_fbuf) {
 				vfree(isp_fbuf);
@@ -1922,7 +1923,7 @@ static long msm_companion_cmd(struct companion_device *companion_dev, void *arg)
 			pr_err("[syscamera][%s::%d] msm_companion_stream_on failed\n", __FUNCTION__, __LINE__);
 			return -EFAULT;
 		}
-		usleep(10000);
+//		usleep(10000);
 		break;
 
 	case COMPANION_CMD_DUMP_REGISTER:
@@ -1941,7 +1942,7 @@ static long msm_companion_cmd(struct companion_device *companion_dev, void *arg)
 	case COMPANION_CMD_SET_MODE:
 		pr_err("[syscamera][%s::%d] Companion mode setting Array size = %d, Data type = %d\n", __FUNCTION__, __LINE__, cdata->cfg.mode_setting.size, cdata->cfg.mode_setting.data_type);
 		rc = msm_companion_set_mode(companion_dev, cdata->cfg.mode_setting);
-		usleep(10000);
+//		usleep(10000);
 		break;
 
 	case COMPANION_CMD_GET_STATS2:
@@ -2246,6 +2247,11 @@ static int msm_companion_spi_probe(struct spi_device *spi)
 
 	pr_err("[syscamera][%s::%d][E]\n", __FUNCTION__, __LINE__);
 	if (poweroff_charging == 1) {
+		int comp_gpio_en;
+		comp_gpio_en = of_get_named_gpio(spi->dev.of_node, "qcom,gpio-comp-en", 0);
+		gpio_request(comp_gpio_en, "gpio-comp-en");
+		gpio_direction_output(comp_gpio_en, 0);
+		gpio_free(comp_gpio_en);
 		pr_err("forced return companion_spi_probe at lpm mode\n");
 		return 0;
 	}

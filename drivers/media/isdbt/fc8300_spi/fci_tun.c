@@ -209,6 +209,7 @@ s32 tuner_select(HANDLE handle, DEVICEID devid,
 	fc8300_set_broadcast_mode(handle, devid, broadcast);
 
 #ifdef BBM_ES
+
 	if (product == FC8300_TUNER) {
 		u8 chip_ver = 0x00;
 		tuner_i2c_read(handle, devid, 0xff, 1, &chip_ver, 1);

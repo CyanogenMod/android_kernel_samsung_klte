@@ -475,13 +475,13 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	pipe->src_fmt = fmt;
 
 	if((pipe->src.h > 2500) && (pipe->src.h > pipe->dst.h)
-				&& (pipe->src.h - 2 <= pipe->dst.h)){ 
-			pr_debug("[QCT_TEST] mixer_height : %d, width : %d \n",pipe->mixer->height,pipe->mixer->width); 
+				&& (pipe->src.h - 2 <= pipe->dst.h)){
+			pr_debug("[QCT_TEST] mixer_height : %d, width : %d \n",pipe->mixer->height,pipe->mixer->width);
 
-			pipe->dst.h= pipe->src.h; 
-			if(pipe->dst.h+pipe->dst.y > pipe->mixer->height) 
-				pipe->dst.y -= (pipe->dst.h + pipe->dst.y - pipe->mixer->height); 
-	} 
+			pipe->dst.h= pipe->src.h;
+			if(pipe->dst.h+pipe->dst.y > pipe->mixer->height)
+				pipe->dst.y -= (pipe->dst.h + pipe->dst.y - pipe->mixer->height);
+	}
 	pipe->mixer_stage = req->z_order;
 	pipe->is_fg = req->is_fg;
 	pipe->alpha = req->alpha;
@@ -970,6 +970,10 @@ static bool mdss_first_init = true;
 #endif
 #endif
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+int get_lcd_ldi_info(void);
+#endif
+
 int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp_display_commit *data)
 {
@@ -979,6 +983,9 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	struct mdss_mdp_ctl *tmp;
 	int ret = 0;
 	int sd_in_pipe = 0;
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	int te_ret = 0;
+#endif
 
 	if (ctl->shared_lock)
 		mutex_lock(ctl->shared_lock);
@@ -1089,7 +1096,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 			pipe->ndx == BIT(4) ? "RGB1" : pipe->ndx == BIT(5) ? "RGB2" :
 			pipe->ndx == BIT(6) ? "DMA0" : "DMA1" ,
 			pipe->mixer_stage - MDSS_MDP_STAGE_0, pipe->flags,
-			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h, 
+			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h,
 			pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h);
 
 	}
@@ -1135,6 +1142,15 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 #endif
 #endif
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	if (get_lcd_ldi_info()) {
+		te_ret = mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_TE_UPDATE, NULL);
+		if (te_ret < 0) {
+			mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_TE_RESTORE, NULL);
+		}
+	}
+#endif
+
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)\
 	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 	mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_FRAME_UPDATE, NULL);
@@ -1150,7 +1166,7 @@ commit_fail:
 	mutex_unlock(&mdp5_data->ov_lock);
 	if (ctl->shared_lock)
 		mutex_unlock(ctl->shared_lock);
-	
+
 #if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
 	if(get_lcd_attached() == 0)
 		return 0;
@@ -1221,7 +1237,7 @@ static int mdss_mdp_overlay_unset(struct msm_fb_data_type *mfd, int ndx)
 		goto done;
 	}
 	}
-	
+
 #else
 	if (!mfd->panel_power_on) {
 		ret = -EPERM;
@@ -2938,7 +2954,7 @@ void mdss_mdp_underrun_dump_info(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 
 	pr_info(" ============ dump_start ===========\n");
-	
+
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		if (pipe)
 			pr_info(" [%4d, %4d, %4d, %4d] -> [%4d, %4d, %4d, %4d]"

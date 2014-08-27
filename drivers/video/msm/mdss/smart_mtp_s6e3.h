@@ -54,6 +54,10 @@ Copyright (C) 2012, Samsung Electronics. All rights reserved.
 #define EVT0_K_wqhd_REVE 0x03
 #define EVT0_K_wqhd_REVF 0x04
 
+#define EVT2_K_fhd_magna_REVA  0x50
+#define EVT2_K_fhd_magna_REVB  0x61
+#define EVT2_K_fhd_magna_REVC  0x72
+
 /*
 *	From 4.8 inch model use AID function
 *	CASE#1 is used for now.

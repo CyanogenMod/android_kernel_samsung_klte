@@ -185,14 +185,14 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"AI", "AI", 1},
 	{"AF", "AD", 0},
 	{"AG", "AG", 2},
-	{"AR", "AR", 21},
+	{"AR", "AU", 6},
 	{"AW", "AW", 2},
 	{"AU", "AU", 6},
 	{"AT", "AT", 4},
 	{"AZ", "AZ", 2},
 	{"BS", "BS", 2},
 	{"BH", "BH", 4},
-	{"BD", "BD", 2},
+	{"BD", "AO", 0},
 	{"BY", "BY", 3},
 	{"BE", "BE", 4},
 	{"BM", "BM", 12},
@@ -257,7 +257,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"MA", "MA", 2},
 	{"NP", "ID", 5},
 	{"NL", "NL", 4},
-	{"AN", "AN", 2},
+	{"AN", "GD", 2},
 	{"NZ", "NZ", 4},
 	{"NO", "NO", 4},
 	{"OM", "OM", 4},
@@ -332,12 +332,15 @@ void get_customized_country_code(void *adapter, char *country_iso_code, wl_count
 	return;
 }
 
-#ifdef SLP_PATH
+#ifdef PLATFORM_SLP
 #define CIDINFO "/opt/etc/.cid.info"
 #define PSMINFO "/opt/etc/.psm.info"
 #define MACINFO "/opt/etc/.mac.info"
 #define MACINFO_EFS NULL
-#define	REVINFO "/data/.rev"
+#define REVINFO "/opt/etc/.rev"
+#define WIFIVERINFO "/opt/etc/.wifiver.info"
+#define ANTINFO "/opt/etc/.ant.info"
+#define WRMAC_BUF_SIZE 19
 #else
 #define MACINFO "/data/.mac.info"
 #define MACINFO_EFS "/efs/wifi/.mac.info"
@@ -345,7 +348,10 @@ void get_customized_country_code(void *adapter, char *country_iso_code, wl_count
 #define	REVINFO "/data/.rev"
 #define CIDINFO "/data/.cid.info"
 #define PSMINFO "/data/.psm.info"
-#endif /* SLP_PATH */
+#define WIFIVERINFO "/data/.wifiver.info"
+#define ANTINFO "/data/.ant.info"
+#define WRMAC_BUF_SIZE 18
+#endif /* PLATFORM_SLP */
 
 #ifdef BCM4330_CHIP
 #define CIS_BUF_SIZE            128
@@ -1117,7 +1123,9 @@ int dhd_check_module_mac(dhd_pub_t *dhd, struct ether_addr *mac)
 		while (index < remained_len) {
 			if (cis_buf[index] == CIS_TUPLE_TAG_START) {
 				remained_len -= index;
-				elt = (bcm_tlv_t *)&cis_buf[index];
+				if (remained_len >= sizeof(bcm_tlv_t)) {
+					elt = (bcm_tlv_t *)&cis_buf[index];
+				}
 				break;
 			} else {
 				index++;
@@ -1130,8 +1138,8 @@ int dhd_check_module_mac(dhd_pub_t *dhd, struct ether_addr *mac)
 			int body_len = (int)elt->len;
 
 			if ((elt->id == CIS_TUPLE_TAG_START) &&
-				(*elt->data == CIS_TUPLE_TAG_MACADDR) &&
-				(remained_len >= (body_len + TLV_HDR_LEN))) {
+				(remained_len >= (body_len + TLV_HDR_LEN)) &&
+				(*elt->data == CIS_TUPLE_TAG_MACADDR)) {
 				/* found MAC Address tuple and
 				 * get the MAC Address data
 				 */
@@ -1184,7 +1192,7 @@ int dhd_write_macaddr(struct ether_addr *mac)
 	char *filepath_efs      = MACINFO_EFS;
 
 	struct file *fp_mac = NULL;
-	char buf[18]      = {0};
+	char buf[WRMAC_BUF_SIZE]      = {0};
 	mm_segment_t oldfs    = {0};
 	int ret = -1;
 	int retry_count = 0;
@@ -1350,13 +1358,14 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 	int ret = -1;
 	uint32 ant_val = 0;
 	uint32 btc_mode = 0;
-	char *filepath = "/data/.ant.info";
+	char *filepath = ANTINFO;
 	char iovbuf[WLC_IOCTL_SMLEN];
 	uint chip_id = dhd_bus_chip_id(dhd);
 
 	/* Check if this chip can support MIMO */
 	if (chip_id != BCM4324_CHIP_ID &&
 		chip_id != BCM4350_CHIP_ID &&
+		chip_id != BCM4356_CHIP_ID &&
 		chip_id != BCM4354_CHIP_ID) {
 		DHD_ERROR(("[WIFI_SEC] %s: This chipset does not support MIMO\n",
 			__FUNCTION__));
@@ -1544,7 +1553,7 @@ uint32 sec_save_wlinfo(char *firm_ver, char *dhd_ver, char *nvram_p)
 {
 	struct file *fp = NULL;
 	struct file *nvfp = NULL;
-	char *filepath = "/data/.wifiver.info";
+	char *filepath = WIFIVERINFO;
 	int min_len, str_len = 0;
 	int ret = 0;
 	char* nvram_buf;

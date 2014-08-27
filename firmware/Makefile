@@ -157,6 +157,7 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_MMS134S) += tsp_melfas/kanas_mms134s_new.fw
 
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_G)    += tsp_synaptics/synaptics_s5100_k_a2_fhd.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_G)    += tsp_synaptics/synaptics_s5100_k_a3.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI_G)    += tsp_synaptics/synaptics_s5100_k_active.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)      += tsp_synaptics/synaptics_s5050_h.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= tsp_synaptics/synaptics_s5707.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= tsp_synaptics/synaptics_s5708.fw
@@ -193,6 +194,7 @@ fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw ssp_rev03.fw
 ifndef CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE
 fw-shipped-$(CONFIG_SENSORS_SSP_STM) += ssp_stm.fw ssp_stm_rvs.fw ssp_stm_88921.fw ssp_stm_w2014.fw
 fw-shipped-$(CONFIG_SENSORS_SSP_STM_32F) += ssp_stm32f.fw
+fw-shipped-$(CONFIG_SEC_KSPORTS_PROJECT) += ssp_stm_tasman.fw
 endif
 fw-shipped-$(CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE) += ssp_stm_bf.fw
 fw-shipped-$(CONFIG_SENSORS_SSP) += ssp_crashed.fw

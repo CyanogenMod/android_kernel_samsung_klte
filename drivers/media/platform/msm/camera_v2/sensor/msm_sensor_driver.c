@@ -365,12 +365,10 @@ int32_t msm_sensor_driver_probe(void *setting)
 		s_ctrl->sensor_i2c_client);
 #endif
 
-#ifndef CONFIG_SEC_KACTIVE_PROJECT
 	/*COMP_EN init-set low*/
 	gpio_set_value_cansleep(
 		power_info->gpio_conf->gpio_num_info->gpio_num
 		[SENSOR_GPIO_COMP], GPIOF_OUT_INIT_LOW);
-#endif
 	return rc;
 
  FREE_POWER_OFF_SETTING:

@@ -1051,11 +1051,6 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 
 	ret = -EBUSY;
 
-#ifdef CONFIG_CMA
-	if ((mode & ISOLATE_NO_CMA) && is_cma_pageblock(page))
-		return ret;
-#endif
-
 	/*
 	 * To minimise LRU disruption, the caller can indicate that it only
 	 * wants to isolate pages it will be able to operate on without
@@ -1151,6 +1146,11 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 			mem_cgroup_lru_del_list(page, lru);
 			list_move(&page->lru, dst);
 			nr_taken += hpage_nr_pages(page);
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+			if (PageCMA(page))
+				__mod_zone_page_state(page_zone(page),
+					NR_FREE_CMA_PAGES + 1 + lru, -1);
+#endif
 			break;
 
 		case -EBUSY:
@@ -1335,10 +1335,6 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
 		isolate_mode |= ISOLATE_UNMAPPED;
 	if (!sc->may_writepage)
 		isolate_mode |= ISOLATE_CLEAN;
-#ifdef CONFIG_CMA
-	if (allocflags_to_migratetype(sc->gfp_mask) != MIGRATE_MOVABLE)
-		isolate_mode |= ISOLATE_NO_CMA;
-#endif
 
 	spin_lock_irq(&zone->lru_lock);
 
@@ -1455,6 +1451,9 @@ static void move_active_pages_to_lru(struct zone *zone,
 {
 	unsigned long pgmoved = 0;
 	struct page *page;
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	unsigned long nr_cma = 0;
+#endif
 
 	while (!list_empty(list)) {
 		struct lruvec *lruvec;
@@ -1467,6 +1466,10 @@ static void move_active_pages_to_lru(struct zone *zone,
 		lruvec = mem_cgroup_lru_add_list(zone, page, lru);
 		list_move(&page->lru, &lruvec->lists[lru]);
 		pgmoved += hpage_nr_pages(page);
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+		if (PageCMA(page))
+			nr_cma++;
+#endif
 
 		if (put_page_testzero(page)) {
 			__ClearPageLRU(page);
@@ -1482,6 +1485,10 @@ static void move_active_pages_to_lru(struct zone *zone,
 		}
 	}
 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, pgmoved);
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	__mod_zone_page_state(zone, NR_FREE_CMA_PAGES + 1 + lru, nr_cma);
+#endif
+
 	if (!is_active_lru(lru))
 		__count_vm_events(PGDEACTIVATE, pgmoved);
 }
@@ -2334,6 +2341,7 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 				lru_pages += zone_reclaimable_pages(zone);
 			}
 
+			shrink->priority = sc->priority;
 			shrink_slab(shrink, sc->nr_scanned, lru_pages);
 			if (reclaim_state) {
 				sc->nr_reclaimed += reclaim_state->reclaimed_slab;
@@ -2817,6 +2825,7 @@ loop_again:
 				shrink_zone(zone, &sc);
 
 				reclaim_state->reclaimed_slab = 0;
+				shrink.priority = sc.priority;
 				nr_slab = shrink_slab(&shrink, sc.nr_scanned, lru_pages);
 				sc.nr_reclaimed += reclaim_state->reclaimed_slab;
 				total_scanned += sc.nr_scanned;
@@ -3428,6 +3437,7 @@ static int __zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
 			unsigned long lru_pages = zone_reclaimable_pages(zone);
 
 			/* No reclaimable slab or very low memory pressure */
+			shrink.priority = sc.priority;
 			if (!shrink_slab(&shrink, sc.nr_scanned, lru_pages))
 				break;
 
@@ -3574,6 +3584,11 @@ void check_move_unevictable_pages(struct page **pages, int nr_pages)
 						LRU_UNEVICTABLE, lru);
 			list_move(&page->lru, &lruvec->lists[lru]);
 			__inc_zone_state(zone, NR_INACTIVE_ANON + lru);
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+			if (PageCMA(page))
+				__inc_zone_state(zone,
+					NR_FREE_CMA_PAGES + 1 + lru);
+#endif
 			pgrescued++;
 		}
 	}

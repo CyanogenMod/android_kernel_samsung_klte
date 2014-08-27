@@ -54,6 +54,7 @@ extern void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 extern int sec_debug_is_enabled(void);
 extern int sec_debug_is_enabled_for_ssr(void);
 extern int silent_log_panic_handler(void);
+extern void sec_debug_secure_app_addr_size(uint32_t addr,uint32_t size);
 #else
 static inline int sec_debug_init(void)
 {
@@ -556,6 +557,8 @@ struct sec_debug_subsys {
 	struct sec_debug_subsys_data_modem *modem;
 	struct sec_debug_subsys_data *dsps;
 
+	int secure_app_start_addr;
+	int secure_app_size;
 	struct sec_debug_subsys_private priv;
 };
 

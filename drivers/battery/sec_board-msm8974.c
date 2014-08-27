@@ -88,6 +88,11 @@ static struct battery_data_t samsung_battery_data[] = {
 		.RCOMP_charging = 0x68,
 		.temp_cohot = -175,
 		.temp_cocold = -5825,
+#elif defined(CONFIG_SEC_KSPORTS_PROJECT)
+		.RCOMP0 = 0x67,
+		.RCOMP_charging = 0x67,
+		.temp_cohot = -175,
+		.temp_cocold = -5825,
 #elif defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
 		.RCOMP0 = 0x5D,
 		.RCOMP_charging = 0x5D,
@@ -135,7 +140,8 @@ static struct battery_data_t samsung_battery_data[] = {
 #endif
 
 
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
+	defined(CONFIG_SEC_KSPORTS_PROJECT)
 #define CAPACITY_MAX			990
 #define CAPACITY_MAX_MARGIN	50
 #define CAPACITY_MIN			-7
@@ -171,7 +177,8 @@ static struct sec_fuelgauge_info *sec_fuelgauge = NULL;
 #if defined(CONFIG_MACH_KLTE_EUR) || defined(CONFIG_MACH_KLTE_ATT) || defined(CONFIG_MACH_KLTE_TMO) || \
 	defined (CONFIG_MACH_KLTE_SKT) || defined(CONFIG_MACH_KLTE_KTT) || defined(CONFIG_MACH_KLTE_LGT) || \
 	defined(CONFIG_MACH_KLTE_SPR) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_MTR) || \
-	defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_SEC_LOCALE_CHN) || defined(CONFIG_MACH_KLTE_AUS_TEL)
+	defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_SEC_LOCALE_CHN) || defined(CONFIG_MACH_KLTE_AUS_TEL) || \
+	defined(CONFIG_MACH_KLTE_LRA)
 static sec_bat_adc_table_data_t temp_table[] = {
 	{26009,	900},
 	{26280,	850},
@@ -207,7 +214,7 @@ static sec_bat_adc_table_data_t temp_table[] = {
 	{42030,	-250},
 	{42327,	-300},
 };
-#elif defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT)
+#elif defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_CAN) || defined(CONFIG_MACH_KACTIVELTE_SKT)
 static sec_bat_adc_table_data_t temp_table[] = {
 	{26009,	900},
 	{26280,	850},
@@ -232,6 +239,47 @@ static sec_bat_adc_table_data_t temp_table[] = {
 	{40002,	-50},
 	{41724,	-200},
 	{42373,	-300},
+};
+#elif defined(CONFIG_SEC_KSPORTS_PROJECT)
+static sec_bat_adc_table_data_t temp_table[] = {
+	{25744,	900},
+	{26015,	850},
+	{26335,	800},
+	{26685,	750},
+	{27082,	700},
+	{27512,	650},
+	{27900,	600},
+	{28223,	550},
+	{28438,	530},
+	{28790,	500},
+	{29080,	490},
+	{29370,	480},
+	{29660,	470},
+	{29950,	460},
+	{30250,	450},
+	{31223,	400},
+	{32138,	350},
+	{33153,	300},
+	{34177,	250},
+	{35432,	200},
+	{36520,	150},
+	{37636,	100},
+	{38598,	50},
+	{38700,	40},
+	{38930,	30},
+	{38950,	20},
+	{39050,	10},
+	{39168,	0},
+	{39281,	-10},
+	{39438,	-20},
+	{39596,	-30},
+	{39728,	-40},
+	{39898,	-50},
+	{40594,	-100},
+	{41193,	-150},
+	{41651,	-200},
+	{42033,	-250},
+	{42325,	-300},
 };
 #elif defined (CONFIG_MACH_KLTE_DCM)
 static sec_bat_adc_table_data_t temp_table[] = {
@@ -311,7 +359,7 @@ static sec_bat_adc_table_data_t temp_table[] = {
 	{41146,	-150},
 	{41622,	-200},
 };
-#elif defined (CONFIG_MACH_KLTE_USC)
+#elif defined (CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KLTE_ACG)
 static sec_bat_adc_table_data_t temp_table[] = {
 	{26013,	900},
 	{26227,	850},
@@ -655,7 +703,8 @@ static sec_bat_adc_table_data_t temp_table[] = {
 };
 #endif
 
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
+	defined(CONFIG_SEC_KSPORTS_PROJECT)
 #define TEMP_HIGHLIMIT_THRESHOLD_EVENT		800
 #define TEMP_HIGHLIMIT_RECOVERY_EVENT		750
 #define TEMP_HIGHLIMIT_THRESHOLD_NORMAL		800
@@ -666,7 +715,7 @@ static sec_bat_adc_table_data_t temp_table[] = {
 
 #if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_ATT) || \
 	defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_SPR) || \
-	defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KLTE_MTR)
+	defined(CONFIG_MACH_KLTE_MTR) || defined(CONFIG_MACH_KACTIVELTE_SKT)
 #define TEMP_HIGH_THRESHOLD_EVENT	600
 #define TEMP_HIGH_RECOVERY_EVENT		460
 #define TEMP_LOW_THRESHOLD_EVENT		-50
@@ -679,7 +728,33 @@ static sec_bat_adc_table_data_t temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM		500
 #define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		-20
-#elif defined(CONFIG_MACH_KLTE_VZW)
+#elif defined(CONFIG_MACH_KSPORTSLTE_SPR)
+#define TEMP_HIGH_THRESHOLD_EVENT	600
+#define TEMP_HIGH_RECOVERY_EVENT		460
+#define TEMP_LOW_THRESHOLD_EVENT		-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	550
+#define TEMP_HIGH_RECOVERY_NORMAL	470
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		500
+#define TEMP_HIGH_RECOVERY_LPM		480
+#define TEMP_LOW_THRESHOLD_LPM		-30
+#define TEMP_LOW_RECOVERY_LPM		23
+#elif defined(CONFIG_MACH_KACTIVELTE_ATT)
+#define TEMP_HIGH_THRESHOLD_EVENT	600
+#define TEMP_HIGH_RECOVERY_EVENT		460
+#define TEMP_LOW_THRESHOLD_EVENT		-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	550
+#define TEMP_HIGH_RECOVERY_NORMAL	470
+#define TEMP_LOW_THRESHOLD_NORMAL	-30
+#define TEMP_LOW_RECOVERY_NORMAL	20
+#define TEMP_HIGH_THRESHOLD_LPM		525
+#define TEMP_HIGH_RECOVERY_LPM		470
+#define TEMP_LOW_THRESHOLD_LPM		-10
+#define TEMP_LOW_RECOVERY_LPM		20
+#elif defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_LRA)
 #define TEMP_HIGH_THRESHOLD_EVENT	600
 #define TEMP_HIGH_RECOVERY_EVENT		460
 #define TEMP_LOW_THRESHOLD_EVENT		-50
@@ -692,6 +767,19 @@ static sec_bat_adc_table_data_t temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM		500
 #define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		-20
+#elif defined (CONFIG_MACH_KLTE_ACG)
+#define TEMP_HIGH_THRESHOLD_EVENT	540
+#define TEMP_HIGH_RECOVERY_EVENT		460
+#define TEMP_LOW_THRESHOLD_EVENT		-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	540
+#define TEMP_HIGH_RECOVERY_NORMAL	460
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		540
+#define TEMP_HIGH_RECOVERY_LPM		460
+#define TEMP_LOW_THRESHOLD_LPM		-50
+#define TEMP_LOW_RECOVERY_LPM		0
 #elif defined (CONFIG_MACH_KLTE_USC)
 #define TEMP_HIGH_THRESHOLD_EVENT	600
 #define TEMP_HIGH_RECOVERY_EVENT		460
@@ -1286,7 +1374,7 @@ bool sec_bat_check_jig_status(void)
 #if defined(CONFIG_SEC_H_PROJECT) || defined(CONFIG_SEC_F_PROJECT) || \
 	defined(CONFIG_SEC_KS01_PROJECT) || defined(CONFIG_MACH_MONDRIAN) || \
 	defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_FRESCO_PROJECT) || \
-	defined(CONFIG_SEC_KACTIVE_PROJECT)
+	defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)
 #if defined(CONFIG_EXTCON)
 	return get_jig_state();
 #else
@@ -1410,7 +1498,8 @@ bool sec_bat_check_cable_result_callback(
 			regulator_enable(ldo11);
 		}
 	}
-#elif defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#elif defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
+	defined(CONFIG_SEC_KSPORTS_PROJECT)
 	struct regulator *max77826_ldo6;
 	current_cable_type = cable_type;
 
@@ -1483,7 +1572,8 @@ void board_battery_init(struct platform_device *pdev, struct sec_battery_info *b
 		battery->pdata->temp_amb_adc_table_size = sizeof(temp_table)/sizeof(sec_bat_adc_table_data_t);
 	}
 	battery->pdata->event_check = true;
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
+	defined(CONFIG_SEC_KSPORTS_PROJECT)
 	battery->pdata->temp_highlimit_threshold_event = TEMP_HIGHLIMIT_THRESHOLD_EVENT;
 	battery->pdata->temp_highlimit_recovery_event = TEMP_HIGHLIMIT_RECOVERY_EVENT;
 	battery->pdata->temp_highlimit_threshold_normal = TEMP_HIGHLIMIT_THRESHOLD_NORMAL;
@@ -1506,8 +1596,10 @@ void board_battery_init(struct platform_device *pdev, struct sec_battery_info *b
 
 #if defined(CONFIG_MACH_KLTE_ATT) || defined(CONFIG_MACH_KLTE_TMO) || \
 	defined(CONFIG_MACH_KLTE_SPR) || defined(CONFIG_MACH_KLTE_VZW) || \
-	defined(CONFIG_MACH_KLTE_MTR) || \
-	defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KACTIVELTE_ATT)
+	defined(CONFIG_MACH_KLTE_MTR) || defined(CONFIG_MACH_KSPORTSLTE_SPR) || \
+	defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KACTIVELTE_ATT) || \
+	defined(CONFIG_MACH_KLTE_ACG) || defined(CONFIG_MACH_KLTE_LRA) || \
+	defined(CONFIG_MACH_KACTIVELTE_SKT)
 	battery->pdata->check_adc_max = 1110;
 	battery->pdata->check_adc_min = 150;
 #endif

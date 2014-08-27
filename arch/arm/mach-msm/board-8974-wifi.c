@@ -178,7 +178,7 @@ static int brcm_init_wlan_mem(void)
 #endif /* defined CONFIG_SEC_K_PROJECT and CONFIG_SEC_KACTIVE_PROJECT */
 
 /* MSM8974 WLAN_HOST_WAKE GPIO Number */
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)
 #if defined(CONFIG_MACH_KLTE_JPN_WLAN_OBSOLETE)
 #define GPIO_WL_HOST_WAKE 73
 #else
@@ -193,7 +193,8 @@ extern int ice_gpiox_get(int num);
 extern int ice_gpiox_set(int num, int val);
 #endif
 
-#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KS01_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KS01_PROJECT) &&\
+    !defined(CONFIG_SEC_KACTIVE_PROJECT) && !defined(CONFIG_SEC_KSPORTS_PROJECT)
 static unsigned config_gpio_wl_reg_on[] = {
 	GPIO_CFG(GPIO_WL_REG_ON, 0, GPIO_CFG_OUTPUT,
 		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA) };
@@ -224,7 +225,7 @@ int __init brcm_wifi_init_gpio(void)
 		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA);
 
 #ifndef CONFIG_SEC_KS01_PROJECT
-#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT) && !defined(CONFIG_SEC_KSPORTS_PROJECT)
 	if (gpio_tlmm_config(config_gpio_wl_reg_on[0], GPIO_CFG_ENABLE))
 		printk(KERN_ERR "%s: Failed to configure GPIO"
 			" - WL_REG_ON\n", __func__);
@@ -304,7 +305,7 @@ static int brcm_wlan_power(int onoff)
 		else
 		{
 			printk("[%s] gpio value is 0. We need reinit.\n",__func__);
-#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT) && !defined(CONFIG_SEC_KSPORTS_PROJECT)
 			if (gpio_tlmm_config(config_gpio_wl_reg_on[0], GPIO_CFG_ENABLE))
 				printk(KERN_ERR "%s: Failed to configure GPIO"
 						" - WL_REG_ON\n", __func__);

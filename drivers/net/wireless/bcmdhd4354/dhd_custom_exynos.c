@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_custom_exynos.c 454079 2014-02-07 11:37:39Z $
+ * $Id: dhd_custom_exynos.c 459213 2014-03-01 06:26:09Z $
  */
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -169,6 +169,13 @@ static int dhd_init_wlan_mem(void)
 
 err_mem_alloc:
 	pr_err("Failed to mem_alloc for WLAN\n");
+	if (wlan_static_scan_buf0)
+		kfree(wlan_static_scan_buf0);
+	if (wlan_static_scan_buf1)
+		kfree(wlan_static_scan_buf1);
+	if (wlan_static_dhd_info_buf)
+		kfree(wlan_static_dhd_info_buf);
+
 	for (j = 0; j < i; j++)
 		kfree(wlan_mem_array[j].mem_ptr);
 

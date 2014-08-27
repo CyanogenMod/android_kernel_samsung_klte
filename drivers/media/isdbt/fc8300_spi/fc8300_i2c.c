@@ -25,7 +25,7 @@
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include<linux/slab.h>
-
+#include <mach/sec_debug.h>
 #include "fci_types.h"
 #include "fc8300_regs.h"
 #include "fci_oal.h"
@@ -243,7 +243,7 @@ s32 fc8300_i2c_dataread(HANDLE handle, DEVICEID devid,
 		u16 addr, u8 *data, u32 length)
 {
 	s32 res;
-	pr_err("%s \n",__func__);
+	ISDB_PR_DBG("%s \n",__func__);
 #ifdef BBM_I2C_SPI
 	res = fc8300_spi_dataread(handle, devid,
 		addr, data, length);

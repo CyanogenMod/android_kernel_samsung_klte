@@ -51,7 +51,8 @@ s32 fci_hpi_read(HANDLE handle, DEVICEID devid,
 s32 fci_hpi_write(HANDLE handle, DEVICEID devid,
 		u8 chip, u8 addr, u8 alen, u8 *data, u8 len)
 {
-#if !defined(BBM_I2C_SPI) && !defined(BBM_I2C_TSIF) /* ONLY ES SPI */
+#if !defined(BBM_I2C_SPI) && !defined(BBM_I2C_TSIF) && defined(BBM_ES) /* ONLY ES SPI */
+
 	s32 i;
 
 	mutex_lock(&fci_hpi_lock);

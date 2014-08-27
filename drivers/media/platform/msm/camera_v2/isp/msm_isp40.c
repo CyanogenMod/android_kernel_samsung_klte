@@ -574,17 +574,15 @@ static void msm_vfe40_axi_cfg_comp_mask(struct vfe_device *vfe_dev,
 		      stream_composite_mask << (comp_mask_index * 8));
 	if (stream_info->plane_cfg[0].plane_addr_offset &&
 	    stream_info->stream_type == CONTINUOUS_STREAM) {
-		/* This was added for CPP firmware workaround. Now done by ISPIF IRQ */
-//		comp_mask |= (axi_data->composite_info[comp_mask_index].
-//			      stream_composite_mask << 24);
+		comp_mask |= (axi_data->composite_info[comp_mask_index].
+			      stream_composite_mask << 24);
 	}
 	msm_camera_io_w(comp_mask, vfe_dev->vfe_base + 0x40);
 	printk("%s comp mask:0x%x\n", __func__, comp_mask);
 	irq_mask = msm_camera_io_r(vfe_dev->vfe_base + 0x28);
 	irq_mask |= 1 << (comp_mask_index + 25);
-	/* This was added for CPP firmware workaround. Now done by ISPIF IRQ */
-//	if (stream_info->plane_cfg[0].plane_addr_offset && (comp_mask >> 24))
-//		irq_mask |= 0x10000000;
+	if (stream_info->plane_cfg[0].plane_addr_offset && (comp_mask >> 24))
+		irq_mask |= 0x10000000;
 	msm_camera_io_w(irq_mask, vfe_dev->vfe_base + 0x28);
 }
 

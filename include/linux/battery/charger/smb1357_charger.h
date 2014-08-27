@@ -70,8 +70,10 @@
 
 #define	CFG_A_REG			0x0A
 #define	DCIN_ADAPTER_MASK		SMB135X_MASK(7, 5)
+#define DCIN_9VONLY			0x60
 #define DCIN_5VTO9V			0x40
 #define DCIN_5VOR9V			0x20
+#define DCIN_5VONLY			0x00
 #define	DCIN_INPUT_MASK			SMB135X_MASK(4, 0)
 
 #define	CFG_B_REG			0x0B
@@ -159,6 +161,7 @@
 
 #define IRQ3_CFG_REG			0x09
 #define IRQ3_SRC_DETECT_BIT		BIT(2)
+#define IRQ3_DCIN_OV_BIT		BIT(1)
 #define IRQ3_DCIN_UV_BIT		BIT(0)
 
 /* Command Registers */
@@ -225,10 +228,10 @@
 #define HVDCP_SEL_5V_BIT	BIT(0)
 
 #define STATUS_8_REG			0x4E
-#define USBIN_9V			BIT(5)
+#define USBIN_HV			BIT(5)
 #define USBIN_UNREG			BIT(4)
 #define USBIN_LV			BIT(3)
-#define DCIN_9V				BIT(2)
+#define DCIN_HV				BIT(2)
 #define DCIN_UNREG			BIT(1)
 #define DCIN_LV				BIT(0)
 
@@ -277,6 +280,12 @@
 enum {
 	WRKARND_USB100_BIT = BIT(0),
 	WRKARND_APSD_FAIL = BIT(1),
+};
+
+enum {
+	DCIN_NONE = 0,
+	DCIN_5V = 5,
+	DCIN_9V = 9,
 };
 
 enum {

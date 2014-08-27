@@ -585,7 +585,7 @@ static int msm_isp_flush_buf(struct msm_isp_buf_mgr *buf_mgr,
 			pr_err("%s: buf not found\n", __func__);
 			continue;
 		}
-		pr_err("%s abhishek i %d buf_state %d frame_id %u get_count %d put_count %d used[0] %d used[1] %d\n", __func__, i,
+		pr_err("%s i %d buf_state %d frame_id %u get_count %d put_count %d used[0] %d used[1] %d\n", __func__, i,
 		       buf_info->state, buf_info->frame_id, buf_info->buf_get_count, buf_info->buf_put_count,
 		       buf_info->buf_used[0], buf_info->buf_used[1]);
 		spin_lock_irqsave(&bufq->bufq_lock, flags);

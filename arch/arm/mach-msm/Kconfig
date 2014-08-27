@@ -2169,6 +2169,20 @@ config MACH_KACTIVELTE_ATT
 	help
 	  Support for Samsung KACTIVELTE_ATT device.
 
+config MACH_KACTIVELTE_CAN
+	default n
+	bool "Samsung model KACTIVELTE_CAN"
+	select SEC_KACTIVE_PROJECT
+	help
+	  Support for Samsung KACTIVELTE_CAN device.
+
+config MACH_KACTIVELTE_SKT
+	default n
+	bool "Samsung model KACTIVELTE_SKT"
+	select SEC_KACTIVE_PROJECT
+	help
+	  Support for Samsung KACTIVELTE_SKT device.
+
 config SEC_KSPORTS_PROJECT
 	depends on ARCH_MSM8974PRO
 	default n
@@ -4264,7 +4278,8 @@ config TIMA_RKP_30
 config TIMA_RKP_COHERENT_TT
        bool
        depends on TIMA_RKP_30
-       default n 
+       depends on ARCH_MSM8974PRO
+       default y 
        help
          RKP cache coherency feature- depends on corresponding TZ RKP code!!!
 
@@ -4297,12 +4312,13 @@ config TIMA_RKP_LAZY_MMU
 	help
 	 TIMA lazy MMU for L2 pages
 
-config	TIMA_RKP_DMA_MVA_TO_SETWAY
+config 	TIMA_RKP_EMUL_CP15_INSTR
 	bool
-	depends on TIMA_RKP
-	default n
+	depends on TIMA_RKP_30
+	depends on ARCH_MSM8974PRO
+	default y
 	help
-	 Flush cache by set-way for dma?
+	 RKP emulates CP15 instructions affecting MMU
 
 config TIMA_RKP_DEBUG
        bool
@@ -4321,7 +4337,7 @@ config TIMA_LKMAUTH
 config TIMA_LKMAUTH_CODE_PROT
        bool
        depends on TIMA_LKMAUTH
-       default y
+       default n
        help
          When enabled, this feature will mark all Executable sections in an
          LKM as RO

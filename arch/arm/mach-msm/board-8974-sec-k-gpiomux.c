@@ -80,7 +80,7 @@ static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(117),
 	GPIOMUX_SET_NC(118),
 #endif
-#if defined(CONFIG_MACH_KLTE_VZW)
+#if defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_LRA)
 	GPIOMUX_SET_NC(105),
 #endif
 #if defined(CONFIG_MACH_K3GDUOS_CTC)
@@ -1186,7 +1186,7 @@ static struct msm_gpiomux_config sd_card_det __initdata = {
 static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 	{
 		.gpio = 15, /* CAM_MCLK0 */
-#if !defined(CONFIG_MACH_KLTE_CHN)
+#if !defined(CONFIG_MACH_KLTE_CHN) && !defined(CONFIG_MACH_K3GDUOS_CTC)
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &cam_settings[0],
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[3],
