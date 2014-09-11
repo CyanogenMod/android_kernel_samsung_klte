@@ -123,9 +123,9 @@ struct vibrator_platform_data vibrator_drvdata;
 
 /*
  * msm8974_sec tspdrv vibration strength control
- * (/sys/vibrator/pwm_val)
+ * (/sys/class/timed_output/vibrator/pwm_value)
  *
- * sysfs pwm_val
+ * sysfs pwm_value
  *    range   : 0 - 100 (100 = old hardcoded value)
  *
  * Author : Park Ju Hyung <qkrwngud825@gmail.com>
@@ -261,9 +261,11 @@ static void vibetonz_start(void)
 
 	ret = timed_output_dev_register(&timed_output_vt);
 
-	if (ret)
+	if (ret) {
 		DbgOut((KERN_ERR
 		"tspdrv: timed_output_dev_register is fail\n"));
+		return;
+	}
 
 	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_value);
 
