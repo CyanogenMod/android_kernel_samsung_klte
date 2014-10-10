@@ -1,3 +1,4 @@
+header-y += audio_effects.h
 header-y += asequencer.h
 header-y += asound.h
 header-y += asound_fm.h
