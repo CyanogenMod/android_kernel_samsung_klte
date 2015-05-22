@@ -104,12 +104,6 @@ ifeq ($(CONFIG_SEC_K_PROJECT),y)
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r07.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r08.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r14.dtb
-        # dtbs for CHN
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r06.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r07.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r08.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r09.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r10.dtb
         # dtbs for KOR
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r03.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r04.dtb
