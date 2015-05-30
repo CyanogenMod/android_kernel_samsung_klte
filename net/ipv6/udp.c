@@ -454,7 +454,6 @@ csum_copy_err:
 	}
 	unlock_sock_fast(sk, slow);
 
-	
 	/* starting over for a new packet, but check if we need to yield */
 	cond_resched();
 	msg->msg_flags &= ~MSG_TRUNC;
