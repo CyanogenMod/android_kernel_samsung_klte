@@ -1574,6 +1574,12 @@ config MACH_K3GDUOS_CTC
         help
           Support for Samsung K3GDUOS_CTC device.
 
+config MACH_KLTE_LTNDUOS
+        default n
+        bool "Samsung model KLTE_LTNDUOS"
+        help
+          Support for Samsung KLTE LTNDUOS device.
+
 config MACH_KLTE_CMCC
         default n
         bool "Samsung model KLTE_CMCC"

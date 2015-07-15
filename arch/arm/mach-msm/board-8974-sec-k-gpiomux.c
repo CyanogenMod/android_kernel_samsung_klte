@@ -68,7 +68,9 @@ static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(73),
 #elif !defined(CONFIG_MACH_K3GDUOS_CTC)
 	GPIOMUX_SET_NC(18),
+	#if !defined(CONFIG_MACH_KLTE_LTNDUOS)
 	GPIOMUX_SET_NC(73),
+	#endif
 #endif
 #endif
 #if !defined(CONFIG_MACH_KLTE_CHN)
@@ -2441,6 +2443,16 @@ static struct msm_gpiomux_config msm8974_fingerprint_configs_08[] __initdata = {
 	{
 		/* BTP_LDO */
 		.gpio = 63,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &gpio_spi_btp_rst_config,
+			[GPIOMUX_ACTIVE] = &gpio_spi_btp_rst_config,
+		},
+	},
+#endif
+#if defined(CONFIG_MACH_KLTE_LTNDUOS)
+	{
+		/* BTP_LDO_EN2 */
+		.gpio = 73,
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_btp_rst_config,
 			[GPIOMUX_ACTIVE] = &gpio_spi_btp_rst_config,
