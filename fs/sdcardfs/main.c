@@ -2,11 +2,11 @@
  * fs/sdcardfs/main.c
  *
  * Copyright (c) 2013 Samsung Electronics Co. Ltd
- *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun, 
+ *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun,
  *               Sunghwan Yun, Sungjong Seo
- *                      
+ *
  * This program has been developed as a stackable file system based on
- * the WrapFS which written by 
+ * the WrapFS which written by
  *
  * Copyright (c) 1998-2011 Erez Zadok
  * Copyright (c) 2009     Shrikar Archak
@@ -19,16 +19,14 @@
  */
 
 #include "sdcardfs.h"
-#include "version.h"
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/parser.h>
-#include "../internal.h"
 
 enum {
-	Opt_uid, 
-	Opt_gid, 
-	Opt_wgid, 
+	Opt_uid,
+	Opt_gid,
+	Opt_wgid,
 	Opt_debug,
 	Opt_split,
 	Opt_derive,
@@ -49,7 +47,7 @@ static const match_table_t sdcardfs_tokens = {
 	{Opt_err, NULL}
 };
 
-static int parse_options(struct super_block *sb, char *options, int silent, 
+static int parse_options(struct super_block *sb, char *options, int silent,
 				int *debug, struct sdcardfs_mount_options *opts)
 {
 	char *p;
@@ -62,7 +60,7 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 	opts->fs_low_gid = AID_MEDIA_RW;
 	/* by default, we use AID_SDCARD_RW as write_gid */
 	opts->write_gid = AID_SDCARD_RW;
-	/* default permission policy 
+	/* default permission policy
 	 * (DERIVE_NONE | DERIVE_LEGACY | DERIVE_UNIFIED) */
 	opts->derive = DERIVE_NONE;
 	opts->split_perms = 0;
@@ -82,7 +80,7 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 			continue;
 
 		token = match_token(p, sdcardfs_tokens, args);
-		
+
 		switch (token) {
 		case Opt_debug:
 			*debug = 1;
@@ -149,9 +147,9 @@ invalid_option:
 
 	if (*debug) {
 		printk( KERN_INFO "sdcardfs : options - debug:%d\n", *debug);
-		printk( KERN_INFO "sdcardfs : options - uid:%d\n", 
+		printk( KERN_INFO "sdcardfs : options - uid:%d\n",
 							opts->fs_low_uid);
-		printk( KERN_INFO "sdcardfs : options - gid:%d\n", 
+		printk( KERN_INFO "sdcardfs : options - gid:%d\n",
 							opts->fs_low_gid);
 	}
 
@@ -174,9 +172,10 @@ static struct dentry *sdcardfs_d_alloc_root(struct super_block *sb)
 			.len = 1
 		};
 
-		ret = __d_alloc(sb, &name);
+		ret = d_alloc(NULL, &name);
 		if (ret) {
 			d_set_d_op(ret, &sdcardfs_ci_dops);
+			ret->d_sb = sb;
 			ret->d_parent = ret;
 		}
 	}
@@ -187,7 +186,7 @@ static struct dentry *sdcardfs_d_alloc_root(struct super_block *sb)
  * There is no need to lock the sdcardfs_super_info's rwsem as there is no
  * way anyone can have a reference to the superblock at this point in time.
  */
-static int sdcardfs_read_super(struct super_block *sb, const char *dev_name, 
+static int sdcardfs_read_super(struct super_block *sb, const char *dev_name,
 						void *raw_data, int silent)
 {
 	int err = 0;
@@ -197,7 +196,7 @@ static int sdcardfs_read_super(struct super_block *sb, const char *dev_name,
 	struct sdcardfs_sb_info *sb_info;
 	void *pkgl_id;
 
-	printk(KERN_INFO "sdcardfs: version %s\n", SDCARDFS_VERSION);
+	printk(KERN_INFO "sdcardfs version 2.0\n");
 
 	if (!dev_name) {
 		printk(KERN_ERR
@@ -282,7 +281,7 @@ static int sdcardfs_read_super(struct super_block *sb, const char *dev_name,
 		/* setup permission policy */
 		switch(sb_info->options.derive) {
 			case DERIVE_NONE:
-				setup_derived_state(sb->s_root->d_inode, 
+				setup_derived_state(sb->s_root->d_inode,
 					PERM_ROOT, 0, AID_ROOT, AID_SDCARD_RW, 00775);
 				sb_info->obbpath_s = NULL;
 				break;
@@ -290,37 +289,33 @@ static int sdcardfs_read_super(struct super_block *sb, const char *dev_name,
 				/* Legacy behavior used to support internal multiuser layout which
 				 * places user_id at the top directory level, with the actual roots
 				 * just below that. Shared OBB path is also at top level. */
-				setup_derived_state(sb->s_root->d_inode, 
+				setup_derived_state(sb->s_root->d_inode,
 				        PERM_LEGACY_PRE_ROOT, 0, AID_ROOT, AID_SDCARD_R, 00771);
-				/* initialize the obbpath string and lookup the path 
-				 * sb_info->obb_path will be deactivated by path_put 
+				/* initialize the obbpath string and lookup the path
+				 * sb_info->obb_path will be deactivated by path_put
 				 * on sdcardfs_put_super */
 				sb_info->obbpath_s = kzalloc(PATH_MAX, GFP_KERNEL);
 				snprintf(sb_info->obbpath_s, PATH_MAX, "%s/obb", dev_name);
-				err =  prepare_dir(sb_info->obbpath_s, 
+				err =  prepare_dir(sb_info->obbpath_s,
 							sb_info->options.fs_low_uid,
 							sb_info->options.fs_low_gid, 00755);
 				if(err)
-					printk(KERN_ERR "sdcardfs: %s: %d, error on creating %s\n", 
+					printk(KERN_ERR "sdcardfs: %s: %d, error on creating %s\n",
 							__func__,__LINE__, sb_info->obbpath_s);
 				break;
 			case DERIVE_UNIFIED:
 				/* Unified multiuser layout which places secondary user_id under
 				 * /Android/user and shared OBB path under /Android/obb. */
-				setup_derived_state(sb->s_root->d_inode, 
+				setup_derived_state(sb->s_root->d_inode,
 						PERM_ROOT, 0, AID_ROOT, AID_SDCARD_R, 00771);
-				
+
 				sb_info->obbpath_s = kzalloc(PATH_MAX, GFP_KERNEL);
 				snprintf(sb_info->obbpath_s, PATH_MAX, "%s/Android/obb", dev_name);
 				break;
 		}
 		fix_derived_permission(sb->s_root->d_inode);
 
-		sb_info->devpath = kzalloc(PATH_MAX, GFP_KERNEL);
-		if(sb_info->devpath && dev_name)
-			memcpy(sb_info->devpath, dev_name, PATH_MAX);
-		
-		if (!silent && !err)
+		if (!silent)
 			printk(KERN_INFO "sdcardfs: mounted on top of %s type %s\n",
 						dev_name, lower_sb->s_type->name);
 		goto out;
@@ -370,7 +365,7 @@ static struct dentry *mount_nodev_with_options(struct file_system_type *fs_type,
 struct dentry *sdcardfs_mount(struct file_system_type *fs_type, int flags,
 			    const char *dev_name, void *raw_data)
 {
-	/* 
+	/*
 	 * dev_name is a lower_path_name,
 	 * raw_data is a option string.
 	 */
@@ -420,9 +415,10 @@ static void __exit exit_sdcardfs_fs(void)
 	pr_info("Completed sdcardfs module unload\n");
 }
 
-MODULE_AUTHOR("Woojoong Lee, Daeho Jeong, Kitae Lee, Yeongjin Gil"
-        " System Memory Lab., Samsung Electronics");
-MODULE_DESCRIPTION("Sdcardfs " SDCARDFS_VERSION);
+MODULE_AUTHOR("Erez Zadok, Filesystems and Storage Lab, Stony Brook University"
+	      " (http://www.fsl.cs.sunysb.edu/)");
+MODULE_DESCRIPTION("Wrapfs " SDCARDFS_VERSION
+		   " (http://wrapfs.filesystems.org/)");
 MODULE_LICENSE("GPL");
 
 module_init(init_sdcardfs_fs);

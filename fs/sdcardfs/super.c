@@ -2,11 +2,11 @@
  * fs/sdcardfs/super.c
  *
  * Copyright (c) 2013 Samsung Electronics Co. Ltd
- *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun, 
+ *   Authors: Daeho Jeong, Woojoong Lee, Seunghwan Hyun,
  *               Sunghwan Yun, Sungjong Seo
- *                      
+ *
  * This program has been developed as a stackable file system based on
- * the WrapFS which written by 
+ * the WrapFS which written by
  *
  * Copyright (c) 1998-2011 Erez Zadok
  * Copyright (c) 2009     Shrikar Archak
@@ -35,11 +35,6 @@ static void sdcardfs_put_super(struct super_block *sb)
 	spd = SDCARDFS_SB(sb);
 	if (!spd)
 		return;
-
-	printk(KERN_ERR "sdcardfs: umounted dev_name %s\n", 
-				spd->devpath ? spd->devpath : "");
-	if(spd->devpath)
-		kfree(spd->devpath);
 
 	if(spd->obbpath_s) {
 		kfree(spd->obbpath_s);
@@ -75,15 +70,15 @@ static int sdcardfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 			printk(KERN_ERR "Returned block size is zero.\n");
 			return -EINVAL;
 		}
-	
+
 		min_blocks = ((sbi->options.reserved_mb * 1024 * 1024)/buf->f_bsize);
 		buf->f_blocks -= min_blocks;
-	
+
 		if (buf->f_bavail > min_blocks)
 			buf->f_bavail -= min_blocks;
 		else
 			buf->f_bavail = 0;
-	
+
 		/* Make reserved blocks invisiable to media storage */
 		buf->f_bfree = buf->f_bavail;
 	}
@@ -198,9 +193,9 @@ static void sdcardfs_umount_begin(struct super_block *sb)
 		lower_sb->s_op->umount_begin(lower_sb);
 }
 
-static int sdcardfs_show_options(struct seq_file *m, struct dentry *root)
+static int sdcardfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 {
-	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(root->d_sb);
+	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(mnt->mnt_sb);
 	struct sdcardfs_mount_options *opts = &sbi->options;
 
 	if (opts->fs_low_uid != 0)
