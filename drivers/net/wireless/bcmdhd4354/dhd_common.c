@@ -350,6 +350,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 	case IOV_GVAL(IOV_MSGLEVEL):
 		int_val = (int32)dhd_msg_level;
 		bcopy(&int_val, arg, val_size);
+		dhd_os_send_hang_message(dhd_pub);
 		break;
 
 	case IOV_SVAL(IOV_MSGLEVEL):

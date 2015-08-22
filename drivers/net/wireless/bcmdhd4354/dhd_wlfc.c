@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_wlfc.c 479444 2014-05-21 04:19:36Z $
+ * $Id: dhd_wlfc.c 487328 2014-06-25 12:24:21Z $
  *
  */
 
@@ -2530,7 +2530,12 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 
 	dhd->proptxstatus_mode = WLFC_FCMODE_EXPLICIT_CREDIT;
 	/* default to check rx pkt */
-	dhd->wlfc_rxpkt_chk = TRUE;
+	if (dhd->op_mode & DHD_FLAG_IBSS_MODE) {
+		dhd->wlfc_rxpkt_chk = FALSE;
+	} else {
+		dhd->wlfc_rxpkt_chk = TRUE;
+	}
+
 
 	/* initialize all interfaces to accept traffic */
 	for (i = 0; i < WLFC_MAX_IFNUM; i++) {

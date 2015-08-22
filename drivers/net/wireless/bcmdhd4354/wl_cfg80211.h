@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 470107 2014-04-13 13:08:18Z $
+ * $Id: wl_cfg80211.h 487871 2014-06-27 07:48:00Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -618,6 +618,8 @@ struct bcm_cfg80211 {
 	u32 aibss_txfail_pid;
 	u32 aibss_txfail_seq;
 #endif /* WLAIBSS */
+	u32 rmc_event_pid;
+	u32 rmc_event_seq;
 	bool roam_offload;
 #ifdef WLFBT
 	uint8 fbt_key[FBT_KEYLEN];
@@ -1016,6 +1018,8 @@ extern s32 wl_cfg80211_ibss_vsie_delete(struct net_device *dev);
 #ifdef WLAIBSS
 extern void wl_cfg80211_set_txfail_pid(int pid);
 #endif /* WLAIBSS */
+extern void wl_cfg80211_set_rmc_pid(int pid);
+
 #ifdef WLFBT
 extern void wl_cfg80211_get_fbt_key(uint8 *key);
 #endif
