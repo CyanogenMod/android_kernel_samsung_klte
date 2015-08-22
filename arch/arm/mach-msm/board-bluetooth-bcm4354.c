@@ -52,11 +52,29 @@
 #endif
 #define BT_HOST_WAKE 75
 
+#if defined(CONFIG_SEC_S_PROJECT)
+// general gpio
+#define BT_EN_GENERAL_GPIO
+#define GPIO_BT_EN 31
 #define BT_WAKE 91
-#define BT_EN -1
-
+#elif defined(CONFIG_MACH_CHAGALL_KDI)
+#define BT_EN_GENERAL_GPIO
+#define GPIO_BT_EN 63
+#define BT_WAKE 9
+#elif defined(CONFIG_MACH_KLIMT_VZW) || defined(CONFIG_MACH_CHAGALL)
+// general gpio
+#define BT_EN_GENERAL_GPIO
+#define GPIO_BT_EN 42
+#define BT_WAKE 41
+#elif defined(CONFIG_SEC_PATEK_PROJECT)
+#define BT_EN_GENERAL_GPIO
+#define GPIO_BT_EN 25
+#define BT_WAKE 91
+#else
 //HLTE Rev0.5 gpio expander
-#define FPGA_GPIO_BT_EN 309
+#define GPIO_BT_EN 309
+#define BT_WAKE 91
+#endif
 
 
 #define GPIO_BT_UART_RTS BT_UART_RTS
@@ -163,13 +181,6 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
     int ret = -1;
 
     if(cnt < 1) {
-        ret = gpio_request(FPGA_GPIO_BT_EN, "bt_en");
-        if (ret)
-        {
-            pr_err("[BT] %s: gpio_request for host_wake is failed", __func__);
-            gpio_free(FPGA_GPIO_BT_EN);
-        }
-
         /* configure host_wake as input */
         gpio_tlmm_config(GPIO_CFG(gpio_bt_host_wake, 0, GPIO_CFG_INPUT,
                                 GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
@@ -201,7 +212,7 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
         }
 #endif
 
-        ret = gpio_direction_output(FPGA_GPIO_BT_EN, 1);
+        ret = gpio_direction_output(GPIO_BT_EN, 1);
         if (ret)
             pr_err("[BT] failed to set BT_EN.\n");
     } else {
@@ -216,7 +227,7 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
 #endif
         pr_err("[BT] Bluetooth Power Off.\n");
 
-        ret = gpio_direction_output(FPGA_GPIO_BT_EN, 0);
+        ret = gpio_direction_output(GPIO_BT_EN, 0);
   	    if (ret)
             pr_err("[BT] failed to set BT_EN.\n");
 
@@ -254,6 +265,18 @@ static int bcm4354_bluetooth_probe(struct platform_device *pdev)
 
 #ifdef BT_UART_CFG
     int pin = 0;
+#endif
+    rc = gpio_request(GPIO_BT_EN, "bt_en");
+    if (rc)
+    {
+        pr_err("[BT] %s: gpio_request for GPIO_BT_EN is failed", __func__);
+        gpio_free(GPIO_BT_EN);
+    }
+
+#ifdef BT_EN_GENERAL_GPIO
+    gpio_tlmm_config(GPIO_CFG(GPIO_BT_EN, 0, GPIO_CFG_OUTPUT,
+        GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+    gpio_set_value(GPIO_BT_EN, 0);
 #endif
 
     /* temporailiy set HOST_WAKE OUT direction until FPGA work finishs */
@@ -306,7 +329,7 @@ static int bcm4354_bluetooth_remove(struct platform_device *pdev)
     rfkill_unregister(bt_rfkill);
     rfkill_destroy(bt_rfkill);
 
-    gpio_free(get_gpio_hwrev(FPGA_GPIO_BT_EN));
+    gpio_free(get_gpio_hwrev(GPIO_BT_EN));
     gpio_free(get_gpio_hwrev(BT_WAKE));
 
 	cnt = 0;
