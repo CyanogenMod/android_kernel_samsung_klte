@@ -1,0 +1,7 @@
+
+# Cypress Touchscreen driver configuration
+#
+
+config TOUCHSCREEN_CYTTSP4
+	tristate "CYPRESS touchscreen driver"
+	depends on I2C

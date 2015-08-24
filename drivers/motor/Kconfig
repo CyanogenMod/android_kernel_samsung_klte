@@ -1,0 +1,71 @@
+#
+# Immersion TouchSense Player driver configuration
+#
+menuconfig VIBETONZ
+	tristate "Vibetonz"
+	default n
+	help
+	Say Y to enable Vibetonz support.
+	-------------
+	-------------
+	-------------
+
+config TACTILE_ASSIST
+	tristate "Auto Haptic"
+	default n
+	depends on VIBETONZ
+
+config MOTOR_DRV_MAX77803
+	tristate "Maxim MAX77803 motor"
+	default n
+
+	depends on MFD_MAX77803
+
+config MOTOR_DRV_MAX77804K
+	tristate "Maxim MAX77804K motor"
+	default n
+
+	depends on MFD_MAX77804K
+
+config MOTOR_DRV_MAX77828
+	tristate "Maxim MAX77828 motor"
+	default n
+	depends on MFD_MAX77828
+
+config MOTOR_DRV_ISA1400
+	tristate "ISA1400 motor"
+	default n
+	depends on I2C
+	help
+	  Say Y to enalbe the ISA1400 IC.
+
+config MOTOR_DRV_DRV2603
+	tristate "DRV2603 motor"
+	default n
+	help
+	  Say Y to enalbe the DRV2603 IC.
+
+#
+# Immersion TouchSense Player driver configuration
+#
+menuconfig MOTOR_DRV_TSP5000
+        tristate "MOTOR_DRV_TSP5000"
+        default n
+        help
+          Say Y to enable MOTOR_DRV_TSP5000 support.
+
+#
+# vibrator controlled by PMIC regualtor configuration
+#
+menuconfig MSM_VIBRATOR
+	tristate "MSM_VIBRATOR"
+	default n
+	help
+	Say Y to enable MSM_VIBRATOR support.
+
+config CONFIG_HAPTIC_ISA1200
+        tristate "ISA1200 motor"
+        default n
+        depends on I2C
+        help
+          Say Y to enable the ISA1200 IC. 
