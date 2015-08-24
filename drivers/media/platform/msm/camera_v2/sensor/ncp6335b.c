@@ -96,23 +96,23 @@ void ncp6335b_set_voltage(int version)
 
 	switch (version) {
 	case 0: /*BIN1*/
-		ncp6335b_write(ncp_dev->client, 0xAA);
+		ncp6335b_write(ncp_dev->client, 0xAC);
 		break;
 	case 1: /*BIN2*/
-		ncp6335b_write(ncp_dev->client, 0xAE);
+		ncp6335b_write(ncp_dev->client, 0xB0);
 		break;
 	case 2: /*BIN3*/
-		ncp6335b_write(ncp_dev->client, 0xB2);
+		ncp6335b_write(ncp_dev->client, 0xB4);
 		break;
 	case 3: /*BIN4*/
-		ncp6335b_write(ncp_dev->client, 0xB6);
+		ncp6335b_write(ncp_dev->client, 0xB8);
 		break;
 	case 4: /*BIN5*/
-		ncp6335b_write(ncp_dev->client, 0xBA);
+		ncp6335b_write(ncp_dev->client, 0xBC);
 		break;
 	case 5: /*BIN6*/
 	default:
-		ncp6335b_write(ncp_dev->client, 0xBE);
+		ncp6335b_write(ncp_dev->client, 0xC0);
 		break;
 	}
 	return;

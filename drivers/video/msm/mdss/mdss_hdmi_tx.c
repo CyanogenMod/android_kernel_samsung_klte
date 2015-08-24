@@ -1108,9 +1108,6 @@ static void hdmi_tx_hpd_int_work(struct work_struct *work)
 		DEV_INFO("%s: sense cable CONNECTED: state switch to %d\n",
 			__func__, hdmi_ctrl->sdev.state);
 	} else {
-#if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
-		hdmi_ctrl->hpd_feature_on = false;
-#endif
 		hdmi_tx_set_audio_switch_node(hdmi_ctrl, 0, false);
 		hdmi_tx_wait_for_audio_engine(hdmi_ctrl);
 
@@ -2836,7 +2833,9 @@ static int hdmi_tx_set_mhl_hpd(struct platform_device *pdev, uint8_t on)
 	hdmi_ctrl->mhl_hpd_on = on;
 
 	if (!on && hdmi_ctrl->hpd_feature_on) {
+#if !defined (CONFIG_VIDEO_MHL_V2) && !defined (CONFIG_VIDEO_MHL_SII8246)
 		rc = hdmi_tx_sysfs_enable_hpd(hdmi_ctrl, false);
+#endif
 	} else if (on && !hdmi_ctrl->hpd_feature_on) {
 		rc = hdmi_tx_sysfs_enable_hpd(hdmi_ctrl, true);
 	} else {

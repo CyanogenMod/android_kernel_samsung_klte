@@ -122,7 +122,7 @@ static struct msm_gpiomux_config msm_hdmi_ddc_configs[] = {
 		},
 	},
 };
-
+static bool mhl_power_on;
 #ifdef CONFIG_ARCH_MSM8974
 int platform_ap_hdmi_hdcp_auth(struct sii8240_data *sii8240)
 {
@@ -466,7 +466,11 @@ static void of_sii8240_hw_onoff(bool onoff)
 	int ret;
 	struct sii8240_platform_data *pdata = g_pdata;
 	pr_info("%s: Onoff: %d\n", __func__, onoff);
-
+	if (mhl_power_on == onoff) {
+		pr_info("sii8240 : MHL power is already %d\n", onoff);
+		return;
+	}
+	mhl_power_on = onoff;
 	if (onoff) {
 		/*
 		if(pdata->gpio_barcode_emul)

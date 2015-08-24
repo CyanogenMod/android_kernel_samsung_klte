@@ -49,11 +49,11 @@
 #define MAX_LIMIT_COEFFS 6
 /* 3x3 transformation matrix coefficients in s4.9 fixed point format */
 static u32 vpe_csc_601_to_709_matrix_coeff[MAX_MATRIX_COEFFS] = {
-	0x1BA, 0, 0, 0, 0x1C4, 0, 0, 0, 0x1C4
+	0x1B8, 0x1FCC, 0x1FA2, 0, 0x1CC, 0x34, 0, 0x22, 0x1CF
 };
 /* offset coefficients in s9 fixed point format */
 static u32 vpe_csc_601_to_709_bias_coeff[MAX_BIAS_COEFFS] = {
-    0x10, 0x10, 0x10
+    0x35, 0, 0x4
 };
 /* clamping value for Y/U/V([min,max] for Y/U/V) */
 static u32 vpe_csc_601_to_709_limit_coeff[MAX_LIMIT_COEFFS] = {

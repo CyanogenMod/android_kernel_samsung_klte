@@ -1715,7 +1715,7 @@ char AUTO_GALLERY_2_FHD[] = {
 	0x20, //curve23_a
 	0x00, //curve24_b
 	0xFF, //curve24_a
-	0x2c, //ascr_skin_on strength 0 00000
+	0x30, //ascr_skin_on strength 0 00000
 	0x67, //ascr_skin_cb
 	0xa9, //ascr_skin_cr
 	0x17, //ascr_dist_up
@@ -1735,8 +1735,8 @@ char AUTO_GALLERY_2_FHD[] = {
 	0x34,
 	0x83,
 	0xff, //ascr_skin_Rr
-	0x40, //ascr_skin_Rg
-	0x40, //ascr_skin_Rb
+	0x50, //ascr_skin_Rg
+	0x60, //ascr_skin_Rb
 	0xff, //ascr_skin_Yr
 	0xff, //ascr_skin_Yg
 	0x00, //ascr_skin_Yb
@@ -2512,7 +2512,7 @@ char AUTO_VIDEO_2_FHD[] = {
 	0x20, //curve23_a
 	0x00, //curve24_b
 	0xFF, //curve24_a
-	0x2c, //ascr_skin_on strength 0 00000
+	0x30, //ascr_skin_on strength 0 00000
 	0x67, //ascr_skin_cb
 	0xa9, //ascr_skin_cr
 	0x17, //ascr_dist_up
@@ -2532,8 +2532,8 @@ char AUTO_VIDEO_2_FHD[] = {
 	0x34,
 	0x83,
 	0xff, //ascr_skin_Rr
-	0x40, //ascr_skin_Rg
-	0x40, //ascr_skin_Rb
+	0x50, //ascr_skin_Rg
+	0x60, //ascr_skin_Rb
 	0xff, //ascr_skin_Yr
 	0xff, //ascr_skin_Yg
 	0x00, //ascr_skin_Yb
@@ -3788,7 +3788,7 @@ char AUTO_CAMERA_2_FHD[] = {
 	0x20, //curve23_a
 	0x00, //curve24_b
 	0xFF, //curve24_a
-	0x2c, //ascr_skin_on strength 0 00000
+	0x30, //ascr_skin_on strength 0 00000
 	0x67, //ascr_skin_cb
 	0xa9, //ascr_skin_cr
 	0x17, //ascr_dist_up
@@ -3808,8 +3808,8 @@ char AUTO_CAMERA_2_FHD[] = {
 	0x34,
 	0x83,
 	0xff, //ascr_skin_Rr
-	0x40, //ascr_skin_Rg
-	0x40, //ascr_skin_Rb
+	0x50, //ascr_skin_Rg
+	0x60, //ascr_skin_Rb
 	0xff, //ascr_skin_Yr
 	0xff, //ascr_skin_Yg
 	0x00, //ascr_skin_Yb
@@ -5859,7 +5859,7 @@ char AUTO_BROWSER_2_FHD[] = {
 	0x20, //curve23_a
 	0x00, //curve24_b
 	0xFF, //curve24_a
-	0x2c, //ascr_skin_on strength 0 00000
+	0x30, //ascr_skin_on strength 0 00000
 	0x67, //ascr_skin_cb
 	0xa9, //ascr_skin_cr
 	0x17, //ascr_dist_up
@@ -5879,8 +5879,8 @@ char AUTO_BROWSER_2_FHD[] = {
 	0x34,
 	0x83,
 	0xff, //ascr_skin_Rr
-	0x40, //ascr_skin_Rg
-	0x40, //ascr_skin_Rb
+	0x50, //ascr_skin_Rg
+	0x60, //ascr_skin_Rb
 	0xff, //ascr_skin_Yr
 	0xff, //ascr_skin_Yg
 	0x00, //ascr_skin_Yb

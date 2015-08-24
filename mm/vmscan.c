@@ -1051,6 +1051,11 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
 
 	ret = -EBUSY;
 
+#ifdef CONFIG_CMA
+	if ((mode & ISOLATE_NO_CMA) && is_cma_pageblock(page))
+		return ret;
+#endif
+
 	/*
 	 * To minimise LRU disruption, the caller can indicate that it only
 	 * wants to isolate pages it will be able to operate on without
@@ -1330,6 +1335,10 @@ shrink_inactive_list(unsigned long nr_to_scan, struct mem_cgroup_zone *mz,
 		isolate_mode |= ISOLATE_UNMAPPED;
 	if (!sc->may_writepage)
 		isolate_mode |= ISOLATE_CLEAN;
+#ifdef CONFIG_CMA
+	if (allocflags_to_migratetype(sc->gfp_mask) != MIGRATE_MOVABLE)
+		isolate_mode |= ISOLATE_NO_CMA;
+#endif
 
 	spin_lock_irq(&zone->lru_lock);
 

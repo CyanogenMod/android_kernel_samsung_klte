@@ -89,7 +89,8 @@ struct max86900_device_data
 	const char *led_l19;
 #endif
 	bool *bio_status;
-	u8 is_enable;
+	atomic_t is_enable;
+	atomic_t is_suspend;
 	u8 led_current;
 	u8 hr_range;
 	u8 hr_range2;

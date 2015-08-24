@@ -1493,10 +1493,6 @@ static int switch_to_d3(struct sii8240_data *sii8240)
 		pr_info("sii8240: interrupt enabled\n");
 	}
 
-	if (sii8240->pdata->hdmi_mhl_ops) {
-		struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
-		hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);
-	}
 	return 0;
 }
 
@@ -2213,11 +2209,13 @@ static void sii8240_power_down(struct sii8240_data *sii8240)
 
 	mhl_hpd_control_low(sii8240);
 
+	mutex_lock(&sii8240->lock);
 	if (sii8240->irq_enabled) {
 		disable_irq_nosync(sii8240->irq);
 		sii8240->irq_enabled = false;
 		pr_info("sii8240: interrupt disabled\n");
 	}
+	mutex_unlock(&sii8240->lock);
 
 	sii8240->state = STATE_DISCONNECTED;
 
@@ -3240,6 +3238,10 @@ static void sii8240_detection_restart(struct work_struct *work)
 	mutex_lock(&sii8240->lock);
 
 	pr_info("sii8240: detection restarted\n");
+	if (sii8240->pdata->hdmi_mhl_ops) {
+		struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
+		hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);
+	}
 	if (sii8240->mhl_connected == false) {
 		pr_err("[ERROR] sii8240 : already powered off\n");
 		goto err_exit;
@@ -3319,6 +3321,12 @@ static int sii8240_mhl_onoff(unsigned long event)
 		sii8240->muic_state = MHL_DETACHED;
 		wake_unlock(&sii8240->mhl_wake_lock);
 		mutex_lock(&sii8240->lock);
+
+		if (sii8240->pdata->hdmi_mhl_ops) {
+			struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
+			hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);
+		}
+
 		goto power_down;
 	}
 	pr_info("lock M--->%d\n", __LINE__);
@@ -3362,36 +3370,6 @@ static int sii8240_mhl_onoff(unsigned long event)
 	}
 
 	mutex_unlock(&sii8240->lock);
-
-	ret = wait_event_timeout(sii8240->wq, (sii8240->rgnd != RGND_UNKNOWN),
-				msecs_to_jiffies(T_WAIT_TIMEOUT_RGND_INT));
-
-	mutex_lock(&sii8240->lock);
-	if (ret == 0) {
-		pr_err("[ERROR] no RGND interrupt\n");
-		goto unhandled;
-	}
-	if (sii8240->rgnd == RGND_UNKNOWN) {
-		pr_err("[ERROR] RGND is UNKNOWN\n");
-		goto unhandled;
-	}
-	mutex_unlock(&sii8240->lock);
-	pr_info("sii8240: waiting for connection to be established\n");
-	ret = wait_event_timeout(sii8240->wq,
-				(sii8240->state == STATE_MHL_DISCOVERY_ON ||
-				sii8240->state == STATE_MHL_DISCOVERY_FAIL ||
-				sii8240->state == STATE_MHL_DISCOVERY_SUCCESS),
-				msecs_to_jiffies(T_WAIT_TIMEOUT_DISC_INT));
-
-	mutex_lock(&sii8240->lock);
-
-	if (sii8240->state == STATE_DISCONNECTED)
-		goto unhandled;
-	if (sii8240->state == STATE_MHL_DISCOVERY_SUCCESS)
-		pr_info("sii8240: connection established\n");
-
-	mutex_unlock(&sii8240->lock);
-
 	pr_info("sii8240: detection_callback return !\n");
 
 	return MHL_CON_HANDLED;
@@ -3569,6 +3547,11 @@ static int sii8240_msc_irq_handler(struct sii8240_data *sii8240, u8 intr)
 			if (temp & HPD_OVERRIDE_EN) {
 				/* TODO:If HPD is overriden,clear HPD_OUT bit
 				   upstream register */
+				if (sii8240->pdata->hdmi_mhl_ops) {
+					struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
+					hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);
+				}
+
 				sii8240->hpd_status = false;
 				sii8240->tmds_enable = false;
 				sii8240->ap_hdcp_success = false;
@@ -4594,6 +4577,11 @@ static irqreturn_t sii8240_irq_thread(int irq, void *data)
 			} else {
 				pr_info("Sii8240:HPD event low\n");
 				if (sii8240->hpd_status) {
+					if (sii8240->pdata->hdmi_mhl_ops) {
+						struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
+						hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);
+					}
+
 					sii8240->hpd_status = false;
 					tmds_control(sii8240, false);
 					ret = mhl_modify_reg(tmds,

@@ -186,7 +186,7 @@ static int initialize_irq(struct ssp_data *data)
 
 	pr_info("[SSP]: requesting IRQ %d\n", iIrq);
 	iRet = request_threaded_irq(iIrq, NULL, sensordata_irq_thread_fn,
-				    IRQF_TRIGGER_FALLING, "SSP_Int", data);
+				    IRQF_TRIGGER_FALLING|IRQF_ONESHOT, "SSP_Int", data);
 	if (iRet < 0) {
 		pr_err("[SSP]: %s - request_irq(%d) failed for gpio %d (%d)\n",
 		       __func__, iIrq, iIrq, iRet);

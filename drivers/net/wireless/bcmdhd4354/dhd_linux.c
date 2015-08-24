@@ -682,10 +682,11 @@ static int dhd_toe_set(dhd_info_t *dhd, int idx, uint32 toe_ol);
 static int dhd_wl_host_event(dhd_info_t *dhd, int *ifidx, void *pktdata,
                              wl_event_msg_t *event_ptr, void **data_ptr);
 
-#ifdef PROP_TXSTATUS
+#if defined(SUPPORT_P2P_GO_PS)
+#if defined(PROP_TXSTATUS)
 static int dhd_wakelock_waive(dhd_info_t *dhdinfo);
 static int dhd_wakelock_restore(dhd_info_t *dhdinfo);
-#endif
+#endif /* PROP_TXSTATUS */
 
 #if defined(CONFIG_PM_SLEEP)
 static int dhd_pm_callback(struct notifier_block *nfb, unsigned long action, void *ignored)
@@ -732,7 +733,8 @@ static bool dhd_pm_notifier_registered = FALSE;
 
 extern int register_pm_notifier(struct notifier_block *nb);
 extern int unregister_pm_notifier(struct notifier_block *nb);
-#endif /* CONFIG_PM_SLEEP */
+#endif /* defined(CONFIG_PM_SLEEP)  */
+#endif /* defined(SUPPORT_P2P_GO_PS) */
 
 /* Request scheduling of the bus rx frame */
 static void dhd_sched_rxf(dhd_pub_t *dhdp, void *skb);
@@ -3836,7 +3838,9 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	dhd->wakelock_wd_counter = 0;
 	dhd->wakelock_rx_timeout_enable = 0;
 	dhd->wakelock_ctrl_timeout_enable = 0;
+#ifdef SUPPORT_P2P_GO_PS	
 	dhd->waive_wakelock = FALSE;
+#endif /* SUPPORT_P2P_GO_PS */
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_init(&dhd->wl_wifi, WAKE_LOCK_SUSPEND, "wlan_wake");
 	wake_lock_init(&dhd->wl_rxwake, WAKE_LOCK_SUSPEND, "wlan_rx_wake");
@@ -3919,6 +3923,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	 */
 	memcpy(netdev_priv(net), &dhd, sizeof(dhd));
 
+#if defined(SUPPORT_P2P_GO_PS)
 #if defined(CONFIG_PM_SLEEP)
 	dhd->pm_notifier.notifier_call = dhd_pm_callback;
 	dhd->pm_notifier.priority = 10;
@@ -3927,6 +3932,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 		register_pm_notifier(&dhd->pm_notifier);
 	}
 #endif /* CONFIG_PM_SLEEP */
+#endif /* SUPPORT_P2P_GO_PS */
 
 #if defined(CONFIG_HAS_EARLYSUSPEND) && defined(DHD_USE_EARLYSUSPEND)
 	dhd->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 20;
@@ -5739,12 +5745,14 @@ void dhd_detach(dhd_pub_t *dhdp)
 	if (dhdp->pno_state)
 		dhd_pno_deinit(dhdp);
 #endif
+#if defined(SUPPORT_P2P_GO_PS)
 #if defined(CONFIG_PM_SLEEP)
 	if (dhd_pm_notifier_registered) {
 		unregister_pm_notifier(&dhd->pm_notifier);
 		dhd_pm_notifier_registered = FALSE;
 	}
 #endif /* CONFIG_PM_SLEEP */
+#endif /* SUPPORT_P2P_GO_PS */
 #ifdef DEBUG_CPU_FREQ
 		if (dhd->new_freq)
 			free_percpu(dhd->new_freq);
@@ -6972,7 +6980,7 @@ int net_os_wake_lock_ctrl_timeout_enable(struct net_device *dev, int val)
 		ret = dhd_os_wake_lock_ctrl_timeout_enable(&dhd->pub, val);
 	return ret;
 }
-
+#if defined(SUPPORT_P2P_GO_PS)
 int dhd_os_wake_lock(dhd_pub_t *pub)
 {
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
@@ -6995,6 +7003,30 @@ int dhd_os_wake_lock(dhd_pub_t *pub)
 	return ret;
 }
 
+#else
+int dhd_os_wake_lock(dhd_pub_t *pub)
+{
+	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+	unsigned long flags;
+	int ret = 0;
+
+	if (dhd) {
+		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
+#ifdef CONFIG_HAS_WAKELOCK
+		if (!dhd->wakelock_counter)
+			wake_lock(&dhd->wl_wifi);
+#elif (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 36))
+		dhd_bus_dev_pm_stay_awake(pub);
+#endif
+		dhd->wakelock_counter++;
+		ret = dhd->wakelock_counter;
+		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
+	}
+	return ret;
+}
+#endif
+
+
 int net_os_wake_lock(struct net_device *dev)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
@@ -7005,6 +7037,7 @@ int net_os_wake_lock(struct net_device *dev)
 	return ret;
 }
 
+#if defined(SUPPORT_P2P_GO_PS)
 int dhd_os_wake_unlock(dhd_pub_t *pub)
 {
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
@@ -7029,6 +7062,30 @@ int dhd_os_wake_unlock(dhd_pub_t *pub)
 	}
 	return ret;
 }
+#else
+int dhd_os_wake_unlock(dhd_pub_t *pub)
+{
+	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+	unsigned long flags;
+	int ret = 0;
+
+	dhd_os_wake_lock_timeout(pub);
+	if (dhd) {
+		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
+		if (dhd->wakelock_counter) {
+			dhd->wakelock_counter--;
+#ifdef CONFIG_HAS_WAKELOCK
+				wake_unlock(&dhd->wl_wifi);
+#elif (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 36))
+			dhd_bus_dev_pm_relax(pub);
+#endif
+			ret = dhd->wakelock_counter;
+		}
+		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
+	}
+	return ret;
+}
+#endif
 
 int dhd_os_check_wakelock(dhd_pub_t *pub)
 {
@@ -7061,6 +7118,7 @@ int net_os_wake_unlock(struct net_device *dev)
 	return ret;
 }
 
+#if defined(SUPPORT_P2P_GO_PS)
 int dhd_os_wd_wake_lock(dhd_pub_t *pub)
 {
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
@@ -7081,7 +7139,29 @@ int dhd_os_wd_wake_lock(dhd_pub_t *pub)
 	}
 	return ret;
 }
+#else
+int dhd_os_wd_wake_lock(dhd_pub_t *pub)
+{
+	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+	unsigned long flags;
+	int ret = 0;
 
+	if (dhd) {
+		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
+#ifdef CONFIG_HAS_WAKELOCK
+			/* if wakelock_wd_counter was never used : lock it at once */
+		if (!dhd->wakelock_wd_counter)
+			wake_lock(&dhd->wl_wdwake);
+#endif
+		dhd->wakelock_wd_counter++;
+		ret = dhd->wakelock_wd_counter;
+		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
+	}
+	return ret;
+}
+#endif /* defined(SUPPORT_P2P_GO_PS) */
+
+#if defined(SUPPORT_P2P_GO_PS)
 int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
 {
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
@@ -7102,8 +7182,30 @@ int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
 	}
 	return ret;
 }
+#else
+int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
+{
+	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
+	unsigned long flags;
+	int ret = 0;
 
-#ifdef PROP_TXSTATUS
+	if (dhd) {
+		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
+		if (dhd->wakelock_wd_counter) {
+			dhd->wakelock_wd_counter = 0;
+#ifdef CONFIG_HAS_WAKELOCK
+			wake_unlock(&dhd->wl_wdwake);
+#endif
+		}
+		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
+	}
+	return ret;
+}
+#endif /* defined(SUPPORT_P2P_GO_PS) */
+
+
+
+#if defined(PROP_TXSTATUS) && defined(SUPPORT_P2P_GO_PS)
 /* waive wakelocks for operations such as IOVARs in suspend function, must be closed
  * by a paired function call to dhd_wakelock_restore. returns current wakelock counter
  */
@@ -7160,7 +7262,7 @@ exit:
 	spin_unlock_irqrestore(&dhdinfo->wakelock_spinlock, flags);
 	return ret;
 }
-#endif /* PROP_TXSTATUS */
+#endif /* defined(PROP_TXSTATUS) && defined(SUPPORT_P2P_GO_PS) */
 
 bool dhd_os_check_if_up(dhd_pub_t *pub)
 {

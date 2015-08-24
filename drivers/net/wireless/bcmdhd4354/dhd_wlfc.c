@@ -3058,6 +3058,7 @@ dhd_wlfc_hostreorder_init(dhd_pub_t *dhd)
 	return BCME_OK;
 }
 
+#ifdef SUPPORT_P2P_GO_PS
 int
 dhd_wlfc_suspend(dhd_pub_t *dhd)
 {
@@ -3117,6 +3118,7 @@ dhd_wlfc_resume(dhd_pub_t *dhd)
 
 	return 0;
 }
+#endif /* SUPPORT_P2P_GO_PS */
 
 int
 dhd_wlfc_cleanup_txq(dhd_pub_t *dhd, f_processpkt_t fn, void *arg)

@@ -498,7 +498,8 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 		err = max86900_enable(data);
 		if (err != 0)
 			pr_err("max86900_enable err : %d\n", err);
-		data->is_enable = 1;
+
+		atomic_set(&data->is_enable, 1);
 	} else {
 		err = max86900_disable(data);
 		if (err != 0)
@@ -509,7 +510,8 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 				pr_err("%s max86900_regulator_off fail err = %d\n",
 					__func__, err);
 		}
-		data->is_enable = 0;
+
+		atomic_set(&data->is_enable, 0);
 	}
 	pr_info("%s - part_type = %u, onoff = %d\n", __func__, data->part_type, onoff);
 }
@@ -520,7 +522,7 @@ static ssize_t max86900_enable_show(struct device *dev,
 {
     struct max86900_device_data *data = dev_get_drvdata(dev);
 
-    return sprintf(buf, "%d\n", data->is_enable);
+    return sprintf(buf, "%d\n", atomic_read(&data->is_enable));
 }
 
 static ssize_t max86900_enable_store(struct device *dev,
@@ -1368,6 +1370,33 @@ static void max86900_shutdown(struct i2c_client *client)
 	pr_info("%s\n", __func__);
 }
 
+static int max86900_pm_suspend(struct device *dev)
+{
+	struct max86900_device_data *data = dev_get_drvdata(dev);
+	if (atomic_read(&data->is_enable)) {
+		max86900_mode_enable(data, HRM_LDO_OFF);
+		atomic_set(&data->is_suspend, 1);
+	}
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static int max86900_pm_resume(struct device *dev)
+{
+	struct max86900_device_data *data = dev_get_drvdata(dev);
+	if (atomic_read(&data->is_suspend)) {
+		max86900_mode_enable(data, HRM_LDO_ON);
+		atomic_set(&data->is_suspend, 0);
+	}
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static const struct dev_pm_ops max86900_pm_ops = {
+	.suspend = max86900_pm_suspend,
+	.resume = max86900_pm_resume
+};
+
 static struct of_device_id max86900_match_table[] = {
 	{ .compatible = "max86900",},
 	{},
@@ -1383,6 +1412,7 @@ static struct i2c_driver max86900_i2c_driver =
 	.driver = {
 	    .name = CHIP_NAME,
 	    .owner = THIS_MODULE,
+	    .pm = &max86900_pm_ops,
 	    .of_match_table = max86900_match_table,
 	},
 	.probe = max86900_probe,
