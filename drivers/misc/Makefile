@@ -94,3 +94,5 @@ endif
 obj-$(CONFIG_SEC_FPGA_ICE40XX)	+= ice40xx.o
 obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
 obj-$(CONFIG_SEC_MODEM) += modem_if/
+
+obj-y += dualwave/
