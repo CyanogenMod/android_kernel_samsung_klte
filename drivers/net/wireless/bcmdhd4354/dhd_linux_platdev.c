@@ -245,7 +245,7 @@ static int wifi_plat_dev_drv_probe(struct platform_device *pdev)
 		resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "bcm4329_wlan_irq");
 	if (resource) {
 		adapter->irq_num = resource->start;
-		adapter->intr_flags = resource->flags & IRQF_TRIGGER_MASK;
+		adapter->intr_flags = resource->flags;
 	}
 
 	wifi_plat_dev_probe_ret = dhd_wifi_platform_load();
@@ -374,7 +374,7 @@ static int wifi_ctrlfunc_register_drv(void)
 		adapter->wifi_plat_data = (void *)&dhd_wlan_control;
 		resource = &dhd_wlan_resources;
 		adapter->irq_num = resource->start;
-		adapter->intr_flags = resource->flags & IRQF_TRIGGER_MASK;
+		adapter->intr_flags = resource->flags;
 		wifi_plat_dev_probe_ret = dhd_wifi_platform_load();
 	}
 

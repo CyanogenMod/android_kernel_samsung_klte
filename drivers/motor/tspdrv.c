@@ -187,6 +187,9 @@ static void enable_vibetonz_from_user(struct timed_output_dev *dev, int value)
 	hrtimer_cancel(&timer);
 
 	/* set_vibetonz(value); */
+#ifdef CONFIG_TACTILE_ASSIST
+	g_bOutputDataBufferEmpty = 0;
+#endif
 	vibrator_work = value;
 	schedule_work(&vibetonz_work);
 

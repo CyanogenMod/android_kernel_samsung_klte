@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 457855 2014-02-25 01:27:41Z $
+ * $Id: wl_cfg80211.h 470107 2014-04-13 13:08:18Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -435,8 +435,10 @@ struct ap_info {
 /* Structure to hold WPS, WPA IEs for a AP */
 	u8   probe_res_ie[VNDR_IES_MAX_BUF_LEN];
 	u8   beacon_ie[VNDR_IES_MAX_BUF_LEN];
+	u8   assoc_res_ie[VNDR_IES_MAX_BUF_LEN];
 	u32 probe_res_ie_len;
 	u32 beacon_ie_len;
+	u32 assoc_res_ie_len;
 	u8 *wpa_ie;
 	u8 *rsn_ie;
 	u8 *wps_ie;
@@ -661,10 +663,6 @@ wl_dealloc_netinfo(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 		if (ndev && (_net_info->ndev == ndev)) {
 			list_del(&_net_info->list);
 			cfg->iface_cnt--;
-			if (_net_info->wdev) {
-				kfree(_net_info->wdev);
-				ndev->ieee80211_ptr = NULL;
-			}
 			kfree(_net_info);
 		}
 	}

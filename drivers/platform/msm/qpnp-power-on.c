@@ -525,7 +525,8 @@ qpnp_config_pull(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 	int rc;
 	u8 pull_bit;
 
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
+#if defined(CONFIG_SEC_K_PROJECT) || \
+	defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)
 	/* Do nothing in case of KPDPWR_RESIN*/
 	if (cfg->pon_type == PON_KPDPWR_RESIN)
 		return 0;

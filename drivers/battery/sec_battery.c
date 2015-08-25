@@ -1801,7 +1801,7 @@ static unsigned int sec_bat_get_polling_time(
 			battery->polling_short = false;
 		break;
 	case POWER_SUPPLY_STATUS_DISCHARGING:
-		if (battery->polling_in_sleep)
+		if (battery->polling_in_sleep && (battery->ps_enable != true))
 			battery->polling_time =
 				battery->pdata->polling_time[
 				SEC_BATTERY_POLLING_TIME_SLEEP];
@@ -1944,7 +1944,8 @@ static void sec_bat_monitor_work(
 	/* monitor once after wakeup */
 	if (battery->polling_in_sleep) {
 		battery->polling_in_sleep = false;
-		if (battery->status == POWER_SUPPLY_STATUS_DISCHARGING) {
+		if ((battery->status == POWER_SUPPLY_STATUS_DISCHARGING) &&
+			(battery->ps_enable != true)) {
 			if ((unsigned long)(c_ts.tv_sec - old_ts.tv_sec) < 10 * 60) {
 				pr_info("Skip monitor_work(%ld)\n",
 						c_ts.tv_sec - old_ts.tv_sec);
@@ -3270,6 +3271,13 @@ static int sec_ps_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		if (battery->ps_status) {
+			if ((battery->ps_enable == true) && (battery->ps_changed == true)) {
+				battery->ps_changed = false;
+
+				value.intval = POWER_SUPPLY_TYPE_POWER_SHARING;
+				psy_do_property(battery->pdata->charger_name, set,
+						POWER_SUPPLY_PROP_ONLINE, value);
+			}
 			val->intval = 1;
 		} else {
 			if (battery->ps_enable == true) {
@@ -3400,6 +3408,9 @@ static int batt_handle_notification(struct notifier_block *nb,
 			__func__, cable_type);
 	} else if (cable_type == POWER_SUPPLY_TYPE_POWER_SHARING) {
 		battery->ps_status = true;
+		battery->ps_enable = true;
+		battery->ps_changed = true;
+
 		dev_info(battery->dev,
 			"%s: power sharing cable plugin (%d)\n", __func__, battery->ps_status);
 	} else if (cable_type == POWER_SUPPLY_TYPE_WIRELESS) {
@@ -3849,6 +3860,7 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 
 	battery->wc_status = 0;
 	battery->ps_status= 0;
+	battery->ps_changed= 0;
 	battery->wire_status = POWER_SUPPLY_TYPE_BATTERY;
 
 	alarm_init(&battery->event_termination_alarm,

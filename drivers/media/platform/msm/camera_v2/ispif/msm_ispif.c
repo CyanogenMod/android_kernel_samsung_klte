@@ -660,7 +660,7 @@ static int msm_ispif_stop_immediately(struct ispif_device *ispif,
 	int i, rc = 0;
 	uint16_t cid_mask = 0;
 
-	pr_err("%s abhishek E\n ", __func__);
+	pr_err("%s E\n ", __func__);
 	BUG_ON(!ispif);
 	BUG_ON(!params);
 
@@ -677,7 +677,7 @@ static int msm_ispif_stop_immediately(struct ispif_device *ispif,
 	for (i = 0; i < params->num; i++) {
 		cid_mask = msm_ispif_get_cids_mask_from_cfg(
 			&params->entries[i]);
-		pr_err("%s abhishek cid_mask 0x%x \n ", __func__, cid_mask);
+		pr_err("%s cid_mask 0x%x \n ", __func__, cid_mask);
 		msm_ispif_enable_intf_cids(ispif, params->entries[i].intftype,
 					   cid_mask, params->entries[i].vfe_intf, 0);
 	}
@@ -690,7 +690,7 @@ static int msm_ispif_start_frame_boundary(struct ispif_device *ispif,
 {
 	int rc = 0;
 
-	pr_err("%s abhishek E\n ", __func__);
+	pr_err("%s E\n ", __func__);
 
 	if (ispif->ispif_state != ISPIF_POWER_UP) {
 		pr_err("%s: ispif invalid state %d\n", __func__,
@@ -717,7 +717,7 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	struct clk *reset_clk[ARRAY_SIZE(ispif_8974_reset_clk_info)];
 
 //	uint32_t stop_flag = 1;
-	pr_err("%s abhishek E\n ", __func__);
+	pr_err("%s E\n ", __func__);
 
 	if (ispif->ispif_state != ISPIF_POWER_UP) {
 		pr_err("%s: ispif invalid state %d\n", __func__,
@@ -766,7 +766,7 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 	if (vfe_mask & (1 << VFE0)) {
 		timeout = wait_for_completion_interruptible_timeout(
 			&ispif->reset_complete[VFE0], msecs_to_jiffies(500));
-		pr_err("%s: abhishek VFE0 done\n", __func__);
+		pr_err("%s: VFE0 done\n", __func__);
 		if (timeout <= 0) {
 			pr_err("%s: VFE0 reset wait timeout\n", __func__);
 			rc = -ETIMEDOUT;
@@ -778,7 +778,7 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		timeout = wait_for_completion_interruptible_timeout(
 			&ispif->reset_complete[VFE1],
 			msecs_to_jiffies(500));
-		pr_err("%s: abhishek VFE1 done\n", __func__);
+		pr_err("%s: VFE1 done\n", __func__);
 		if (timeout <= 0) {
 			pr_err("%s: VFE1 reset wait timeout\n", __func__);
 			rc = -ETIMEDOUT;
@@ -836,7 +836,7 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
  */
 
 		msm_ispif_intf_cmd(ispif, ISPIF_INTF_CMD_ENABLE_FRAME_BOUNDARY, params);
-		pr_err("%s abhishek intftype %x, vfe_intf %d\n", __func__,
+		pr_err("%s intftype %x, vfe_intf %d\n", __func__,
 		       intftype, vfe_intf);
 	}
 

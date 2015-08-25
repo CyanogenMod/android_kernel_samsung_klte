@@ -401,15 +401,11 @@ void mDNIe_Set_Mode(void)
 	play_speed_1_5 = 0;
 
 	if (mdnie_tun_state.accessibility) {
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-		if (get_lcd_panel_res() == 1) { // 1 fhd
-			DPRINT(" = ACCESSIBILITY MODE =\n");
-			INPUT_PAYLOAD1(blind_tune_value_fhd[mdnie_tun_state.accessibility][0]);
-			INPUT_PAYLOAD2(blind_tune_value_fhd[mdnie_tun_state.accessibility][1]);
-		}else 
-#endif
-		{
 		DPRINT(" = ACCESSIBILITY MODE =\n");
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+		INPUT_PAYLOAD1(blind_tune_value_fhd[mdnie_tun_state.accessibility][0]);
+		INPUT_PAYLOAD2(blind_tune_value_fhd[mdnie_tun_state.accessibility][1]);
+#else
 #if defined(CONFIG_FB_MSM_MIPI_VIDEO_WVGA_NT35502_PT_PANEL)
 		INPUT_PAYLOAD1(blind_tune_value[mdnie_tun_state.accessibility][0]);
 		INPUT_PAYLOAD2(blind_tune_value[mdnie_tun_state.accessibility][1]);
@@ -420,26 +416,23 @@ void mDNIe_Set_Mode(void)
 		INPUT_PAYLOAD1(blind_tune_value[mdnie_tun_state.accessibility][0]);
 		INPUT_PAYLOAD2(blind_tune_value[mdnie_tun_state.accessibility][1]);
 #endif
-		}
-
+#endif
 	}
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	else if (mdnie_msd->dstat.auto_brightness == 6) {
 		DPRINT("[LOCAL CE] HBM mode! only LOCAL CE tuning\n");
-		if (get_lcd_panel_res() == 1) { // 1 fhd
+#if defined(CONFIG_MDNIE_ENHENCED_LOCAL_CE)
+			INPUT_PAYLOAD1(LOCAL_CE_1_ENHENCED);
+			INPUT_PAYLOAD2(LOCAL_CE_2_ENHENCED);
+#else
 			INPUT_PAYLOAD1(LOCAL_CE_1_FHD);
 			INPUT_PAYLOAD2(LOCAL_CE_2_FHD);
-		} else {
-			INPUT_PAYLOAD1(LOCAL_CE_1);
-			INPUT_PAYLOAD2(LOCAL_CE_2);
-		}
+#endif
 	}
 #endif
 #if defined(CONFIG_TDMB)
 	else if (mdnie_tun_state.dmb > DMB_MODE_OFF){
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-			if (get_lcd_panel_res() == 1) { // 1 fhd
-
 			if (!dmb_tune_value_fhd[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
 				!dmb_tune_value_fhd[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]) {
 				pr_err("dmb tune data is NULL!\n");
@@ -450,9 +443,7 @@ void mDNIe_Set_Mode(void)
 				INPUT_PAYLOAD2(
 					dmb_tune_value_fhd[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
 			}
-			} else
-#endif
-			{
+#else
 		if (!dmb_tune_value[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
 			!dmb_tune_value[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]) {
 			pr_err("dmb tune data is NULL!\n");
@@ -463,12 +454,11 @@ void mDNIe_Set_Mode(void)
 			INPUT_PAYLOAD2(
 				dmb_tune_value[mdnie_tun_state.dmb][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);	
 		}
-	}
+#endif
 	}
 #endif
 	else {
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-		if (get_lcd_panel_res() == 1) { // 1 fhd
 			if (!mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
 				!mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]) {
 				pr_err("mdnie tune data is NULL!\n");
@@ -482,9 +472,7 @@ void mDNIe_Set_Mode(void)
 				mdnie_tun_state.scr_white_green = mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1][ADDRESS_SCR_WHITE_GREEN];
 				mdnie_tun_state.scr_white_blue= mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1][ADDRESS_SCR_WHITE_BLUE];
 			}
-		}else
-#endif
-		{
+#else
 #if defined(CONFIG_FB_MSM_MIPI_VIDEO_WVGA_NT35502_PT_PANEL)
 		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
 			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
@@ -515,9 +503,9 @@ void mDNIe_Set_Mode(void)
 			INPUT_PAYLOAD2(
 				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);	
 #endif
-		}
 		}		
-	}
+#endif
+}
 
 	sending_tuning_cmd();
 	free_tun_cmd();
@@ -865,18 +853,15 @@ static ssize_t accessibility_store(struct device *dev,
 		mdnie_tun_state.accessibility = COLOR_BLIND;
 
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-		if (get_lcd_panel_res() == 1) { // 1 : fhd
 			memcpy(&COLOR_BLIND_2_FHD[MDNIE_COLOR_BLINDE_OFFSET],
 				buffer, MDNIE_COLOR_BLINDE_CMD);
-		} else
-#endif		
-		{
+#else
 #ifndef	MDNIE_DATA_NONE
 		memcpy(&COLOR_BLIND_2[MDNIE_COLOR_BLINDE_OFFSET],
 				buffer, MDNIE_COLOR_BLINDE_CMD);
 #endif
+#endif
 		}
-	}
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	else if (cmd_value == SCREEN_CURTAIN) {
 		mdnie_tun_state.accessibility = SCREEN_CURTAIN;
@@ -926,10 +911,10 @@ static ssize_t sensorRGB_store(struct device *dev,
 		mdnie_tun_state.scr_white_green = green;
 		mdnie_tun_state.scr_white_blue= blue;
 		DPRINT("%s: white_red = %d, white_green = %d, white_blue = %d\n", __func__, white_red, white_green, white_blue);
-		if (get_lcd_panel_res() == 1) { // 1 fhd 
+
 			INPUT_PAYLOAD1(mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
 			memcpy( white_rgb_buf, mdnie_tune_value_fhd[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1], MDNIE_TUNE_FIRST_SIZE);
-		}
+
 		white_rgb_buf[ADDRESS_SCR_WHITE_RED] = white_red;
 		white_rgb_buf[ADDRESS_SCR_WHITE_GREEN] = white_green;
 		white_rgb_buf[ADDRESS_SCR_WHITE_BLUE] = white_blue;
@@ -1345,8 +1330,6 @@ void coordinate_tunning(int x, int y)
 	pr_info("%s x : %d, y : %d, tune_number : %d", __func__, x, y, tune_number);
 
 #if defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-
-	if(get_lcd_panel_res() == 1) { // 1 : fhd
 		memcpy(&DYNAMIC_BROWSER_2_FHD[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 		memcpy(&DYNAMIC_GALLERY_2_FHD[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 		memcpy(&DYNAMIC_UI_2_FHD[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
@@ -1369,9 +1352,7 @@ void coordinate_tunning(int x, int y)
 		memcpy(&AUTO_VT_2_FHD[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 
 		memcpy(&CAMERA_2_FHD[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
-	}else
-#endif	
-	{
+#else
 	memcpy(&DYNAMIC_BROWSER_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 	memcpy(&DYNAMIC_GALLERY_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 	memcpy(&DYNAMIC_UI_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
@@ -1394,7 +1375,7 @@ void coordinate_tunning(int x, int y)
 	memcpy(&AUTO_VT_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 
 	memcpy(&CAMERA_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
-	}
+#endif
 
 }
 #endif /* COORDINATE_DATA_NONE */

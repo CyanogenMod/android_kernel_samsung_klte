@@ -187,7 +187,7 @@
 	rpm-regulator-ldoa3 {
 		status = "okay";
 		pma8084_l3: regulator-l3 {
-			regulator-min-microvolt = <1200000>;
+			regulator-min-microvolt = <1050000>;
 			regulator-max-microvolt = <1200000>;
 			qcom,init-voltage = <1200000>;
 			status = "okay";

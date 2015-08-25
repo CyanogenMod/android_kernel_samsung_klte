@@ -55,6 +55,9 @@ struct mdss_mdp_cmd_ctx {
 	int rdptr_enabled;
 	struct mutex clk_mtx;
 	spinlock_t clk_lock;
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	spinlock_t te_lock;
+#endif
 	struct work_struct clk_work;
 	struct work_struct pp_done_work;
 	atomic_t pp_done_cnt;
@@ -264,12 +267,29 @@ int	dynamic_fps_use_te_ctrl_value;
 int skip_te_enable = 0;
 static unsigned int skip_te = 0;
 #endif
+
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+int te;
+int te_cnt;
+int te_set_done;
+struct completion te_check_comp;
+int get_lcd_ldi_info(void);
+#endif
+
 static void mdss_mdp_cmd_readptr_done(void *arg)
 {
 	struct mdss_mdp_ctl *ctl = arg;
 	struct mdss_mdp_cmd_ctx *ctx = ctl->priv_data;
 	struct mdss_mdp_vsync_handler *tmp;
 	ktime_t vsync_time;
+
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	static ktime_t vsync_time1;
+	static ktime_t vsync_time2;
+	static int i = 0;
+	static int time1 = 0, time2 = 0;
+#endif
+
 #if defined(DYNAMIC_FPS_USE_TE_CTRL)
 	if(dynamic_fps_use_te_ctrl)
 	{
@@ -301,6 +321,39 @@ static void mdss_mdp_cmd_readptr_done(void *arg)
 	vsync_time = ktime_get();
 	ctl->vsync_cnt++;
 
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	if (get_lcd_ldi_info()) {
+		if (te_set_done == TE_SET_START) {
+
+			pr_debug("%s : TE_SET_START...",__func__);
+			if (i % 2 == 0) {
+				vsync_time1 = ktime_get();
+				time1 = (int)ktime_to_us(vsync_time1);
+				te = time1 && time2 ? time1 - time2 : 0;
+				pr_debug("[%s] : ktime = %d\n",__func__, te);
+			} else {
+				vsync_time2 = ktime_get();
+				time2 = (int)ktime_to_us(vsync_time2);
+				te = time1 && time2 ? time2 - time1 : 0;
+				pr_debug("[%s] : ktime = %d\n",__func__, te);
+			}
+			i++;
+
+			pr_debug("[%s] TE = %d\n",__func__, te);
+
+			spin_lock(&ctx->te_lock);
+			te_cnt++;
+			if (te_cnt >= 2) { // check TE using only two signal..
+				pr_debug(">>>> te_check_comp COMPLETE <<<< \n");
+				complete(&te_check_comp);
+			}
+			spin_unlock(&ctx->te_lock);
+		} else {
+			pr_debug("%s : not TE_SET_START...",__func__);
+		}
+	}
+#endif
+
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 	xlog(__func__,ctl->num, ctx->koff_cnt, ctx->clk_enabled, ctx->rdptr_enabled, 0, 0x88888);
 #endif
@@ -317,6 +370,10 @@ static void mdss_mdp_cmd_readptr_done(void *arg)
 	}
 
 	if (ctx->rdptr_enabled == 0) {
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+		if (get_lcd_ldi_info())
+			if (te_set_done == TE_SET_DONE || te_set_done == TE_SET_FAIL)
+#endif
 		mdss_mdp_irq_disable_nosync
 			(MDSS_MDP_IRQ_PING_PONG_RD_PTR, ctx->pp_num);
 		complete(&ctx->stop_comp);
@@ -855,6 +912,9 @@ int mdss_mdp_cmd_start(struct mdss_mdp_ctl *ctl)
 	init_completion(&ctx->pp_comp);
 	init_completion(&ctx->stop_comp);
 	spin_lock_init(&ctx->clk_lock);
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
+	spin_lock_init(&ctx->te_lock);
+#endif
 	mutex_init(&ctx->clk_mtx);
 	INIT_WORK(&ctx->clk_work, clk_ctrl_work);
 	INIT_WORK(&ctx->pp_done_work, pingpong_done_work);

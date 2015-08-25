@@ -14,7 +14,9 @@
 
 #define pr_fmt(fmt) "AXI: %s(): " fmt, __func__
 
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_MILLETLTE_COMMON)
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_MILLETLTE_COMMON) || \
+	defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT) || \
+	defined(CONFIG_SEC_S_PROJECT)
 #define DEBUG_MSM_BUS_ARB_REQ
 #endif
 

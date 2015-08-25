@@ -35,7 +35,7 @@
 
 #include <linux/io.h>
 #include <mach/isdbt_tuner_pdata.h>
-
+#include <mach/sec_debug.h>
 #include <mach/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/wakelock.h>
@@ -53,6 +53,7 @@
 #include "fci_hal.h"
 #include <asm/system_info.h>
 
+
 struct ISDBT_INIT_INFO_T *hInit;
 
 #define RING_BUFFER_SIZE	(188 * 320 * 17)
@@ -61,13 +62,145 @@ struct ISDBT_INIT_INFO_T *hInit;
 #define FC8300_NAME		"isdbt"
 static struct isdbt_platform_data *isdbt_pdata;
 
-#ifdef FEATURE_DEBUG_BROADCAST
 #define TS0_1SEG_LENGTH	(188 * 32)
-#define TS0_TMM_13SEG_LENGTH (188 * 32)
-#endif
+#define TS0_TMM_13SEG_LENGTH (188 * 96)
 
 u8 static_ringbuffer[RING_BUFFER_SIZE];
 
+#ifdef TS_DROP_DEBUG
+#define FEATURE_TS_CHECK
+#ifdef FEATURE_TS_CHECK
+u32 check_cnt_size;
+
+#define MAX_DEMUX           2
+
+/*
+ * Sync Byte 0xb8
+ */
+#define SYNC_BYTE_INVERSION
+
+struct pid_info {
+	unsigned long count;
+	unsigned long discontinuity;
+	unsigned long continuity;
+};
+
+struct demux_info {
+	struct pid_info  pids[8192];
+
+	unsigned long    ts_packet_c;
+	unsigned long    malformed_packet_c;
+	unsigned long    tot_scraped_sz;
+	unsigned long    packet_no;
+	unsigned long    sync_err;
+	unsigned long 	   sync_err_set;
+};
+
+static int is_sync(unsigned char *p)
+{
+	int syncword = p[0];
+#ifdef SYNC_BYTE_INVERSION
+	if (0x47 == syncword || 0xb8 == syncword)
+		return 1;
+#else
+	if (0x47 == syncword)
+		return 1;
+#endif
+	return 0;
+}
+static struct demux_info demux[MAX_DEMUX];
+
+int print_pkt_log(void)
+{
+	unsigned long i = 0;
+
+	print_log(NULL, "\nPKT_TOT : %d, SYNC_ERR : %d, SYNC_ERR_BIT : %d \
+		, ERR_PKT : %d \n"
+		, demux[0].ts_packet_c, demux[0].sync_err
+		, demux[0].sync_err_set, demux[0].malformed_packet_c);
+
+	for (i = 0; i < 8192; i++) {
+		if (demux[0].pids[i].count > 0)
+			print_log(NULL, "PID : %d, TOT_PKT : %d\
+							, DISCONTINUITY : %d \n"
+			, i, demux[0].pids[i].count
+			, demux[0].pids[i].discontinuity);
+	}
+	return 0;
+}
+
+int put_ts_packet(int no, unsigned char *packet, int sz)
+{
+	unsigned char *p;
+	int transport_error_indicator, pid, payload_unit_start_indicator;
+	int continuity_counter, last_continuity_counter;
+	int i;
+	if ((sz % 188)) {
+		print_log(NULL, "L : %d", sz);
+	} else {
+		for (i = 0; i < sz; i += 188) {
+			p = packet + i;
+
+			pid = ((p[1] & 0x1f) << 8) + p[2];
+
+			demux[no].ts_packet_c++;
+			if (!is_sync(packet + i)) {
+				print_log(NULL, "S     ");
+				demux[no].sync_err++;
+				if (0x80 == (p[1] & 0x80))
+					demux[no].sync_err_set++;
+				print_log(NULL, "0x%x, 0x%x, 0x%x, 0x%x \n"
+					, *p, *(p+1),  *(p+2), *(p+3));
+				continue;
+			}
+
+			transport_error_indicator = (p[1] & 0x80) >> 7;
+			if (1 == transport_error_indicator) {
+				demux[no].malformed_packet_c++;
+				continue;
+			}
+
+			payload_unit_start_indicator = (p[1] & 0x40) >> 6;
+
+			demux[no].pids[pid].count++;
+
+			continuity_counter = p[3] & 0x0f;
+
+			if (demux[no].pids[pid].continuity == -1) {
+				demux[no].pids[pid].continuity
+					= continuity_counter;
+			} else {
+				last_continuity_counter
+					= demux[no].pids[pid].continuity;
+
+				demux[no].pids[pid].continuity
+					= continuity_counter;
+
+				if (((last_continuity_counter + 1) & 0x0f)
+					!= continuity_counter) {
+					demux[no].pids[pid].discontinuity++;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+
+void create_tspacket_anal(void)
+{
+	int n, i;
+
+	for (n = 0; n < MAX_DEMUX; n++) {
+		memset((void *)&demux[n], 0, sizeof(demux[n]));
+
+		for (i = 0; i < 8192; i++)
+			demux[n].pids[i].continuity = -1;
+	}
+
+}
+#endif
+#endif
 enum ISDBT_MODE driver_mode = ISDBT_POWEROFF;
 static DEFINE_MUTEX(ringbuffer_lock);
 
@@ -94,7 +227,7 @@ static int tuner_ioctl_set_monitor_mode ( struct file* FIle,
 {
 	int ret = 0;
 	
-	pr_info ("tuner_ioctl_set_monitor_mode << Start >> ");
+	ISDB_PR_DBG("tuner_ioctl_set_monitor_mode << Start >> ");
 	
 	if ( 1 == arg )
 	{
@@ -107,11 +240,11 @@ static int tuner_ioctl_set_monitor_mode ( struct file* FIle,
 		moni_cnt--;
 		if ( 0 > moni_cnt )
 		{
-			pr_info (" tuner_ioctl_set_monitor_mode under counter = %ld => 0", moni_cnt );
+			ISDB_PR_INFO(" tuner_ioctl_set_monitor_mode under counter = %ld => 0", moni_cnt );
 			moni_cnt = 0;
 		}
 	}
-	pr_info ("tuner_ioctl_set_monitor_mode << End >> : moni_cnt = %ld", 
+	ISDB_PR_INFO("tuner_ioctl_set_monitor_mode << End >> : moni_cnt = %ld", 
 				 moni_cnt );
 
 	return ( ret );
@@ -126,7 +259,7 @@ static int tuner_ioctl_get_open_count ( struct file*  FIle,
 	unsigned long 	temp_open = 0,
 				  	temp_moni = 0;
 	
-	pr_info ("tuner_ioctl_get_open_count << Start >> : open = %ld", 
+	ISDB_PR_INFO("tuner_ioctl_get_open_count << Start >> : open = %ld", 
 				 ( open_cnt - moni_cnt ));
 
 	/* Parameter check */
@@ -134,13 +267,13 @@ static int tuner_ioctl_get_open_count ( struct file*  FIle,
 	
 	if ( NULL == arg_data )
 	{
-		pr_err("Parameter Error : arg = NULL");
+		ISDB_PR_ERR("Parameter Error : arg = NULL");
 		return ( -1 );
 	}
 	/* state check */
 	if ( open_cnt < moni_cnt ) 
 	{
-		pr_err("tuner_ioctl_get_open_count Error : open = %ld, moni = %ld", 
+		ISDB_PR_ERR("tuner_ioctl_get_open_count Error : open = %ld, moni = %ld", 
 					 open_cnt, moni_cnt );
 		return ( -1 );
 	}
@@ -152,7 +285,7 @@ static int tuner_ioctl_get_open_count ( struct file*  FIle,
 	
 	if ( 0 != ret )
 	{
-		pr_err("tuner_ioctl_get_open_count put_user(arg_data->open_cnt) Error : ret = %d", ret );
+		ISDB_PR_ERR("tuner_ioctl_get_open_count put_user(arg_data->open_cnt) Error : ret = %d", ret );
 		return ( -1 );
 	}
 	
@@ -160,13 +293,13 @@ static int tuner_ioctl_get_open_count ( struct file*  FIle,
 	ret = put_user ( moni_cnt, (unsigned long __user *)&(arg_data->moni_cnt) );
 	if ( 0 != ret )
 	{
-		pr_err("tuner_ioctl_get_open_count put_user(arg_data->moni_cnt) Error : ret = %d", ret );
+		ISDB_PR_ERR("tuner_ioctl_get_open_count put_user(arg_data->moni_cnt) Error : ret = %d", ret );
 		return ( -1 );
 	}	
 	
-	pr_info("tuner_ioctl_get_open_count << End >>");
-	pr_info(" Open Count Result    : %ld", open_cnt );
-	pr_info(" Monitor Count Result : %ld", moni_cnt );
+	ISDB_PR_DBG("tuner_ioctl_get_open_count << End >>");
+	ISDB_PR_INFO(" Open Count Result    : %ld", open_cnt );
+	ISDB_PR_INFO(" Monitor Count Result : %ld", moni_cnt );
 	
 	return ( 0 );
 }
@@ -174,17 +307,17 @@ static int tuner_ioctl_get_open_count ( struct file*  FIle,
 int isdbt_hw_setting(void)
 {
 	int err;
-	pr_info("isdbt_hw_setting \n");
+	ISDB_PR_INFO("isdbt_hw_setting \n");
 
 	err = gpio_request(isdbt_pdata->gpio_en, "isdbt_en");
 	if (err) {
-		pr_info("isdbt_hw_setting: Couldn't request isdbt_en\n");
+		ISDB_PR_ERR("isdbt_hw_setting: Couldn't request isdbt_en\n");
 		goto ISBT_EN_ERR;
 	}
 	gpio_direction_output(isdbt_pdata->gpio_en, 0);
 	err =	gpio_request(isdbt_pdata->gpio_rst, "isdbt_rst");
 	if (err) {
-		pr_info("isdbt_hw_setting: Couldn't request isdbt_rst\n");
+		ISDB_PR_ERR("isdbt_hw_setting: Couldn't request isdbt_rst\n");
 		goto ISDBT_RST_ERR;
 	}
 	gpio_direction_output(isdbt_pdata->gpio_rst, 0);
@@ -192,7 +325,7 @@ int isdbt_hw_setting(void)
 #ifndef BBM_I2C_TSIF
 	err =	gpio_request(isdbt_pdata->gpio_int, "isdbt_irq");
 	if (err) {
-		pr_info("isdbt_hw_setting: Couldn't request isdbt_irq\n");
+		ISDB_PR_ERR("isdbt_hw_setting: Couldn't request isdbt_irq\n");
 		goto ISDBT_INT_ERR;
 	}
 	
@@ -202,8 +335,7 @@ int isdbt_hw_setting(void)
 		, IRQF_DISABLED | IRQF_TRIGGER_FALLING, FC8300_NAME, NULL);
 
 	if (err < 0) {
-		print_log(0,
-			"isdbt_hw_setting: couldn't request gpio	\
+		ISDB_PR_ERR("isdbt_hw_setting: couldn't request gpio	\
 			interrupt %d reason(%d)\n"
 			, gpio_to_irq(isdbt_pdata->gpio_int), err);
 	goto request_isdbt_irq;
@@ -228,7 +360,7 @@ ISBT_EN_ERR:
 
 static void isdbt_gpio_init(void)
 {
-	pr_info("%s\n",__func__);
+	ISDB_PR_INFO("%s\n",__func__);
 
 					 
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_en, GPIOMUX_FUNC_GPIO,
@@ -283,7 +415,7 @@ void isdbt_hw_init(void)
 			break;
 	}
 
-	pr_info("isdbt_hw_init \n");
+	ISDB_PR_INFO("isdbt_hw_init \n");
 
 	gpio_set_value(isdbt_pdata->gpio_rst, 0);
 	gpio_set_value(isdbt_pdata->gpio_en, 1);
@@ -297,7 +429,7 @@ void isdbt_hw_init(void)
 /*POWER_OFF */
 void isdbt_hw_deinit(void)
 {
-	pr_info("isdbt_hw_deinit \n");
+	ISDB_PR_INFO("isdbt_hw_deinit \n");
 	driver_mode = ISDBT_POWEROFF;
 	gpio_set_value(isdbt_pdata->gpio_en, 0);
 	gpio_set_value(isdbt_pdata->gpio_rst, 0);
@@ -316,25 +448,42 @@ int data_callback(u32 hDevice, u8 bufid, u8 *data, int len)
 		hOpen = list_entry(temp, struct ISDBT_OPEN_INFO_T, hList);
 
 		if (hOpen->isdbttype == TS_TYPE) {
+#ifdef TS_DROP_DEBUG
+#if 0//def FEATURE_TS_CHECK
+			if (!(len%188)) {
+				put_ts_packet(0, data, len);
+				check_cnt_size += len;
+
+				if (check_cnt_size > 188*32*200) {
+					print_pkt_log();
+					check_cnt_size = 0;
+				}
+			}
+#endif
+#endif
 			mutex_lock(&ringbuffer_lock);
 			if (fci_ringbuffer_free(&hOpen->RingBuffer) < len) {
-#ifdef FEATURE_DEBUG_BROADCAST
-				print_log((void *)hDevice, "f");
+#ifdef TS_DROP_DEBUG
+				print_log(NULL, "[FC8300] RingBuffer full  \n");
 #endif
 				/* return 0 */;
 				FCI_RINGBUFFER_SKIP(&hOpen->RingBuffer, len);
 			}
-
-			fci_ringbuffer_write(&hOpen->RingBuffer, data, len);
-#ifdef FEATURE_DEBUG_BROADCAST
-		print_log((void *)hDevice, "[FC8300] data_callback : %d [0x%x][0x%x]\n", len
-		, data[0], data[1]);
+#ifdef TS_DROP_DEBUG
+			print_log(NULL, "[FC8300] RingBuffer Write %d  \n", len);
 #endif
+			fci_ringbuffer_write(&hOpen->RingBuffer, data, len);
+			
+			ISDB_PR_DBG("data_callback : %d [0x%x][0x%x]\n", len, data[0], data[1]);
 
 			wake_up_interruptible(&(hOpen->RingBuffer.queue));
 
 			mutex_unlock(&ringbuffer_lock);
 		}
+#ifdef TS_DROP_DEBUG
+		else
+			print_log(NULL, "[FC8300] Data callback : TS Stop \n");
+#endif
 	}
 
 	return 0;
@@ -348,7 +497,7 @@ static int isdbt_thread(void *hDevice)
 
 	set_user_nice(current, -20);
 
-	pr_info("isdbt_kthread enter\n");
+	ISDB_PR_INFO("isdbt_kthread enter\n");
 
 	bbm_com_ts_callback_register((u32)hInit, data_callback);
 
@@ -370,7 +519,7 @@ static int isdbt_thread(void *hDevice)
 
 	bbm_com_ts_callback_deregister();
 
-	pr_info("isdbt_kthread exit\n");
+	ISDB_PR_INFO("isdbt_kthread exit\n");
 
 	return 0;
 }
@@ -394,7 +543,7 @@ int isdbt_open(struct inode *inode, struct file *filp)
 {
 	struct ISDBT_OPEN_INFO_T *hOpen;
 
-	pr_info("isdbt open\n");
+	ISDB_PR_INFO("isdbt open\n");
 	open_cnt++;
 	hOpen = kmalloc(sizeof(struct ISDBT_OPEN_INFO_T), GFP_KERNEL);
 
@@ -407,7 +556,7 @@ int isdbt_open(struct inode *inode, struct file *filp)
 	hOpen->hInit = (HANDLE *)hInit;
 
 	if (hOpen->buf == NULL) {
-		pr_info("ring buffer malloc error\n");
+		ISDB_PR_ERR("ring buffer malloc error\n");
 		return -ENOMEM;
 	}
 
@@ -429,18 +578,17 @@ ssize_t isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 	
 	
 	if (!cibuf->data || !count)	{
-		/*pr_info(" return 0\n"); */
+		ISDB_PR_INFO(" return 0\n");
 		return 0;
 	}
 
 	if (non_blocking && (fci_ringbuffer_empty(cibuf)))	{
-		/*pr_info("return EWOULDBLOCK\n");*/
 		return -EWOULDBLOCK;
 	}
 
 	if (wait_event_interruptible(cibuf->queue,
 		!fci_ringbuffer_empty(cibuf))) {
-		pr_info("return ERESTARTSYS\n");
+		ISDB_PR_INFO("return ERESTARTSYS\n");
 		return -ERESTARTSYS;
 	}
 
@@ -453,14 +601,30 @@ ssize_t isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 	else
 		len = count - (count % 188);
 
+
 	read_len = fci_ringbuffer_read_user(cibuf, buf, len);
-#ifdef FEATURE_DEBUG_BROADCAST
-	print_log(hInit, "[FC8300] TS READ : %d [0x%x][0x%x]\n", read_len
-	, buf[0], buf[1]);
+#ifdef TS_DROP_DEBUG
+#ifdef FEATURE_TS_CHECK
+	if (!(read_len%188)) {
+		put_ts_packet(0, buf, read_len);
+		check_cnt_size += read_len;
+	
+		if (check_cnt_size > 188*32*200) {
+			print_pkt_log();
+			check_cnt_size = 0;
+		}
+	}
+	else
+		print_log(NULL, "[FC8300] Read Len Error %d \n", read_len);
+#endif
 #endif
 
 	mutex_unlock(&ringbuffer_lock);
 
+
+#ifdef TS_DROP_DEBUG
+	print_log(hInit, "[FC8300] RingBuffer Read %d  Buffer : %d\n", read_len, count);
+#endif
 	return read_len;
 }
 
@@ -468,7 +632,7 @@ int isdbt_release(struct inode *inode, struct file *filp)
 {
 	struct ISDBT_OPEN_INFO_T *hOpen;
 
-	pr_info("isdbt_release\n");
+	ISDB_PR_INFO("isdbt_release\n");
 
 	if( open_cnt <= 0 )
 	{
@@ -492,7 +656,7 @@ int isdbt_release(struct inode *inode, struct file *filp)
 		hOpen->isdbttype = 0;
 
 		list_del(&(hOpen->hList));
-		pr_info("isdbt_release hList\n");
+		ISDB_PR_INFO("isdbt_release hList\n");
 	
 		/*kfree(hOpen->buf);*/
 
@@ -542,31 +706,30 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case IOCTL_ISDBT_RESET:
-	//pr_info("[FC8300] IOCTL_ISDBT_RESET \n");
 		res = bbm_com_reset(hInit, DIV_BROADCAST);
-		pr_info("[FC8300] IOCTL_ISDBT_RESET \n");
+		ISDB_PR_INFO("IOCTL_ISDBT_RESET \n");
 		break;
 	case IOCTL_ISDBT_INIT:
-#ifdef FEATURE_DEBUG_BROADCAST
-		print_log(hInit, "[FC8300] IOCTL_ISDBT_INIT \n");
-#endif
+
+		ISDB_PR_DBG("IOCTL_ISDBT_INIT \n");
+
 		res = bbm_com_i2c_init(hInit, FCI_HPI_TYPE);
-		pr_info("[FC8300] IOCTL_ISDBT_INIT bbm_com_i2c_init res =%d \n",res);
+		ISDB_PR_INFO("IOCTL_ISDBT_INIT bbm_com_i2c_init res =%d \n",res);
 		res |= bbm_com_probe(hInit, DIV_BROADCAST);
 		if (res) {
-			pr_info("FC8300 Initialize Fail \n");
+			ISDB_PR_ERR("FC8300 Initialize Fail \n");
 			break;
 		}
-		pr_info("[FC8300] IOCTL_ISDBT_INIT bbm_com_probe success \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_INIT bbm_com_probe success \n");
 		res |= bbm_com_init(hInit, DIV_BROADCAST);
-		pr_info("[FC8300] IOCTL_ISDBT_INITbbm_com_init \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_INITbbm_com_init \n");
 		#if 0
 		res |= bbm_com_tuner_select(hInit
 			, DIV_BROADCAST, FC8300_TUNER, ISDBT_13SEG);
 		#endif
 		break;
 	case IOCTL_ISDBT_BYTE_READ:
-		pr_info("[FC8300] IOCTL_ISDBT_BYTE_READ \n");
+		ISDB_PR_INFO("IOCTL_ISDBT_BYTE_READ \n");
 		err = copy_from_user((void *)&info, (void *)arg, size);
 		res = bbm_com_byte_read(hInit, DIV_BROADCAST, (u16)info.buff[0]
 			, (u8 *)(&info.buff[1]));
@@ -640,10 +803,10 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 			f_rf = (u32)info.buff[0];
 			subch = (u8)info.buff[1];
-#ifdef FEATURE_DEBUG_BROADCAST
-			print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_SET_FREQ \
+
+			ISDB_PR_DBG("IOCTL_ISDBT_TUNER_SET_FREQ \
 							: f_rf[%d], subch[%d]\n", f_rf, subch);
-#endif
+
 #ifndef BBM_I2C_TSIF
 			isdbt_isr_check(hInit);
 #endif
@@ -656,18 +819,16 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			bbm_com_write(hInit
 				, DIV_BROADCAST, BBM_BUF_INT_ENABLE, 0x01);
 #endif
-#ifdef FEATURE_DEBUG_BROADCAST
-			print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_SET_FREQ BUF En\n");
-#endif
+			ISDB_PR_DBG("IOCTL_ISDBT_TUNER_SET_FREQ BUF En\n");
 
 		}
 		break;
 	case IOCTL_ISDBT_TUNER_SELECT:
-	pr_info("[FC8300] IOCTL_ISDBT_TUNER_SELECT \n");
+		ISDB_PR_INFO("IOCTL_ISDBT_TUNER_SELECT \n");
 		err = copy_from_user((void *)&info, (void *)arg, size);
 		res = bbm_com_tuner_select(hInit
 			, DIV_BROADCAST, (u32)info.buff[0], (u32)info.buff[1]);
-#ifdef FEATURE_DEBUG_BROADCAST
+
 		if (((u32)info.buff[1] != ISDBT_13SEG)
 			&& ((u32)info.buff[1] != ISDBTMM_13SEG)) {
 			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
@@ -675,7 +836,7 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				, TS0_1SEG_LENGTH - 1);
 			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
 				, TS0_1SEG_LENGTH / 2 - 1);
-			print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+			ISDB_PR_DBG("TUNER THRESHOLD: %d \n"
 			, TS0_1SEG_LENGTH / 2 - 1);
 		} else if ((u32)info.buff[1] == ISDBTMM_13SEG) {
                         bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
@@ -683,47 +844,50 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
                                 , TS0_TMM_13SEG_LENGTH - 1);
                         bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
                                 , TS0_TMM_13SEG_LENGTH / 2 - 1);
-			   print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+			   ISDB_PR_DBG("TUNER THRESHOLD: %d \n"
 			   , TS0_TMM_13SEG_LENGTH / 2 - 1);
                 }
-		print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_SELECT %d \n"
+		ISDB_PR_DBG("IOCTL_ISDBT_TUNER_SELECT %d \n"
 		, (u32)info.buff[1]);
-#else
-		print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_SELECT \n");
-#endif
 		break;
 	case IOCTL_ISDBT_TS_START:
-	pr_info("[FC8300] IOCTL_ISDBT_TS_START \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_TS_START \n");
+#ifdef TS_DROP_DEBUG
+#ifdef FEATURE_TS_CHECK
+		create_tspacket_anal();
+		check_cnt_size = 0;
+#endif
+#endif
 		hOpen->isdbttype = TS_TYPE;
 
 		break;
 	case IOCTL_ISDBT_TS_STOP:
-	pr_info("[FC8300] IOCTL_ISDBT_TS_STOP \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_TS_STOP \n");
 		hOpen->isdbttype = 0;
 
 		break;
 	case IOCTL_ISDBT_POWER_ON:
-	pr_info("[FC8300] IOCTL_ISDBT_POWER_ON \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_POWER_ON \n");
 		
 		isdbt_hw_init();
 
 		res = bbm_com_probe(hInit, DIV_BROADCAST);
 		
 		if (res) {
-			pr_info("FC8300 IOCTL_ISDBT_POWER_ON FAIL \n");
+			ISDB_PR_INFO("FC8300 IOCTL_ISDBT_POWER_ON FAIL \n");
 			isdbt_hw_deinit();
 		} else {
-			pr_info("FC8300 IOCTL_ISDBT_POWER_ON SUCCESS\n");
+			ISDB_PR_INFO("FC8300 IOCTL_ISDBT_POWER_ON SUCCESS\n");
 		}
 
 		break;
 	case IOCTL_ISDBT_POWER_OFF:
-	pr_info("[FC8300] IOCTL_ISDBT_POWER_OFF \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_POWER_OFF \n");
 		isdbt_hw_deinit();
 
 		break;
 	case IOCTL_ISDBT_SCAN_STATUS:
-	pr_info("[FC8300] IOCTL_ISDBT_SCAN_STATUS \n");
+		ISDB_PR_DBG("IOCTL_ISDBT_SCAN_STATUS \n");
 		res = bbm_com_scan_status(hInit, DIV_BROADCAST);
 		break;
 	case IOCTL_ISDBT_TUNER_GET_RSSI:
@@ -745,13 +909,13 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 											   arg );
 		break;
 	default:
-		pr_info("isdbt ioctl error!\n");
+		ISDB_PR_INFO("isdbt ioctl error!\n");
 		res = BBM_NOK;
 		break;
 	}
 
 	if (err < 0) {
-		pr_info("copy to/from user fail : %d", err);
+		ISDB_PR_INFO("copy to/from user fail : %d", err);
 		res = BBM_NOK;
 	}
 	return res;
@@ -763,10 +927,10 @@ static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 {
 	struct isdbt_platform_data *pdata;
 	
-	pr_info("%s\n", __func__);
+	ISDB_PR_DBG("%s\n", __func__);
 	pdata =  devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
-		pr_err("%s : could not allocate memory for platform data\n", __func__);
+		ISDB_PR_ERR("%s : could not allocate memory for platform data\n", __func__);
 		goto err;
 	}
 
@@ -774,66 +938,66 @@ static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 
 	pdata->gpio_en = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-pwr-en", 0);
 	if (pdata->gpio_en < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio gpio_en in the dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_en in the dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_en =%d\n", __func__, pdata->gpio_en);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_en =%d\n", __func__, pdata->gpio_en);
 		
 	pdata->gpio_rst = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-rst", 0);
 	if (pdata->gpio_rst < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio gpio_rst in the dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_rst in the dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_rst =%d\n", __func__, pdata->gpio_rst);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_rst =%d\n", __func__, pdata->gpio_rst);
 		
 	pdata->gpio_int = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-irq", 0);
 	if (pdata->gpio_int < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio in the gpio_int dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio in the gpio_int dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_int =%d\n", __func__, pdata->gpio_int);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_int =%d\n", __func__, pdata->gpio_int);
 		
 	pdata->gpio_i2c_sda = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-i2c_sda", 0);
 	if (pdata->gpio_i2c_sda < 0) {
-			pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_sda in the dt\n", __func__);
+			ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_i2c_sda in the dt\n", __func__);
 			goto alloc_err;
 	} else
-			pr_info("%s : isdbt-detect-gpio gpio_i2c_sda=%d\n", __func__, pdata->gpio_i2c_sda);
+			ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_i2c_sda=%d\n", __func__, pdata->gpio_i2c_sda);
 
 	pdata->gpio_i2c_scl = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-i2c_scl", 0);
 	if (pdata->gpio_i2c_scl < 0) {
-			pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_scl in the dt\n", __func__);
+			ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_i2c_scl in the dt\n", __func__);
 			goto alloc_err;
 	} else
-			pr_info("%s : isdbt-detect-gpio gpio_i2c_scl=%d\n", __func__, pdata->gpio_i2c_scl);
+			ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_i2c_scl=%d\n", __func__, pdata->gpio_i2c_scl);
 	
 	pdata->gpio_spi_do = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-spi_do", 0);
 	if (pdata->gpio_spi_do < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio in the gpio_spi_do dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio in the gpio_spi_do dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_spi_do =%d\n", __func__, pdata->gpio_spi_do);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_spi_do =%d\n", __func__, pdata->gpio_spi_do);
 		
 	pdata->gpio_spi_di = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-spi_di", 0);
 	if (pdata->gpio_spi_di < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio in the gpio_spi_di dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio in the gpio_spi_di dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_spi_di =%d\n", __func__, pdata->gpio_spi_di);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_spi_di =%d\n", __func__, pdata->gpio_spi_di);
 		
 	pdata->gpio_spi_cs = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-spi_cs", 0);
 	if (pdata->gpio_spi_cs < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio gpio_spi_cs in the dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_spi_cs in the dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_spi_cs=%d\n", __func__, pdata->gpio_spi_cs);
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_spi_cs=%d\n", __func__, pdata->gpio_spi_cs);
 		
 	pdata->gpio_spi_clk = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-spi_clk", 0);
 	if (pdata->gpio_spi_clk < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio gpio_spi_clk in the dt\n", __func__);
+		ISDB_PR_ERR("%s : can not find the isdbt-detect-gpio gpio_spi_clk in the dt\n", __func__);
 		goto alloc_err;
 	} else
-		pr_info("%s : isdbt-detect-gpio gpio_spi_clk=%d\n", __func__, pdata->gpio_spi_clk);	
+		ISDB_PR_INFO("%s : isdbt-detect-gpio gpio_spi_clk=%d\n", __func__, pdata->gpio_spi_clk);	
 
 	return pdata;
 alloc_err:
@@ -845,12 +1009,12 @@ err:
 static int isdbt_probe(struct platform_device *pdev)
 {
 	int res=0;
-	pr_info("%s\n", __func__);
+	ISDB_PR_INFO("%s\n", __func__);
 
 	open_cnt         = 0;
 	isdbt_pdata = isdbt_populate_dt_pdata(&pdev->dev);
 	if (!isdbt_pdata) {
-		pr_err("%s : isdbt_pdata is NULL.\n", __func__);
+		ISDB_PR_ERR("%s : isdbt_pdata is NULL.\n", __func__);
 		return -ENODEV;
 	}
 	
@@ -859,7 +1023,7 @@ static int isdbt_probe(struct platform_device *pdev)
 	res = misc_register(&fc8300_misc_device);
 
 	if (res < 0) {
-		pr_info("isdbt init fail : %d\n", res);
+		ISDB_PR_INFO("isdbt init fail : %d\n", res);
 		return res;
 	}
 
@@ -871,18 +1035,18 @@ static int isdbt_probe(struct platform_device *pdev)
 
 #if defined(BBM_I2C_TSIF) || defined(BBM_I2C_SPI)
 	res = bbm_com_hostif_select(hInit, BBM_I2C);
-	pr_info("isdbt host interface select BBM_I2C!\n");
+	ISDB_PR_INFO("isdbt host interface select BBM_I2C!\n");
 #else
-	pr_info("isdbt host interface select BBM_SPI !\n");
+	ISDB_PR_INFO("isdbt host interface select BBM_SPI !\n");
 	res = bbm_com_hostif_select(hInit, BBM_SPI);
 #endif
 
 	if (res)
-		pr_info("isdbt host interface select fail!\n");
+		ISDB_PR_INFO("isdbt host interface select fail!\n");
 
 #ifndef BBM_I2C_TSIF
 	if (!isdbt_kthread)	{
-		pr_info("kthread run\n");
+		ISDB_PR_INFO("kthread run\n");
 		isdbt_kthread = kthread_run(isdbt_thread
 			, (void *)hInit, "isdbt_thread");
 	}
@@ -896,7 +1060,7 @@ static int isdbt_probe(struct platform_device *pdev)
 }
 static int isdbt_remove(struct platform_device *pdev)
 {
-        pr_info("ISDBT remove\n");
+        ISDB_PR_INFO("ISDBT remove\n");
 	return 0;
 }
 
@@ -906,7 +1070,7 @@ static int isdbt_suspend(struct platform_device *pdev, pm_message_t mesg)
 	
 	
        value = gpio_get_value_cansleep(isdbt_pdata->gpio_en);
-       pr_info("%s  value = %d\n",__func__,value);
+       ISDB_PR_DBG("%s  value = %d\n",__func__,value);
        if(value == 1)
        {
           gpio_set_value(isdbt_pdata->gpio_en, 0);
@@ -943,12 +1107,12 @@ int isdbt_init(void)
 {
 	s32 res;
 
-	pr_info("isdbt_fc8300_init started\n");
+	ISDB_PR_INFO("isdbt_fc8300_init started\n");
 
 //	res = misc_register(&fc8300_misc_device);
 	res = platform_driver_register(&isdb_fc8300_driver);
 	if (res < 0) {
-		pr_info("isdbt init fail : %d\n", res);
+		ISDB_PR_INFO("isdbt init fail : %d\n", res);
 		return res;
 	}
 
@@ -959,7 +1123,7 @@ int isdbt_init(void)
 
 void isdbt_exit(void)
 {
-	pr_info("isdb_fc8300_exit \n");
+	ISDB_PR_INFO("isdb_fc8300_exit \n");
 	
 #ifndef BBM_I2C_TSIF
 	free_irq(gpio_to_irq(isdbt_pdata->gpio_int), NULL);	

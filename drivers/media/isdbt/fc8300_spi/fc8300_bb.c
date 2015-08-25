@@ -23,6 +23,7 @@
 	----------------------------------------------------------------------
 *******************************************************************************/
 #include <linux/delay.h>
+#include <mach/sec_debug.h>
 #include "fci_types.h"
 #include "fci_oal.h"
 #include "fci_hal.h"
@@ -3763,7 +3764,7 @@ s32 fc8300_probe(HANDLE handle, DEVICEID devid)
 		
 	
 	bbm_word_read(handle, devid, BBM_CHIP_ID, &ver);
-	pr_err(" %s ver = %x\n",__func__,ver);
+	ISDB_PR_ERR(" %s ver = %x\n",__func__,ver);
 	return (ver == 0x8300) ? BBM_OK : BBM_NOK;
 }
 
@@ -4368,7 +4369,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 	u32 data                = 0;
 	u8  a;
 	u32 i;
-	pr_info("ISDBT fc8300_scan_status \n");
+	ISDB_PR_DBG("ISDBT fc8300_scan_status \n");
 
 	for (i = 0; i < ifagc_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x3025, &a);
@@ -4381,12 +4382,12 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == ifagc_timeout)
 	{
-		pr_info("ifagc_timeout returning error\n");
+		ISDB_PR_INFO("ifagc_timeout returning error\n");
 		return BBM_NOK;
 	}
 	for (; i < ofdm_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x3025, &a);
-		pr_debug("ofdm loop: a=0x%x\n",a);
+		ISDB_PR_DBG("ofdm loop: a=0x%x\n",a);
 		if (a & 0x08)
 			break;
 
@@ -4395,7 +4396,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == ofdm_timeout)
 	{
-		pr_info("ISDBT ofdm_timeout \n");
+		ISDB_PR_INFO("ISDBT ofdm_timeout \n");
 		return BBM_NOK;
 	}
 	if (0 == (a & 0x04))
@@ -4403,7 +4404,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	for (; i < ffs_lock_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x3026, &a);
-		pr_debug("ffs loop: a=0x%x\n",a);
+		ISDB_PR_DBG("ffs loop: a=0x%x\n",a);
 		if ((a & 0x11) == 0x11)
 			break;
 
@@ -4412,13 +4413,13 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == ffs_lock_timeout)
 	{	
-		pr_info("ISDBT ffs_lock_timeout \n");	
+		ISDB_PR_INFO("ISDBT ffs_lock_timeout \n");	
 		return BBM_NOK;
 		}
 
 	for (i = 0; i < cfs_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x3025, &a);
-		pr_debug("cfs loop: a=0x%x\n",a);
+		ISDB_PR_DBG("cfs loop: a=0x%x\n",a);
 		if (a & 0x40)
 			break;
 
@@ -4427,7 +4428,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == cfs_timeout)
 	{
-		pr_info("ISDBT cfs_timeout \n");
+		ISDB_PR_INFO("ISDBT cfs_timeout \n");
 		return BBM_NOK;
 	}
 
@@ -4435,13 +4436,13 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (a & 0x01)
 	{
-		pr_debug("ISDBT a & 0x01 = 1 return BBM_NOK \n");
+		ISDB_PR_DBG("ISDBT a & 0x01 = 1 return BBM_NOK \n");
 		return BBM_NOK;
 	}
 
 	for (i = 0; i < tmcc_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x3026, &a);
-		pr_debug("tmcc loop: a=0x%x\n",a);
+		ISDB_PR_DBG("tmcc loop: a=0x%x\n",a);
 		if (a & 0x02)
 			break;
 
@@ -4450,7 +4451,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == tmcc_timeout)
 	{
-		pr_info("ISDBT tmcc_timeout \n");
+		ISDB_PR_INFO("ISDBT tmcc_timeout \n");
 		return BBM_NOK;
 	}
 
@@ -4516,7 +4517,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	for (i = 0; i < ts_err_free_timeout; i++) {
 		bbm_byte_read(handle, DIV_MASTER, 0x50c5, &a);
-		pr_debug( "ts-err loop: a=0x%x\n",a);
+		ISDB_PR_DBG( "ts-err loop: a=0x%x\n",a);
 		if (a)
 			break;
 
@@ -4525,7 +4526,7 @@ s32 fc8300_scan_status(HANDLE handle, DEVICEID devid)
 
 	if (i == ts_err_free_timeout)
 	{
-		pr_info("ISDBT ts_err_free_timeout\n");
+		ISDB_PR_INFO("ISDBT ts_err_free_timeout\n");
 		return BBM_NOK;
 	}
 

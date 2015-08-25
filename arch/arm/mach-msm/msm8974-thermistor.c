@@ -294,7 +294,8 @@ static struct sec_therm_adc_table temper_table_ap[] = {
 	{40934,	-190},
 	{41024,	-200},
 };
-#elif defined(CONFIG_SEC_K_PROJECT)
+#elif defined(CONFIG_SEC_K_PROJECT) || \
+	defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)
 static struct sec_therm_adc_table temper_table_ap[] = {
 	{25954,	900},
 	{26005,	890},

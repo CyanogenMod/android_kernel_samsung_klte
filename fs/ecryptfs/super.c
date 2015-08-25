@@ -33,6 +33,9 @@
 #include <linux/statfs.h>
 #include <linux/magic.h>
 #include "ecryptfs_kernel.h"
+#ifdef CONFIG_SDP
+#include "ecryptfs_dek.h"
+#endif
 
 struct kmem_cache *ecryptfs_inode_info_cache;
 
@@ -60,6 +63,11 @@ static struct inode *ecryptfs_alloc_inode(struct super_block *sb)
 	mutex_init(&inode_info->lower_file_mutex);
 	atomic_set(&inode_info->lower_file_count, 0);
 	inode_info->lower_file = NULL;
+#ifdef CONFIG_SDP
+	// get sdp_id from super block
+	inode_info->sdp_id = ecryptfs_super_block_get_sdp_id(sb);
+	inode_info->crypt_stat.sdp_id = inode_info->sdp_id;
+#endif
 	inode = &inode_info->vfs_inode;
 out:
 	return inode;
@@ -154,11 +162,25 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 	list_for_each_entry(walker,
 			    &mount_crypt_stat->global_auth_tok_list,
 			    mount_crypt_stat_list) {
+#ifdef CONFIG_SDP
+	if(!ecryptfs_is_valid_sdpid(mount_crypt_stat->sdp_id)) {
+#endif
 		if (walker->flags & ECRYPTFS_AUTH_TOK_FNEK)
 			seq_printf(m, ",ecryptfs_fnek_sig=%s", walker->sig);
 		else
 			seq_printf(m, ",ecryptfs_sig=%s", walker->sig);
+#ifdef CONFIG_SDP
 	}
+#endif
+	}
+#ifdef CONFIG_SDP
+	if(ecryptfs_is_valid_sdpid(mount_crypt_stat->sdp_id)){
+		seq_printf(m, ",sdp_id=%d", mount_crypt_stat->sdp_id);
+	}
+	if (mount_crypt_stat->flags & ECRYPTFS_MOUNT_SDP_ENABLED){
+		seq_printf(m, ",sdp_enabled");
+	}
+#endif
 	mutex_unlock(&mount_crypt_stat->global_auth_tok_list_mutex);
 
 	seq_printf(m, ",ecryptfs_cipher=%s",
@@ -170,6 +192,10 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 	if (mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
 		seq_printf(m, ",ecryptfs_enable_filtering");
+#endif
+#ifdef CONFIG_CRYPTO_FIPS
+	if (mount_crypt_stat->flags & ECRYPTFS_ENABLE_CC)
+		seq_printf(m, ",ecryptfs_enable_cc");
 #endif
 	if (mount_crypt_stat->flags & ECRYPTFS_PLAINTEXT_PASSTHROUGH_ENABLED)
 		seq_printf(m, ",ecryptfs_passthrough");

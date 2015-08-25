@@ -98,7 +98,7 @@ static char VT_300CD_R;
 static char VT_300CD_G;
 static char VT_300CD_B;
 
-int get_lcd_panel_res(void);
+int get_lcd_ldi_info(void);
 
 static int char_to_int(char data1)
 {
@@ -2480,6 +2480,7 @@ static void gamma_init_K_fhd_revI(struct SMART_DIM *pSmart, char *str, int size)
 	mtp_offset_substraction(pSmart, str);
 }
 
+#if defined(CONFIG_LCD_HMT)
 static int gradation_offset_K_wqhd_revB[][9] = {
 /*	V255 V203 V151 V87 V51 V35 V23 V11 V3 */
 	{0, 11, 20, 28, 34, 35, 38, 40, 40},
@@ -3396,7 +3397,7 @@ static void gamma_init_K_wqhd_revF(struct SMART_DIM *pSmart, char *str, int size
 	mtp_offset_substraction(pSmart, str);
 }
 
-#if defined(CONFIG_LCD_HMT)
+
 
 #define CCG6_MAX_TABLE_HMT 3
 static int ccg6_candela_table_hmt[][2] = {
@@ -4208,10 +4209,7 @@ static int smart_dimming_init(struct SMART_DIM *psmart)
 	print_RGB_offset(psmart);
 #endif
 
-	if (get_lcd_panel_res()) // 1 : FHD
 		psmart->vregout_voltage = S6E3_VREG0_REF_6P3;
-	else // 0 : WQHD
-		psmart->vregout_voltage = S6E3_VREG0_REF_6P2;
 
 	v255_adjustment(psmart);
 	vt_adjustment(psmart);
@@ -4238,7 +4236,7 @@ static int smart_dimming_init(struct SMART_DIM *psmart)
 		psmart->gen_table[lux_loop].lux = psmart->plux_table[lux_loop];
 
 #if defined(AID_OPERATION)
-		if (get_lcd_panel_res()) { // 1 : FHD
+		if (get_lcd_ldi_info()) { /* SLSI_PANEL */
 			if (id3 <= EVT0_K_fhd_REVF)
 				gamma_init_K_fhd_revE(psmart,
 					(char *)(&(psmart->gen_table[lux_loop].gamma_setting)),
@@ -4252,18 +4250,9 @@ static int smart_dimming_init(struct SMART_DIM *psmart)
 					(char *)(&(psmart->gen_table[lux_loop].gamma_setting)),
 					GAMMA_SET_MAX);				
 			
-		} else {	/* 0 : WQHD */
-			if (id3 == EVT0_K_wqhd_REVB 
-				|| id3 == EVT0_K_wqhd_REVC || id3 == EVT0_K_wqhd_REVD)
-				gamma_init_K_wqhd_revB(psmart,
-				(char *)(&(psmart->gen_table[lux_loop].gamma_setting)),
-				GAMMA_SET_MAX);
-			else if (id3 == EVT0_K_wqhd_REVE )
-				gamma_init_K_wqhd_revE(psmart,
-				(char *)(&(psmart->gen_table[lux_loop].gamma_setting)),
-				GAMMA_SET_MAX);
-			else if (id3 == EVT0_K_wqhd_REVF )
-				gamma_init_K_wqhd_revF(psmart,
+		} else {	/*MAGNA_PANEL*/
+			if (id3 >= EVT2_K_fhd_magna_REVA)
+				gamma_init_K_fhd_revI(psmart,
 				(char *)(&(psmart->gen_table[lux_loop].gamma_setting)),
 				GAMMA_SET_MAX);
 		}

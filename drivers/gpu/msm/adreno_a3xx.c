@@ -4138,6 +4138,7 @@ static void a3xx_protect_init(struct kgsl_device *device)
 
 	/* CP registers */
 	adreno_set_protected_registers(device, &index, 0x1C0, 5);
+	adreno_set_protected_registers(device, &index, 0x1EC, 1);
 	adreno_set_protected_registers(device, &index, 0x1F6, 1);
 	adreno_set_protected_registers(device, &index, 0x1F8, 2);
 	adreno_set_protected_registers(device, &index, 0x45E, 2);
@@ -4577,6 +4578,9 @@ static unsigned int a3xx_register_offsets[ADRENO_REG_REGISTER_MAX] = {
 	ADRENO_REG_DEFINE(ADRENO_REG_TC_CNTL_STATUS, REG_TC_CNTL_STATUS),
 	ADRENO_REG_DEFINE(ADRENO_REG_TP0_CHICKEN, REG_TP0_CHICKEN),
 	ADRENO_REG_DEFINE(ADRENO_REG_RBBM_RBBM_CTL, A3XX_RBBM_RBBM_CTL),
+	ADRENO_REG_DEFINE(ADRENO_REG_UCHE_INVALIDATE0,
+				A3XX_UCHE_CACHE_INVALIDATE0_REG),
+
 };
 
 struct adreno_reg_offsets a3xx_reg_offsets = {

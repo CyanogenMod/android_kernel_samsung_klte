@@ -41,7 +41,7 @@ int get_lcd_attached(void);
 	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL)  || \
 	defined (CONFIG_GET_LCD_ATTACHED)
 int get_samsung_lcd_attached(void);
-int get_lcd_panel_res(void);
+int get_lcd_ldi_info(void);
 
 #elif defined (CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
 
@@ -1125,10 +1125,10 @@ static struct device_node *mdss_dsi_pref_prim_panel(
 					__func__, __LINE__);
 
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-	if (get_lcd_panel_res() == 0x0){  /*wqhd*/
+	if ( !get_lcd_ldi_info()){/* MAGNA_PANEL */
 		dsi_pan_node = of_parse_phandle(pdev->dev.of_node,
-						"qcom,dsi-pref-prim-pan-dual", 0);
-	} else
+						"qcom,dsi-pref-prim-pan-magna", 0);
+	} else /* SLSI_PANEL */
 #elif (defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PT_PANEL)\
 		&& !defined(CONFIG_FB_MSM_MDSS_MAGNA_LDI_EA8061))\
 		|| defined(CONFIG_FB_MSM_MDSS_SAMSUNG_OCTA_VIDEO_720P_PT_PANEL)

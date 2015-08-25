@@ -49,11 +49,34 @@
 /******************************************************************************
  * log
  ******************************************************************************/
-//#define FELICA_DEBUG_READ_DATA
-//#define FELICA_DEBUG
-#define FELICA_UICC_INIT_LOG
 
+#if defined(CONFIG_SEC_FACTORY)
+/* shown at FACTORY */
+#define FELICA_PR_ERR(A,...) pr_err("[FELICA]"A,##__VA_ARGS__)
 
+/* NOT shown at FACTORY */
+#define FELICA_PR_INFO(A,...) 
+#define FELICA_PR_DBG(A,...) 
+#else
+extern unsigned int sec_dbg_level;
+
+/* shown at HIGH/MID/LOW, user mode:default LOW, eng mode: default MID*/
+#define FELICA_PR_ERR(A,...) pr_err("[FELICA]"A,##__VA_ARGS__)
+
+/* shown at HIGH/MID, user mode:default LOW, eng mode: default MID*/
+#define FELICA_PR_INFO(A,...) \
+	do { \
+		if (sec_dbg_level != KERNEL_SEC_DEBUG_LEVEL_LOW)	\
+			pr_info("[FELICA]"A,##__VA_ARGS__);\
+	} while(0)
+
+/* shown at HIGH/MID under debug control, user mode:default LOW, eng mode: default MID*/
+#define FELICA_PR_DBG(A,...) \
+	do { \
+		if (sec_dbg_level != KERNEL_SEC_DEBUG_LEVEL_LOW)	\
+			pr_debug("[FELICA]"A,##__VA_ARGS__);\
+	} while(0)
+#endif
 
 /******************************************************************************
  * config option
@@ -653,6 +676,8 @@ static unsigned int uartcc_is_idle_status(void);
 #define UICC_POWER_ON		_IO(UICC_MAGIC, 1)
 #define UICC_POWER_OFF		_IO(UICC_MAGIC, 2)
 #define UICC_POWER_SPS_PMIC	_IO(UICC_MAGIC, 3)
+#define UICC_POWER_UIM_MON	_IO(UICC_MAGIC, 4)
+
 
 #define UICC_ERROR		1
 #define UICC_SUCCESS	2

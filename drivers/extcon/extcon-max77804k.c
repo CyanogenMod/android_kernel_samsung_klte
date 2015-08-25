@@ -914,6 +914,32 @@ void max77804k_otg_control(struct max77804k_muic_info *info, int enable)
 				__func__, int_mask, cdetctrl1, chg_cnfg_00);
 }
 
+#if defined(CONFIG_CHARGER_SMB1357)
+void max77804k_muic_only_otg_control(struct max77804k_muic_info *info, int enable)
+{
+	u8 cdetctrl1;
+	pr_info("%s: enable(%d)\n", __func__, enable);
+
+	if (enable) {
+		/* disable charger detection */
+		max77804k_read_reg(info->max77804k->muic,
+			MAX77804K_MUIC_REG_CDETCTRL1, &cdetctrl1);
+		cdetctrl1 &= ~(1 << 0);
+		max77804k_write_reg(info->max77804k->muic,
+			MAX77804K_MUIC_REG_CDETCTRL1, cdetctrl1);
+	} else {
+		/* enable charger detection */
+		max77804k_read_reg(info->max77804k->muic,
+			MAX77804K_MUIC_REG_CDETCTRL1, &cdetctrl1);
+		cdetctrl1 |= (1 << 0);
+		max77804k_write_reg(info->max77804k->muic,
+			MAX77804K_MUIC_REG_CDETCTRL1, cdetctrl1);
+	}
+
+	pr_info("%s:CDETCTRL1(0x%x)\n", __func__, cdetctrl1);
+}
+#endif
+
 void max77804k_powered_otg_control(struct max77804k_muic_info *info, int enable)
 {
 	pr_info("%s: enable(%d)\n", __func__, enable);
@@ -947,23 +973,7 @@ int muic_otg_control(int enable)
 	gInfo->otg_test = enable;
 
 #if defined(CONFIG_CHARGER_SMB1357)
-	if(enable) {
-		u8 cdetctrl1;
-		/* disable charger detection */
-		max77804k_read_reg(gInfo->max77804k->muic,
-			MAX77804K_MUIC_REG_CDETCTRL1, &cdetctrl1);
-		cdetctrl1 &= ~(1 << 0);
-		max77804k_write_reg(gInfo->max77804k->muic,
-			MAX77804K_MUIC_REG_CDETCTRL1, cdetctrl1);
-	} else {
-		u8 cdetctrl1;
-		/* enable charger detection */
-		max77804k_read_reg(gInfo->max77804k->muic,
-			MAX77804K_MUIC_REG_CDETCTRL1, &cdetctrl1);
-		cdetctrl1 |= (1 << 0);
-		max77804k_write_reg(gInfo->max77804k->muic,
-			MAX77804K_MUIC_REG_CDETCTRL1, cdetctrl1);
-	}
+	max77804k_muic_only_otg_control(gInfo, enable);
 	smb1357_otg_control(enable);
 #else
 	max77804k_otg_control(gInfo, enable);
@@ -1055,6 +1065,9 @@ static int max77804k_muic_set_path(struct max77804k_muic_info *info, int path)
 	}
 
 	switch (path) {
+	case PATH_OPEN:
+		val = MAX77804K_MUIC_CTRL1_BIN_0_000;
+		break;
 	case PATH_USB_AP:
 		val = MAX77804K_MUIC_CTRL1_BIN_1_001;
 		break;
@@ -1346,13 +1359,15 @@ static int max77804k_muic_handle_attach(struct max77804k_muic_info *info,
 	case ADC_OPEN:
 		switch (chgtyp) {
 		case CHGTYP_USB:
-		case CHGTYP_DOWNSTREAM_PORT:
 			if (adc == ADC_CEA936ATYPE2_CHG) {
 				new_state = BIT(EXTCON_CEA936_CHG);
 			} else {
 				new_state = BIT(EXTCON_USB);
 				info->cable_name = EXTCON_USB;
 			}
+			break;
+		case CHGTYP_DOWNSTREAM_PORT:
+			new_state = BIT(EXTCON_CHARGE_DOWNSTREAM);
 			break;
 		case CHGTYP_DEDICATED_CHGR:
 		case CHGTYP_500MA:
@@ -1715,6 +1730,47 @@ static int __devinit max77804k_muic_probe(struct platform_device *pdev)
 	return ret;
 }
 
+#if !defined(CONFIG_SEC_FACTORY)
+static int max77804k_suspend(struct device *dev)
+{
+    struct max77804k_muic_info *info = dev_get_drvdata(dev);
+#if defined(CONFIG_CHARGER_SMB1357)
+	if (info) {
+		if (info->path == PATH_USB_CP)
+		return 0;
+	}
+#endif
+    if (info)
+	max77804k_muic_set_path(info, PATH_OPEN);
+    else
+	pr_err("%s, dev_get_drvdata fail\n", __func__);
+
+    return 0;
+}
+
+static int max77804k_resume(struct device *dev)
+{
+    struct max77804k_muic_info *info = dev_get_drvdata(dev);
+#if defined(CONFIG_CHARGER_SMB1357)
+	if (info) {
+		if (info->path == PATH_USB_CP)
+		return 0;
+	}
+#endif
+    if (info)
+	max77804k_muic_set_path(info, info->path);
+    else
+	pr_err("%s, dev_get_drvdata fail\n", __func__);
+
+    return 0;
+}
+
+static const struct dev_pm_ops max77804k_dev_pm_ops = {
+    .suspend	= max77804k_suspend,
+    .resume	= max77804k_resume,
+};
+#endif
+
 static int __devexit max77804k_muic_remove(struct platform_device *pdev)
 {
 	struct max77804k_muic_info *info = platform_get_drvdata(pdev);
@@ -1759,6 +1815,9 @@ static struct platform_driver max77804k_muic_driver = {
 	.driver		= {
 		.name	= DEV_NAME,
 		.owner	= THIS_MODULE,
+#if !defined(CONFIG_SEC_FACTORY)
+		.pm	= &max77804k_dev_pm_ops,
+#endif
 		.shutdown = max77804k_muic_shutdown,
 	},
 	.probe		= max77804k_muic_probe,

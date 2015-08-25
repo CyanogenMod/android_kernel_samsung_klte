@@ -433,8 +433,8 @@ void msm_isp_reset_framedrop(struct vfe_device *vfe_dev,
 	stream_info->runtime_num_burst_capture =
 		stream_info->num_burst_capture;
 	stream_info->runtime_framedrop_update = stream_info->framedrop_update;
-	pr_err("%s abhishek runtime_init_frame_drop %d runtime_burst_frame_count %d \n"
-	       "%s abhishek runtime_num_burst_capture %d runtime_framedrop_update %d\n",
+	pr_err("%s runtime_init_frame_drop %d runtime_burst_frame_count %d \n"
+	       "%s runtime_num_burst_capture %d runtime_framedrop_update %d\n",
 	       __func__, stream_info->runtime_init_frame_drop,
 	       stream_info->runtime_burst_frame_count, __func__,
 	       stream_info->runtime_num_burst_capture,
@@ -1074,7 +1074,7 @@ static void msm_isp_deinit_stream_ping_pong_reg(
 		struct msm_isp_buffer *buf;
 		buf = stream_info->buf[i];
 		if (buf) {
-			pr_err("%s abhishek i %d buf_idx %d \n", __func__, i, buf->buf_idx);
+			pr_err("%s i %d buf_idx %d \n", __func__, i, buf->buf_idx);
 			vfe_dev->buf_mgr->ops->put_buf(vfe_dev->buf_mgr,
 						       buf->bufq_handle, buf->buf_idx);
 		}
@@ -1099,7 +1099,7 @@ int msm_isp_axi_halt(struct vfe_device *vfe_dev,
 //	struct msm_vfe_axi_stream *stream_info;
 //	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
 
-	pr_err("%s abhishek HALT vfe_dev %p \n", __func__, vfe_dev);
+	pr_err("%s HALT vfe_dev %p \n", __func__, vfe_dev);
 	if (halt_cmd->overflow_detected) {
 		/*Store current IRQ mask*/
 		if (vfe_dev->error_info.overflow_recover_irq_mask0 == 0) {
@@ -1121,7 +1121,7 @@ int msm_isp_axi_halt(struct vfe_device *vfe_dev,
         for (i = 0; i < axi_data->num_active_stream; i++) {
                 stream_info = &axi_data->stream_info[i];
 
-                pr_err("%s abhishek stream_id %d buf_id %d \n", __func__,
+                pr_err("%s stream_id %d buf_id %d \n", __func__,
                   i, stream_info->buf[0]->buf_idx);
                 msm_isp_deinit_stream_ping_pong_reg(vfe_dev, stream_info);
         }
@@ -1141,7 +1141,7 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 		pr_err("%s Error NULL parameter \n", __func__);
 		return -1;
 	}
-	pr_err("%s abhishek reset vfe_dev %p \n", __func__, vfe_dev);
+	pr_err("%s reset vfe_dev %p \n", __func__, vfe_dev);
 	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, 0, reset_cmd->blocking);
 	if (rc < 0) {
 		pr_err("%s Error! reset hw Timed out\n", __func__);
@@ -1149,7 +1149,7 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 
 	for (i = 0, j = 0; j < axi_data->num_active_stream && i < MAX_NUM_STREAM; i++, j++) {
 		stream_info = &axi_data->stream_info[i];
-		pr_err("%s abhishek num_active_streams %d i %d src %d  intf %d"
+		pr_err("%s num_active_streams %d i %d src %d  intf %d"
 		       "state  %d frame_id %lu handle %x\n", __func__,
 		       axi_data->num_active_stream, i, stream_info->stream_src,
 		       SRC_TO_INTF(stream_info->stream_src),
@@ -1188,7 +1188,7 @@ int msm_isp_axi_restart(struct vfe_device *vfe_dev,
 
 	for (i = 0, j = 0; j < axi_data->num_active_stream && i < MAX_NUM_STREAM; i++, j++) {
 		stream_info = &axi_data->stream_info[i];
-		pr_err("%s abhishek num_active_streams %d i %d src %d  intf %d"
+		pr_err("%s num_active_streams %d i %d src %d  intf %d"
 		       "state  %d frame_id %lu handle %x\n", __func__,
 		       axi_data->num_active_stream, i, stream_info->stream_src,
 		       SRC_TO_INTF(stream_info->stream_src),
@@ -1201,11 +1201,11 @@ int msm_isp_axi_restart(struct vfe_device *vfe_dev,
 		}
 
 		msm_isp_init_stream_ping_pong_reg(vfe_dev, stream_info);
-		pr_err("%s abhishek stream_id %d buf_id %d \n", __func__,
+		pr_err("%s stream_id %d buf_id %d \n", __func__,
 		       i, stream_info->buf[0]->buf_idx);
 	}
 
-	pr_err("%s abhishek restart vfe_dev %p \n", __func__, vfe_dev);
+	pr_err("%s restart vfe_dev %p \n", __func__, vfe_dev);
 	rc = vfe_dev->hw_info->vfe_ops.axi_ops.restart(vfe_dev, 0,
 						       restart_cmd->enable_camif);
 	msm_camera_io_dump_2(vfe_dev->vfe_base, 0x900);
@@ -1232,7 +1232,7 @@ static int msm_isp_start_axi_stream(struct vfe_device *vfe_dev,
 		stream_info = &axi_data->stream_info[
 			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
 		input_src = SRC_TO_INTF(stream_info->stream_src);
-		pr_err("%s abhishek src %d intf %d \n", __func__, stream_info->stream_src, input_src);
+		pr_err("%s src %d intf %d \n", __func__, stream_info->stream_src, input_src);
 		if (input_src >= VFE_RAW_0 && input_src < VFE_SRC_MAX) {
 			pr_err("%s RDI start stream \n", __func__);
 			vfe_dev->axi_data.src_info[input_src].frame_id = 0;

@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_roam.c 457855 2014-02-25 01:27:41Z $
+ * $Id: wl_roam.c 464529 2014-03-25 06:02:53Z $
  */
 
 #include <typedefs.h>
@@ -400,6 +400,7 @@ void wl_update_roamscan_cache_by_band(struct net_device *dev, int band)
 		return;
 	}
 	ioctl_ver = wl_cfg80211_get_ioctl_version();
+	chanlist_after.n = 0;
 	/* filtering by the given band */
 	for (i = 0; i < chanlist_before.n; i++) {
 		chanspec_t chspec = chanlist_before.channels[i];

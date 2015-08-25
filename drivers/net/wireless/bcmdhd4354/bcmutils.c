@@ -20,7 +20,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmutils.c 446873 2014-01-07 11:26:18Z $
+ * $Id: bcmutils.c 461404 2014-03-12 01:59:36Z $
  */
 
 #include <bcm_cfg.h>
@@ -3053,3 +3053,33 @@ bcm_sub_64(uint32* r_hi, uint32* r_lo, uint32 offset)
 	if (*r_lo > r1_lo)
 		(*r_hi) --;
 }
+
+#ifdef DEBUG_COUNTER
+#if (OSL_SYSUPTIME_SUPPORT == TRUE)
+void counter_printlog(counter_tbl_t *ctr_tbl)
+{
+	uint32 now;
+
+	if (!ctr_tbl->enabled)
+		return;
+
+	now = OSL_SYSUPTIME();
+
+	if (now - ctr_tbl->prev_log_print > ctr_tbl->log_print_interval) {
+		uint8 i = 0;
+		printf("counter_print(%s %d):", ctr_tbl->name, now - ctr_tbl->prev_log_print);
+
+		for (i = 0; i < ctr_tbl->needed_cnt; i++) {
+			printf(" %u", ctr_tbl->cnt[i]);
+		}
+		printf("\n");
+
+		ctr_tbl->prev_log_print = now;
+		bzero(ctr_tbl->cnt, CNTR_TBL_MAX * sizeof(uint));
+	}
+}
+#else
+/* OSL_SYSUPTIME is not supported so no way to get time */
+#define counter_printlog(a) do {} while (0)
+#endif /* OSL_SYSUPTIME_SUPPORT == TRUE */
+#endif /* DEBUG_COUNTER */

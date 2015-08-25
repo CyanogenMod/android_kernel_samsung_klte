@@ -371,9 +371,9 @@ static void debug_work_func(struct work_struct *work)
 	unsigned int uSensorCnt;
 	struct ssp_data *data = container_of(work, struct ssp_data, work_debug);
 
-	ssp_dbg("[SSP]: %s(%u) - Sensor state: 0x%x, RC: %u, CC: %u DC: %u\n",
+	ssp_dbg("[SSP]: %s(%u) - Sensor state: 0x%x, RC: %u, CC: %u DC: %u TC: %u\n",
 		__func__, data->uIrqCnt, data->uSensorState, data->uResetCnt,
-		data->uComFailCnt,data->uDumpCnt);
+		data->uComFailCnt, data->uDumpCnt, data->uTimeOutCnt);
 
 	switch (data->fw_dl_state) {
 	case FW_DL_STATE_FAIL:

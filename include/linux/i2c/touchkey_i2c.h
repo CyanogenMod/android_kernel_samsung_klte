@@ -319,14 +319,14 @@ void touchkey_charger_infom(bool en);
 #endif
 
 /* TKEY MODULE 0x6 */
-#if defined(CONFIG_MACH_KLTE_EUR)
+#if defined(CONFIG_MACH_KLTE_EUR) || defined(CONFIG_MACH_KWIFI_LDU)
 #define TKEY_MODULE_CHECK_REV		0xA
-#elif defined(CONFIG_MACH_KLTE_ATT)
+#elif defined(CONFIG_MACH_KLTE_ATT) || defined(CONFIG_MACH_KLTE_AUS_TEL)
 #define TKEY_MODULE_CHECK_REV		0xE
 #elif defined(CONFIG_MACH_KLTE_CHN) || defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN) \
 	|| defined(CONFIG_MACH_KLTE_SPR) || defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_LRA) \
 	|| defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_MTR) \
-	|| defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KLTE_ACG)
+	|| defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KLTE_ACG) || defined(CONFIG_MACH_K3GDUOS_CTC)
 #define TKEY_MODULE_CHECK_REV		0x9
 #else
 #define TKEY_MODULE_CHECK_REV		0xFF

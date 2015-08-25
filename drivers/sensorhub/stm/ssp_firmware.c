@@ -14,13 +14,15 @@
  */
 #include "ssp.h"
 
-#define SSP_FIRMWARE_REVISION_STM	14031900
+#define SSP_FIRMWARE_REVISION_STM	14060700
+#define SSP_FIRMWARE_REVISION_TASMAN	14061000
 
 #define BOOT_SPI_HZ	4800000
 #define NORM_SPI_HZ	4800000
 
 /* Bootload mode cmd */
 #define BL_FW_NAME			"ssp_stm.fw"
+#define BL_FW_NAME_TASMAN		"ssp_stm_tasman.fw"
 #define BL_UMS_FW_NAME			"ssp_stm.bin"
 #define BL_CRASHED_FW_NAME		"ssp_crashed.fw"
 
@@ -94,7 +96,11 @@ static int stm32fwu_spi_write(struct spi_device *spi, const u8 *buffer, ssize_t 
 
 unsigned int get_module_rev(struct ssp_data *data)
 {
+#if defined(CONFIG_SEC_KSPORTS_PROJECT)
+	return SSP_FIRMWARE_REVISION_TASMAN;
+#else
 	return SSP_FIRMWARE_REVISION_STM;
+#endif
 }
 
 static void stm32fwu_spi_send_ack( struct spi_device *spi, u8 SyncData )
@@ -692,6 +698,11 @@ static int change_to_bootmode(struct ssp_data *data)
 		usleep_range(15000, 15500);
 	}
 
+	data->spi->mode = SPI_MODE_0;
+	if (spi_setup(data->spi))
+		pr_err("failed to setup spi mode for boot\n");
+	usleep_range(1000, 1100);
+
 	ret = stm32fwu_spi_write(data->spi, &syncb, 1);
 #if SSP_STM_DEBUG
 	pr_info("[SSP] stm32fwu_spi_write(sync byte) returned %d\n", ret);
@@ -748,7 +759,11 @@ static int update_mcu_bin(struct ssp_data *data, int iBinType)
 	switch (iBinType) {
 	case KERNEL_BINARY:
 	 /* HW request: I2C line is reversed */
+#if defined(CONFIG_SEC_KSPORTS_PROJECT)
+		iRet = load_kernel_fw_bootmode(data->spi, BL_FW_NAME_TASMAN);
+#else
 		iRet = load_kernel_fw_bootmode(data->spi, BL_FW_NAME);
+#endif
 		break;
 	case KERNEL_CRASHED_BINARY:
 		iRet = load_kernel_fw_bootmode(data->spi, BL_CRASHED_FW_NAME);
@@ -762,6 +777,11 @@ static int update_mcu_bin(struct ssp_data *data, int iBinType)
 /* STM : GO USER ADDR */
 	stm32fwu_spi_send_cmd(data->spi, &cmd);
 	send_addr(data->spi, STM_APP_ADDR, 0);
+
+	data->spi->mode = SPI_MODE_1;
+	if (spi_setup(data->spi))
+		pr_err("failed to setup spi mode for app\n");
+	usleep_range(1000, 1100);
 
 	return iRet;
 }
@@ -819,7 +839,11 @@ int check_fwbl(struct ssp_data *data)
 	unsigned int fw_revision;
 
 	pr_info("[SSP] change_rev = %d\n", data->ssp_changes);
+#if defined(CONFIG_SEC_KSPORTS_PROJECT)
+	fw_revision = SSP_FIRMWARE_REVISION_TASMAN;
+#else
 	fw_revision = SSP_FIRMWARE_REVISION_STM;
+#endif
 
 	data->uCurFirmRev = get_firmware_rev(data);
 

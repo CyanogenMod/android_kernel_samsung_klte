@@ -174,10 +174,17 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 #ifdef CONFIG_ZONE_DMA32
 	 256,
 #endif
+#ifdef CONFIG_ARCH_MSM8974PRO
+#ifdef CONFIG_HIGHMEM
+	 96,
+#endif
+	 96,
+#else
 #ifdef CONFIG_HIGHMEM
 	 32,
 #endif
 	 32,
+#endif
 };
 
 EXPORT_SYMBOL(totalram_pages);
@@ -794,6 +801,9 @@ void __init init_cma_reserved_pageblock(struct page *page)
 	do {
 		__ClearPageReserved(p);
 		set_page_count(p, 0);
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+		SetPageCMA(p);
+#endif
 	} while (++p, --i);
 
 	set_page_refcounted(page);
@@ -2962,7 +2972,12 @@ void show_free_areas(unsigned int filter)
 		" dirty:%lu writeback:%lu unstable:%lu\n"
 		" free:%lu slab_reclaimable:%lu slab_unreclaimable:%lu\n"
 		" mapped:%lu shmem:%lu pagetables:%lu bounce:%lu\n"
-		" free_cma:%lu\n",
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+		" free_cma:%lu cma_active_anon:%lu cma_inactive_anon:%lu\n"
+		" cma_active_file:%lu cma_inactive_file:%lu\n",
+#else
+		" free cma:%lu\n",
+#endif
 		global_page_state(NR_ACTIVE_ANON),
 		global_page_state(NR_INACTIVE_ANON),
 		global_page_state(NR_ISOLATED_ANON),
@@ -2980,7 +2995,15 @@ void show_free_areas(unsigned int filter)
 		global_page_state(NR_SHMEM),
 		global_page_state(NR_PAGETABLE),
 		global_page_state(NR_BOUNCE),
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+		global_page_state(NR_FREE_CMA_PAGES),
+		global_page_state(NR_CMA_ACTIVE_ANON),
+		global_page_state(NR_CMA_INACTIVE_ANON),
+		global_page_state(NR_CMA_ACTIVE_FILE),
+		global_page_state(NR_CMA_INACTIVE_FILE));
+#else
 		global_page_state(NR_FREE_CMA_PAGES));
+#endif
 
 	for_each_populated_zone(zone) {
 		int i;

@@ -257,12 +257,16 @@ static int msm_eeprom_match_id(struct msm_eeprom_ctrl_t *e_ctrl)
 	if (rc < 0)
 		return rc;
 
-	pr_info("%s: read 0x%02X%02X, check Fidelix 32Mb:0x%02X%02X, Winbond 32Mb:0x%02X%02X\n", __func__,
+	pr_info("%s: read 0x%02X%02X, check Fidelix 32Mb:0x%02X%02X, Winbond 32Mb:0x%02X%02X, Macronix 32Mb:0x%02X%02X, GigaDevice 32Mb:0x%02X%02X\n", __func__,
 		id[0], id[1], client->spi_client->mfr_id0, client->spi_client->device_id0,
-		client->spi_client->mfr_id1, client->spi_client->device_id1);
+		client->spi_client->mfr_id1, client->spi_client->device_id1,
+		client->spi_client->mfr_id2, client->spi_client->device_id2,
+		client->spi_client->mfr_id3, client->spi_client->device_id3);
 
 	if ((id[0] == client->spi_client->mfr_id0 && id[1] == client->spi_client->device_id0)
-	    || (id[0] == client->spi_client->mfr_id1 && id[1] == client->spi_client->device_id1))
+		|| (id[0] == client->spi_client->mfr_id1 && id[1] == client->spi_client->device_id1)
+		|| (id[0] == client->spi_client->mfr_id2 && id[1] == client->spi_client->device_id2)
+		|| (id[0] == client->spi_client->mfr_id3 && id[1] == client->spi_client->device_id3))
 		return 0;
 
 	return -ENODEV;
@@ -893,6 +897,22 @@ static int msm_eeprom_spi_parse_of(struct msm_camera_spi_client *spic)
 	spic->mfr_id1 = tmp[0];
 	spic->device_id1 = tmp[1];
 
+	rc = of_property_read_u32_array(of, "qcom,eeprom-id2", tmp, 2);
+	if (rc < 0) {
+		pr_err("%s: Failed to get eeprom id 2\n", __func__);
+		return rc;
+	}
+	spic->mfr_id2 = tmp[0];
+	spic->device_id2 = tmp[1];
+
+	rc = of_property_read_u32_array(of, "qcom,eeprom-id3", tmp, 2);
+	if (rc < 0) {
+		pr_err("%s: Failed to get eeprom id 3\n", __func__);
+		return rc;
+	}
+	spic->mfr_id3 = tmp[0];
+	spic->device_id3 = tmp[1];
+
 	return 0;
 }
 
@@ -1108,7 +1128,6 @@ static int msm_eeprom_spi_setup(struct spi_device *spi)
 
 			e_ctrl->is_supported |= msm_eeprom_match_crc(&e_ctrl->cal_data);
 
-#ifndef CONFIG_SEC_KACTIVE_PROJECT
 			if (e_ctrl->is_supported != 0xFF) {
 				pr_err("any CRC values at F-ROM are not matched. Read again(idx = %d, max = %d).\n", i + 1, MAX_RETRY);
 				continue;
@@ -1116,15 +1135,6 @@ static int msm_eeprom_spi_setup(struct spi_device *spi)
 				pr_err("All CRC values are matched.\n");
 				break;
 			}
-#else
-			if (e_ctrl->is_supported != 0xF) {
-				pr_err("any CRC values at F-ROM are not matched. Read again(idx = %d, max = %d).\n", i + 1, MAX_RETRY);
-				continue;
-			} else {
-				pr_err("All CRC values are matched.\n");
-				break;
-			}
-#endif
 		}
 	}
 

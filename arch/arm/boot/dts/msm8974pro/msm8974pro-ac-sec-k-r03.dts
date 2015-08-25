@@ -36,7 +36,7 @@
 		reg = <0x23>;
 		qcom,decimation = <0>;
 		qcom,pre-div-channel-scaling = <1>; /* 1:3 scaling */
-		qcom,calibration-type = "absolute";
+		qcom,calibration-type = "ratiometric";
 		qcom,scale-function = <0>;
 		qcom,hw-settle-time = <0>;
 		qcom,fast-avg-setup = <0>;

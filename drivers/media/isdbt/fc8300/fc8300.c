@@ -639,6 +639,13 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	pr_info("[FC8300] IOCTL_ISDBT_POWER_ON \n");
 		
 		isdbt_hw_init();
+		res = bbm_com_probe(hInit, DIV_BROADCAST);
+		if (res) {
+			pr_info("FC8300 IOCTL_ISDBT_POWER_ON FAIL \n");
+			isdbt_hw_deinit();
+		} else {
+			pr_info("FC8300 IOCTL_ISDBT_POWER_ON SUCCESS\n");
+		}
 
 		break;
 	case IOCTL_ISDBT_POWER_OFF:

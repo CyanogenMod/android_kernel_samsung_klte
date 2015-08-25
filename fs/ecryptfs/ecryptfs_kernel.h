@@ -41,6 +41,10 @@
 #include <linux/backing-dev.h>
 #include <linux/ecryptfs.h>
 
+#ifdef CONFIG_SDP
+#include <dek/dek.h>
+#endif
+
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #define ENC_NAME_FILTER_MAX_INSTANCE 5
 #define ENC_NAME_FILTER_MAX_LEN (256*5)
@@ -58,13 +62,13 @@
 #define ECRYPTFS_MAX_NUM_USERS 32768
 #define ECRYPTFS_XATTR_NAME "user.ecryptfs"
 
+#ifdef CONFIG_SDP
+#define PKG_NAME_SIZE 16
+#endif
+
 void ecryptfs_dump_auth_tok(struct ecryptfs_auth_tok *auth_tok);
 extern void ecryptfs_to_hex(char *dst, char *src, size_t src_size);
 extern void ecryptfs_from_hex(char *dst, char *src, int dst_size);
-
-#ifdef CONFIG_CRYPTO_FIPS
-extern void ecryptfs_cc_mode_set(int mode);
-#endif
 
 struct ecryptfs_key_record {
 	unsigned char type;
@@ -152,6 +156,7 @@ ecryptfs_get_key_payload_data(struct key *key)
 #define ECRYPTFS_TAG_70_DIGEST ECRYPTFS_DEFAULT_HASH
 #define ECRYPTFS_TAG_1_PACKET_TYPE 0x01
 #define ECRYPTFS_TAG_3_PACKET_TYPE 0x8C
+#define ECRYPTFS_DEK_PACKET_TYPE 0xD0 /* dek ecryptfs packet block */
 #define ECRYPTFS_TAG_11_PACKET_TYPE 0xED
 #define ECRYPTFS_TAG_64_PACKET_TYPE 0x40
 #define ECRYPTFS_TAG_65_PACKET_TYPE 0x41
@@ -231,6 +236,13 @@ struct ecryptfs_crypt_stat {
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #define ECRYPTFS_ENCRYPTED_OTHER_DEVICE 0x00008000
 #endif
+#ifdef CONFIG_SDP
+#define ECRYPTFS_DEK_IS_SENSITIVE     0x00010000
+#define ECRYPTFS_DEK_IS_REPLACED      0x00020000
+#define ECRYPTFS_DEK_COMPATIBLE       0x00040000
+#define ECRYPTFS_DEK_SDP_ENABLED      0x00080000
+#define ECRYPTFS_DEK_RSA_ENC          0x00100000
+#endif
 
 	u32 flags;
 	unsigned int file_version;
@@ -252,6 +264,11 @@ struct ecryptfs_crypt_stat {
 	struct mutex cs_tfm_mutex;
 	struct mutex cs_hash_tfm_mutex;
 	struct mutex cs_mutex;
+#ifdef CONFIG_SDP
+	int sdp_id;
+	dek sdp_dek;
+	dek sdp_dek_enc;
+#endif
 };
 
 /* inode private data. */
@@ -262,6 +279,9 @@ struct ecryptfs_inode_info {
 	atomic_t lower_file_count;
 	struct file *lower_file;
 	struct ecryptfs_crypt_stat crypt_stat;
+#ifdef CONFIG_SDP
+	int sdp_id;
+#endif
 };
 
 /* dentry private data. Each dentry must keep track of a lower
@@ -343,6 +363,13 @@ struct ecryptfs_mount_crypt_stat {
 #define ECRYPTFS_ENABLE_FILTERING              0x00000100
 #define ECRYPTFS_ENABLE_NEW_PASSTHROUGH        0x00000200
 #endif
+#ifdef CONFIG_CRYPTO_FIPS
+#define ECRYPTFS_ENABLE_CC                     0x00000400
+#endif
+#ifdef CONFIG_SDP
+#define ECRYPTFS_MOUNT_SDP_ENABLED             0x80000000
+#endif
+
 	u32 flags;
 	struct list_head global_auth_tok_list;
 	struct mutex global_auth_tok_list_mutex;
@@ -360,6 +387,9 @@ struct ecryptfs_mount_crypt_stat {
 	char enc_filter_ext[ENC_EXT_FILTER_MAX_INSTANCE]
 				[ENC_EXT_FILTER_MAX_LEN + 1];
 #endif
+#ifdef CONFIG_SDP
+	int sdp_id;
+#endif
 
 };
 
@@ -368,6 +398,9 @@ struct ecryptfs_sb_info {
 	struct super_block *wsi_sb;
 	struct ecryptfs_mount_crypt_stat mount_crypt_stat;
 	struct backing_dev_info bdi;
+#ifdef CONFIG_SDP
+	int sdp_id;
+#endif
 };
 
 /* file private data. */
@@ -681,15 +714,28 @@ ecryptfs_add_global_auth_tok(struct ecryptfs_mount_crypt_stat *mount_crypt_stat,
 int ecryptfs_get_global_auth_tok_for_sig(
 	struct ecryptfs_global_auth_tok **global_auth_tok,
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat, char *sig);
+#ifdef CONFIG_CRYPTO_FIPS
+int
+ecryptfs_add_new_key_tfm(struct ecryptfs_key_tfm **key_tfm, char *cipher_name,
+			 size_t key_size, u32 mount_flags);
+#else
 int
 ecryptfs_add_new_key_tfm(struct ecryptfs_key_tfm **key_tfm, char *cipher_name,
 			 size_t key_size);
+#endif
 int ecryptfs_init_crypto(void);
 int ecryptfs_destroy_crypto(void);
 int ecryptfs_tfm_exists(char *cipher_name, struct ecryptfs_key_tfm **key_tfm);
+#ifdef CONFIG_CRYPTO_FIPS
+int ecryptfs_get_tfm_and_mutex_for_cipher_name(struct crypto_blkcipher **tfm,
+					       struct mutex **tfm_mutex,
+					       char *cipher_name,
+					       u32 mount_flags);
+#else
 int ecryptfs_get_tfm_and_mutex_for_cipher_name(struct crypto_blkcipher **tfm,
 					       struct mutex **tfm_mutex,
 					       char *cipher_name);
+#endif
 int ecryptfs_keyring_auth_tok_for_sig(struct key **auth_tok_key,
 				      struct ecryptfs_auth_tok **auth_tok,
 				      char *sig);

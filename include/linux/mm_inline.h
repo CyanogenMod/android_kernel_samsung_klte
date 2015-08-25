@@ -30,6 +30,11 @@ add_page_to_lru_list(struct zone *zone, struct page *page, enum lru_list lru)
 	lruvec = mem_cgroup_lru_add_list(zone, page, lru);
 	list_add(&page->lru, &lruvec->lists[lru]);
 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, hpage_nr_pages(page));
+
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	if (PageCMA(page))
+		__mod_zone_page_state(zone, NR_FREE_CMA_PAGES + 1 + lru, 1);
+#endif
 }
 
 static inline void
@@ -38,6 +43,11 @@ del_page_from_lru_list(struct zone *zone, struct page *page, enum lru_list lru)
 	mem_cgroup_lru_del_list(page, lru);
 	list_del(&page->lru);
 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, -hpage_nr_pages(page));
+
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	if (PageCMA(page))
+		__mod_zone_page_state(zone, NR_FREE_CMA_PAGES + 1 + lru, -1);
+#endif
 }
 
 /**

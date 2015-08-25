@@ -677,6 +677,11 @@ static int of_sii8240_parse_dt(void)
 				&pdata->swing_level))
 		pr_info("swing_level = 0x%X\n", pdata->swing_level);
 #endif
+	if (!of_property_read_u32(np, "sii8240,damping",
+				&pdata->damping))
+		pr_info("damping = 0x%X\n", pdata->damping);
+	else
+		pdata->damping = BIT_MHLTX_CTL3_DAMPING_SEL_OFF;
 
 	pdata->gpio_barcode_emul = of_property_read_bool(np,
 			"sii8240,barcode_emul");

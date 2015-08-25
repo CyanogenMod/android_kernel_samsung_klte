@@ -623,11 +623,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 #ifdef CONFIG_MODE_AUTO_CHANGE
 	unsigned int new_mode;
 #endif
-	if (!down_read_trylock(&pcpu->enable_sem)) {
-		if (!timer_pending(&pcpu->cpu_timer))
-			cpufreq_interactive_timer_resched(pcpu);
- 		return;
-	}
+	if (!down_read_trylock(&pcpu->enable_sem))
+		return;
 	if (!pcpu->governor_enabled)
 		goto exit;
 
@@ -1839,17 +1836,18 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			/* update target_freq firstly */
 			if (policy->max < pcpu->target_freq)
 				pcpu->target_freq = policy->max;
-			else if (policy->min > pcpu->target_freq){
+			else if (policy->min > pcpu->target_freq)
 				pcpu->target_freq = policy->min;
 
 			/* Reschedule timer.
-+			 * The governor needs more time to evaluate
-+			 * the load after changing policy parameters
+			 * Delete the timers, else the timer callback may
+			 * return without re-arm the timer when failed
+			 * acquire the semaphore. This race may cause timer
+			 * stopped unexpectedly.
 			 */
-				del_timer_sync(&pcpu->cpu_timer);
-				del_timer_sync(&pcpu->cpu_slack_timer);
-				cpufreq_interactive_timer_start(j);
-			}
+			del_timer_sync(&pcpu->cpu_timer);
+			del_timer_sync(&pcpu->cpu_slack_timer);
+			cpufreq_interactive_timer_start(j);
 			pcpu->minfreq_boost = 1;
 			up_write(&pcpu->enable_sem);
 		}

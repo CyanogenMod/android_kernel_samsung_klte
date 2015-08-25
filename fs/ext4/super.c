@@ -2985,9 +2985,22 @@ void print_block_data(struct super_block *sb, sector_t blocknr
 		}
 		printk(KERN_ERR "---------------------------------------------------\n");
 }
-/* for debugging */
 
-// debugging code
+void print_iloc_info(struct super_block *sb, struct ext4_iloc iloc)
+{
+	/* for debugging, woojoong.lee */
+	printk(KERN_ERR "iloc info, offset : %lu,"
+			, iloc.offset);
+	printk(KERN_ERR " group# : %u\n", iloc.block_group);
+	printk(KERN_ERR "sb info, inodes per group : %lu,"
+			, EXT4_SB(sb)->s_inodes_per_group);
+	printk(KERN_ERR " inode size : %d\n"
+			, EXT4_SB(sb)->s_inode_size);
+	print_bh(sb, iloc.bh, 0, EXT4_BLOCK_SIZE(sb));
+	/* end */
+}
+
+/* for debugging */
 void print_bh(struct super_block *sb, struct buffer_head *bh
 				, int start, int len)
 {

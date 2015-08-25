@@ -39,6 +39,9 @@
 #define ECRYPTFS_WAS_ENCRYPTED 0x0080
 #define ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE 0x0100
 #endif
+#ifdef CONFIG_SDP
+#define ECRYPTFS_IOCTL_GET_SDP          _IOR('l', 0x11, __u32)
+#endif
 
 
 /**
@@ -396,6 +399,34 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				attr = ECRYPTFS_WAS_ENCRYPTED;
 			else
 				attr = ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE;
+		}
+		mutex_unlock(&crypt_stat->cs_mutex);
+		put_user(attr, user_attr);
+		return 0;
+	}
+#endif
+
+#ifdef CONFIG_SDP
+	if (cmd == ECRYPTFS_IOCTL_GET_SDP) {
+		u32 __user *user_attr = (u32 __user *)arg;
+		u32 attr = 0;
+		char filename[NAME_MAX+1] = {0};
+		struct dentry *ecryptfs_dentry = file->f_path.dentry;
+
+		struct inode *inode = ecryptfs_dentry->d_inode;
+		struct ecryptfs_crypt_stat *crypt_stat =
+				&ecryptfs_inode_to_private(inode)->crypt_stat;
+		struct dentry *fp_dentry =
+				ecryptfs_inode_to_private(inode)->lower_file->f_dentry;
+		if (fp_dentry->d_name.len <= NAME_MAX)
+			memcpy(filename, fp_dentry->d_name.name,
+					fp_dentry->d_name.len + 1);
+
+		mutex_lock(&crypt_stat->cs_mutex);
+		if (crypt_stat->flags & ECRYPTFS_DEK_SDP_ENABLED) {
+			attr = 1;
+		} else {
+			attr = 0;
 		}
 		mutex_unlock(&crypt_stat->cs_mutex);
 		put_user(attr, user_attr);

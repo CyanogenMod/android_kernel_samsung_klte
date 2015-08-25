@@ -331,6 +331,11 @@ static int synaptics_parse_dt(struct device *dev,
 		dev_info(dev, "%s: Unable to read synaptics,tsp-project\n", __func__);
 		dt_data->project = "0";
 	}
+	rc = of_property_read_string(np, "synaptics,sub-project", &dt_data->sub_project);
+	if (rc < 0) {
+		dev_info(dev, "%s: Unable to read synaptics,sub-project\n", __func__);
+		dt_data->sub_project = "0";
+	}
 
 	if (dt_data->extra_config[2] > 0)
 		pr_err("%s: OCTA ID = %d\n", __func__, gpio_get_value(dt_data->extra_config[2]));
@@ -4863,11 +4868,18 @@ static void synaptics_get_firmware_name(struct synaptics_rmi4_data *rmi4_data)
 					rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
 				}
 			} else if (rmi4_data->ic_revision_of_ic == SYNAPTICS_IC_REVISION_A3) {
-				/* revision A3 Firmware is not fixed. */
-				if ((strncmp(rmi->product_id_string, "s5100 A3 F", 10) == 0))
-					rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_A3;
-				else
-					rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
+				if (strncmp(rmi4_data->dt_data->sub_project, "0", 1) != 0) {
+					if ((strncmp(rmi4_data->dt_data->sub_project, "active", 6) == 0) ||
+						(strncmp(rmi4_data->dt_data->sub_project, "sports", 6) == 0))
+						rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_ACTIVE;
+					else
+						rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
+				} else {
+					if ((strncmp(rmi->product_id_string, "s5100 A3 F", 10) == 0))
+						rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_A3;
+					else
+						rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
+				}
 			} else {
 				rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
 			}

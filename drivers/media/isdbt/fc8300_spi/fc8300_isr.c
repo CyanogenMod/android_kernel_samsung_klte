@@ -22,12 +22,14 @@
 	History :
 	----------------------------------------------------------------------
 *******************************************************************************/
+#include <linux/kernel.h>
+#include <mach/sec_debug.h>
 #include "fci_types.h"
 #include "fc8300_regs.h"
 #include "fci_hal.h"
+#ifdef TS_DROP_DEBUG
 #include "fci_oal.h"
-
-
+#endif
 s32 (*fc8300_ac_callback)(u32 userdata, u8 bufid, u8 *data, s32 length) = NULL;
 s32 (*fc8300_ts_callback)(u32 userdata, u8 bufid, u8 *data, s32 length) = NULL;
 
@@ -43,18 +45,15 @@ static void fc8300_data(HANDLE handle, DEVICEID devid, u8 buf_int_status)
 {
 	u32 size = 0;
 	s32 i;
-#ifdef FEATURE_DEBUG_BROADCAST
-	u8 overrun;
-#endif
 
-	print_log(NULL, "[FC8300] FC8300_DATA buf_int : 0x%x \n", buf_int_status);
+	ISDB_PR_DBG("FC8300_DATA buf_int : 0x%x \n", buf_int_status);
 	for (i = 0; (i < 4) && (buf_int_status & 0x0f); i++) {
 		if (buf_int_status & (1 << i)) {
 			bbm_word_read(handle, devid,
 					BBM_BUF_TS0_THR + (i << 1),
 					(u16 *) &size);
 
-			print_log(NULL, "[FC8300] ThSize[%d] : %d \n", i, (size + 1) << 1);
+			ISDB_PR_DBG("ThSize[%d] : %d \n", i, (size + 1) << 1);
 
 			if (size == 0)
 				continue;
@@ -66,12 +65,12 @@ static void fc8300_data(HANDLE handle, DEVICEID devid, u8 buf_int_status)
 
 			bbm_data(handle, devid,
 					BBM_TS0_DATA + i, &ts_buffer[0], size);
-			print_log(handle, "[FC8300] fc8300_data size : %d, [0x%x][0x%x][0x%x][0x%x]\n"
+			ISDB_PR_DBG("fc8300_data size : %d, [0x%x][0x%x][0x%x][0x%x]\n"
 				, size, ts_buffer[0], ts_buffer[1], ts_buffer[2], ts_buffer[3]);
 
 			if (fc8300_ts_callback)
 			{
-				print_log(0,"fc8300_ts_callback\n");
+				ISDB_PR_DBG("fc8300_ts_callback\n");
 				(*fc8300_ts_callback)(fc8300_ts_user_data,
 						i, &ts_buffer[0], size);
 			}			
@@ -94,21 +93,21 @@ static void fc8300_data(HANDLE handle, DEVICEID devid, u8 buf_int_status)
 
 			if (fc8300_ac_callback)
 			{
-				print_log(0,"fc8300_ac_callback\n");
+				ISDB_PR_DBG("fc8300_ac_callback\n");
 				(*fc8300_ac_callback)(fc8300_ac_user_data,
 						i, &ac_buffer[0], size);
 			}			
 		}
 	}
 #endif
-#ifdef FEATURE_DEBUG_BROADCAST
+
+/*
 	bbm_read(handle, DIV_BROADCAST, BBM_BUF_OVERRUN, &overrun);
 	if (overrun)
 		bbm_write(handle, DIV_BROADCAST, BBM_BUF_OVERRUN, overrun);
-
-	print_log(handle, "[FC8300] ISR OVR : 0x%x, INT : 0x%x, SIZE : %d \n"
-		, overrun, buf_int_status, size);
-#endif
+		ISDB_PR_DBG("ISR OVR : 0x%x, INT : 0x%x, SIZE : %d \n"
+			, overrun, buf_int_status, size);
+*/
 }
 #endif
 
@@ -197,11 +196,14 @@ void fc8300_isr(HANDLE handle)
 #ifndef BBM_I2C_TSIF
 	u8 buf_int_status = 0;
 #endif
+#ifdef TS_DROP_DEBUG
+	u8 over = 0;
+#endif
 
 #ifdef BBM_AUX_INT
 	u8 aux_int_status = 0;
 #endif
-	print_log(0,"%s \n",__func__);
+	ISDB_PR_DBG("%s \n",__func__);
 #ifndef BBM_I2C_TSIF
 	bbm_byte_read(handle, DIV_MASTER, BBM_BUF_STATUS_CLEAR,
 					&buf_int_status);
@@ -220,7 +222,17 @@ void fc8300_isr(HANDLE handle)
 				BBM_BUF_STATUS_CLEAR, buf_int_status);
 
 		fc8300_data(handle, DIV_MASTER, buf_int_status);
+#ifdef TS_DROP_DEBUG
+		print_log(handle, "[FC8300] Data Read 2 %d\n", buf_int_status);
+#endif
 	}
+#ifdef TS_DROP_DEBUG
+	bbm_byte_read(handle, DIV_MASTER, BBM_BUF_OVERRUN, &over);
+	if (over) {
+		bbm_byte_write(handle, DIV_MASTER, BBM_BUF_OVERRUN, over);
+		print_log(handle, "[FC8300] Data Overrun  %d\n", over);
+	}
+#endif
 #endif
 
 #ifdef BBM_AUX_INT

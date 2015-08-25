@@ -29,8 +29,37 @@
 extern "C" {
 #endif
 
-#define FEATURE_DEBUG_BROADCAST
-//#define BBM_I2C_SPI //shubham
+#if defined(CONFIG_SEC_FACTORY)
+/* shown at FACTORY */
+#define ISDB_PR_ERR(A,...) pr_err("[FC8300_SPI]"A,##__VA_ARGS__)
+
+/* NOT shown at FACTORY */
+#define ISDB_PR_INFO(A,...) 
+#define ISDB_PR_DBG(A,...) 
+#else
+extern unsigned int sec_dbg_level;
+
+/* shown at HIGH/MID/LOW, user mode:default LOW, eng mode: default MID*/
+#define ISDB_PR_ERR(A,...) pr_err("[FC8300_SPI]"A,##__VA_ARGS__)
+
+/* shown at HIGH/MID, user mode:default LOW, eng mode: default MID*/
+#define ISDB_PR_INFO(A,...) \
+	do { \
+		if (sec_dbg_level != KERNEL_SEC_DEBUG_LEVEL_LOW)	\
+			pr_info("[FC8300_SPI]"A,##__VA_ARGS__);\
+	} while(0)
+
+/* shown at HIGH/MID under debug control, user mode:default LOW, eng mode: default MID*/
+#define ISDB_PR_DBG(A,...) \
+	do { \
+		if (sec_dbg_level != KERNEL_SEC_DEBUG_LEVEL_LOW)	\
+			pr_debug("[FC8300_SPI]"A,##__VA_ARGS__);\
+	} while(0)
+#endif
+	
+/* #define FEATURE_DEBUG_BROADCAST */
+/* #define TS_DROP_DEBUG */
+//#define BBM_I2C_SPI
 /* #define BBM_I2C_TSIF */
 #define BBM_INT_LOW_ACTIVE
 /* #define BBM_AUX_INT */
@@ -42,7 +71,7 @@ extern "C" {
 /* #define BBM_DESCRAMBLER */
 #define BBM_SPI_30M /* ONLY CS */
 /* #define BBM_I2C_PARALLEL_TSIF */
-#define BBM_ES /* deprecated */
+/* #define BBM_ES */ /* deprecated */
 /* #define BBM_ES_CURRENT */ /* deprecated */
 
 /* #define BBM_XTAL_FREQ               16000 */

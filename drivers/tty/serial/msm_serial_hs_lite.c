@@ -66,6 +66,10 @@ enum uart_core_type {
 	BLSP_HSUART,
 };
 
+#if defined(CONFIG_MACH_KLTE_JPN) && defined(CONFIG_SEC_FACTORY)
+#define CONFIG_DUMP_UART_PACKET_DISABLE 1
+#endif
+
 #if defined(CONFIG_DUMP_UART_PACKET_DISABLE)
 #define DUMP_UART_PACKET 0
 #else

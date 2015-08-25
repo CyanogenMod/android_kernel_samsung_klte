@@ -25,6 +25,7 @@
 #include <linux/spi/spi.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <mach/sec_debug.h>
 
 #include "fci_types.h"
 #include "fc8300_regs.h"
@@ -52,11 +53,11 @@ static int __devinit fc8300_spi_probe(struct spi_device *spi)
 {
 	s32 ret;
 
-	pr_err("fc8300_spi_probe\n");
+	ISDB_PR_ERR("fc8300_spi_probe\n");
 	//prevent issue CID 27494
 	if(spi == NULL)
 	{
-	pr_err("fc8300_spi_probe spi == NULL \n");
+	ISDB_PR_ERR("fc8300_spi_probe spi == NULL \n");
 	return -1;
 	}
 
@@ -68,7 +69,7 @@ static int __devinit fc8300_spi_probe(struct spi_device *spi)
 
 	if (ret < 0)
 	{
-		pr_err("fc8300_spi_probe ret =%d \n",ret);
+		ISDB_PR_ERR("fc8300_spi_probe ret =%d \n",ret);
 		return ret;
 	}
 
@@ -80,7 +81,7 @@ static int __devinit fc8300_spi_probe(struct spi_device *spi)
 
 static int fc8300_spi_remove(struct spi_device *spi)
 {
-	pr_err("fc8300_spi_remove\n");
+	ISDB_PR_ERR("fc8300_spi_remove\n");
 	return 0;
 }
 
@@ -109,7 +110,7 @@ static int fc8300_spi_write_then_read(struct spi_device *spi
 	struct spi_transfer	x;
 
 	if (spi == NULL) {
-		pr_err("[ERROR] FC8300_SPI Handle Fail...........\n");
+		ISDB_PR_ERR("[ERROR] FC8300_SPI Handle Fail...........\n");
 		return BBM_NOK;
 	}
 
@@ -146,7 +147,7 @@ static s32 spi_bulkread(HANDLE handle, u8 devid,
 		, &tx_data[0], 4, data, length);
 
 	if (res) {
-		pr_err("fc8300_spi_bulkread fail : %d\n", res);
+		ISDB_PR_ERR("fc8300_spi_bulkread fail : %d\n", res);
 		return BBM_NOK;
 	}
 
@@ -171,13 +172,13 @@ static s32 spi_bulkwrite(HANDLE handle, u8 devid,
 			tx_data[4+i] = data[i];
 		}
 		else		
-			pr_err("Error spi_bulkwrite  tx_data length= %d\n",length);
+			ISDB_PR_ERR("Error spi_bulkwrite  tx_data length= %d\n",length);
 	}
 	res = fc8300_spi_write_then_read(fc8300_spi
 		, &tx_data[0], length+4, NULL, 0);
 
 	if (res) {
-		pr_err("fc8300_spi_bulkwrite fail : %d\n", res);
+		ISDB_PR_ERR("fc8300_spi_bulkwrite fail : %d\n", res);
 		return BBM_NOK;
 	}
 
@@ -198,7 +199,7 @@ static s32 spi_dataread(HANDLE handle, u8 devid,
 		, &tx_data[0], 4, data, length);
 
 	if (res) {
-		pr_err("fc8300 spi_dataread fail : %d\n", res);
+		ISDB_PR_ERR("fc8300 spi_dataread fail : %d\n", res);
 		return BBM_NOK;
 	}
 	
@@ -209,12 +210,12 @@ s32 fc8300_spi_init(HANDLE handle, u16 param1, u16 param2)
 {
 	int res = 0;
 
-	pr_err("fc8300_spi_init : %d\n", res);
+	ISDB_PR_ERR("fc8300_spi_init : %d\n", res);
 
 	res = spi_register_driver(&fc8300_spi_driver);
 
 	if (res) {
-		pr_err("fc8300_spi register fail : %d\n", res);
+		ISDB_PR_ERR("fc8300_spi register fail : %d\n", res);
 		return BBM_NOK;
 	}
 
@@ -290,6 +291,7 @@ s32 fc8300_spi_bytewrite(HANDLE handle, DEVICEID devid, u16 addr, u8 data)
 s32 fc8300_spi_wordwrite(HANDLE handle, DEVICEID devid, u16 addr, u16 data)
 {
 	s32 res;
+
 #ifdef BBM_ES
 	u8 command = SPI_WRITE;
 
@@ -367,16 +369,14 @@ s32 fc8300_spi_dataread(HANDLE handle, DEVICEID devid,
 				data, length);
 	mutex_unlock(&fci_spi_lock);
 
-	print_log(handle, "[FC8300] fc8300_spi_dataread res = %d, length : %d \n"
-		, res, length);
-	
+	ISDB_PR_DBG("fc8300_spi_dataread res = %d, length : %d \n", res, length);
 #endif
 	return res;
 }
 
 s32 fc8300_spi_deinit(HANDLE handle)
 {
-	pr_err("fc8300_spi_deinit\n");
+	ISDB_PR_ERR("fc8300_spi_deinit\n");
 	return BBM_OK;
 }
 

@@ -11,18 +11,6 @@
 #include "kernelspd_internal.h"
 #include "package_version.h"
 
-#ifdef CONFIG_AUTHENTEC_VPNCLIENT_INTERCEPTOR
-#if CONFIG_AUTHENTEC_VPNCLIENT_INTERCEPTOR != 'n' && CONFIG_AUTHENTEC_VPNCLIENT_INTERCEPTOR != 'N' 
-#warning "Disable config CONFIG_AUTHENTEC_VPNCLIENT_INTERCEPTOR"
-#error "Interceptor for VpnClient 3 cannot be build to same kernel with older interceptor."
-#endif
-#endif 
-
-#ifdef MODULE
-#error "vpnclient can only be compiled as a built-in MODULE"
-#endif /* MODULE */
-
-
 MODULE_DESCRIPTION("Kernel IPsec SPD " PACKAGE_VERSION);
 
 static int init_called = 0;

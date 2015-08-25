@@ -204,6 +204,26 @@ u32 es705_streaming_cmds[4] = {
 	0x90250100,		/* ES705_UART_INTF */
 };
 
+#define SAMSUNG_ES70X_RESTORE_FW_IN_SLEEP
+#define SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP
+
+#if defined(SAMSUNG_ES70X_RESTORE_FW_IN_SLEEP) || defined(SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP)
+static int cnt_restore_std_fw_in_sleep = 0;
+static int cnt_restore_std_fw_in_wakeup = 0;
+
+int restore_std_fw(struct es705_priv *es705)
+{
+	int rc;
+	dev_info(es705->dev, "%s(): START!\n", __func__);
+
+	es705->mode = SBL;
+	es705_gpio_reset(es705);
+	rc = es705_bootup(es705);
+
+	dev_info(es705->dev, "%s(): rc = %d\n", __func__, rc);
+	return rc;
+}
+#endif
 #define SAMSUNG_ES70X_BACK_TO_BACK_CMD_DELAY
 #ifdef SAMSUNG_ES70X_BACK_TO_BACK_CMD_DELAY
 static int preset_delay_time = 5;
@@ -1482,7 +1502,7 @@ extern unsigned int system_rev;
 
 #if defined(CONFIG_MACH_KLTE_JPN)
 #define UART_DOWNLOAD_WAKEUP_HWREV 7
-#elif defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT)
+#elif defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KSPORTSLTE_SPR) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
 #define UART_DOWNLOAD_WAKEUP_HWREV 0
 #else
 #define UART_DOWNLOAD_WAKEUP_HWREV 6 /* HW rev0.7 */
@@ -1699,6 +1719,18 @@ static int es705_sleep(struct es705_priv *es705)
 								&sync_rspn, match);
 	if (rc)
 		dev_err(es705->dev, "%s(): send sync command failed rc = %d\n", __func__, rc);
+#ifdef SAMSUNG_ES70X_RESTORE_FW_IN_SLEEP
+	if (rc) {
+		mutex_unlock(&es705->pm_mutex);	
+		rc = restore_std_fw(es705);
+		cnt_restore_std_fw_in_sleep++;
+		mutex_lock(&es705->pm_mutex);
+	}
+	
+	if (cnt_restore_std_fw_in_sleep)
+		dev_info(es705->dev, "%s(): cnt_restore_std_fw_in_sleep = %d\n",
+								__func__, cnt_restore_std_fw_in_sleep);
+#endif /* SAMSUNG_ES70X_RESTORE_FW_IN_SLEEP */
 #endif /* SAMSUNG_ES70X_BACK_TO_BACK_CMD_DELAY */
 
 	/* Avoid smoothing time */
@@ -1813,8 +1845,10 @@ static int es705_wakeup(struct es705_priv *es705)
 	u32 sync_cmd = (ES705_SYNC_CMD << 16) | ES705_SYNC_POLLING;
 	u32 sync_rspn = sync_cmd;
 	int match = 1;
+#ifndef SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP
 	int retry = 0;	
 	int retry_wakeup_cnt = 0;
+#endif
 	dev_info(es705->dev, "%s\n",__func__);
 	/* 1 - clocks on
 	 * 2 - wakeup 1 -> 0
@@ -1848,7 +1882,9 @@ static int es705_wakeup(struct es705_priv *es705)
 		dev_info(es705->dev,
 				"%s(): external clock on\n", __func__);
 	}
+#ifndef SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP
 RETRY_TO_WAKEUP:
+#endif
 	if (es705->change_uart_config) {
 		es705_uart_pin_preset(es705);
 	}
@@ -1875,7 +1911,20 @@ RETRY_TO_WAKEUP:
 	}
 
 	msleep(SYNC_DELAY);
-
+#ifdef SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP
+	rc = es705_write_then_read(es705, &sync_cmd, sizeof(sync_cmd),
+								&sync_rspn, match);
+	if (rc) {
+		mutex_unlock(&es705->pm_mutex); 
+		rc = restore_std_fw(es705);
+		cnt_restore_std_fw_in_wakeup++;
+		mutex_lock(&es705->pm_mutex);
+	}
+	
+	if (cnt_restore_std_fw_in_wakeup)
+		dev_info(es705->dev, "%s(): cnt_restore_std_fw_in_wakeup = %d\n",
+								__func__, cnt_restore_std_fw_in_wakeup);
+#else /* !SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP */		
 	/* retry wake up */
 	retry = 0;
 	do {
@@ -1896,6 +1945,7 @@ RETRY_TO_WAKEUP:
 			goto RETRY_TO_WAKEUP;
 		}
 	}
+#endif /* SAMSUNG_ES70X_RESTORE_FW_IN_WAKEUP */
 
 	if (rc) {
 		dev_err(es705->dev, "%s(): es705 wakeup FAIL\n", __func__);
@@ -2654,8 +2704,14 @@ static int es705_put_voice_lpm_enable_value(struct snd_kcontrol *kcontrol,
 	}
 	if (es705_priv.voice_lpm_enable)
 		es705_priv.power_control(ES705_SET_POWER_STATE_VS_LOWPWR, ES705_POWER_STATE);
-	else if (es705_priv.es705_power_state == ES705_SET_POWER_STATE_VS_LOWPWR)
+	else if (es705_priv.es705_power_state == ES705_SET_POWER_STATE_VS_LOWPWR) {
 		es705_priv.power_control(ES705_SET_POWER_STATE_VS_OVERLAY, ES705_POWER_STATE);
+		if (!es705_priv.voice_wakeup_enable) {
+			es705_switch_route_config(5);
+			es705_priv.power_control(ES705_SET_POWER_STATE_NORMAL, ES705_POWER_STATE);
+			es705_read_write_power_control(0);
+		}
+	}
 
 	return 0;
 }

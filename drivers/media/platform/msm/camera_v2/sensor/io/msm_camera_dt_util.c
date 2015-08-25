@@ -34,7 +34,7 @@ extern int led_torch_en;
 extern int led_flash_en;
 extern unsigned int system_rev;
 int gpio_comp_spi_int = -1;
-#ifdef CONFIG_SEC_K_PROJECT     //To check 2P2 version
+#if defined (CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)     //To check 2P2 version
 static char cam_sensor_maker = 'L';
 static char cam_core_ver = '0';
 #endif
@@ -152,8 +152,10 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vdig\n",
 					       __func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
-					cam_vreg[j].min_voltage = cam_vreg[j].max_voltage =
-									  power_setting[i].config_val;
+					if (power_setting[i].config_val != 0) {
+						cam_vreg[j].min_voltage = cam_vreg[j].max_voltage =
+										  power_setting[i].config_val;
+					}
 					pr_err("%s:%d dig min max voltage %ld\n", __func__,
 					       __LINE__, power_setting[i].config_val);
 					break;
@@ -182,7 +184,7 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 					pr_err("%s:%d i %d j %d cam_vana\n",
 					       __func__, __LINE__, i, j);
 					power_setting[i].seq_val = j;
-#ifdef CONFIG_SEC_K_PROJECT                                                                     //To check 2P2 version (AVDD 2.8V or AVDD 2.95V)
+#if defined (CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)     //To check 2P2 version (AVDD 2.8V or AVDD 2.95V)
 					msm_camera_get_sysfs_corever(&cam_sensor_maker, &cam_core_ver);
 					if (cam_sensor_maker == 'L' && cam_core_ver >= 'F') {   // 2P2 LSI sensor and core ver 'F' or higher
 						pr_err("%s:%d rear sensor: %c, core_ver: %c => AVDD 2.95V\n",
@@ -1419,7 +1421,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 
 
 	CDBG("%s:%d\n", __func__, __LINE__);
-#ifdef CONFIG_SEC_K_PROJECT     //To check 2P2 version
+#if defined (CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)     //To check 2P2 version
 	if (camera_id == 0)
 		pr_info("%s:%d rear sensor: %c, core_ver: %c (0x%x)\n", __func__, __LINE__,
 			cam_sensor_maker, cam_core_ver, cam_core_ver);
@@ -1523,7 +1525,7 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 				goto power_up_failed;
 			}
 
-#ifndef CONFIG_SEC_KACTIVE_PROJECT
+#if defined (CONFIG_SEC_K_PROJECT)
 			if (system_rev <= 6 ) { // REV07 (=REV00)
 				if (!strcmp(ctrl->cam_vreg[power_setting->seq_val].reg_name,
 					    "max77826_ldo1")) {
@@ -1789,7 +1791,7 @@ int msm_camera_power_down(struct msm_camera_power_ctrl_t *ctrl,
 				continue;
 			}
 
-#ifndef CONFIG_SEC_KACTIVE_PROJECT
+#if defined (CONFIG_SEC_K_PROJECT)
 			if (system_rev <= 6 ) { // REV07 (=REV00)
 				if (!strcmp(ctrl->cam_vreg[power_setting->seq_val].reg_name,
 					    "max77826_ldo1")) {

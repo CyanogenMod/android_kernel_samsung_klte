@@ -20,3 +20,10 @@ config WTL_ENCRYPTION_FILTER
 	depends on ECRYPT_FS
 	help
 	Modification of encrypted filesystem for SD card encryption
+
+config SDP
+	bool "Enables SDP"
+	default n
+	depends on ECRYPT_FS
+	help
+	Secure Data Protection
