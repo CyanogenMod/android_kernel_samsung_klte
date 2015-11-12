@@ -91,19 +91,37 @@ ifeq ($(CONFIG_SEC_K_PROJECT),y)
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r09.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r10.dtb
     else ifeq ($(CONFIG_MACH_KLTE_JPN),y)
-	# dtbs for JPN
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r03.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r04.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r05.dtb    
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r06.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r07.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r08.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r09.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r10.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r11.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r12.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r13.dtb
-	else
+        # dtbs for JPN
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r03.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r04.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r05.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r06.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r07.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r08.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r09.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r10.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r11.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r12.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r13.dtb
+    else ifeq ($(CONFIG_MACH_KLTE_SPR),y)
+        # dtbs for SPR
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r03.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r04.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r05.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r06.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r07.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r08.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r14.dtb
+    else ifeq ($(CONFIG_MACH_KLTE_VZW),y)
+        # dtbs for VZW
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r03.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r04.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r05.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r06.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r07.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r08.dtb
+        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r14.dtb
+    else ifeq ($(CONFIG_MACH_KLTE_EUR),y)
         # default dtbs
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r03.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r04.dtb
