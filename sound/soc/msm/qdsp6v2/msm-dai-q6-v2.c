@@ -1206,6 +1206,7 @@ static int __devinit msm_auxpcm_dev_probe(struct platform_device *pdev)
 	return rc;
 
 fail_reg_dai:
+	mutex_destroy(&dai_data->rlock);
 fail_invalid_intf:
 fail_nodev_intf:
 fail_invalid_dt:

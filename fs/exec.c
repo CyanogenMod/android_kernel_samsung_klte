@@ -647,7 +647,10 @@ static int shift_arg_pages(struct vm_area_struct *vma, unsigned long shift)
 
 	return 0;
 }
-
+#ifdef CONFIG_TIMA_RKP
+unsigned long tima_switch_count = 0;
+DEFINE_SPINLOCK(tima_switch_count_lock);
+#endif
 /*
  * Finalizes the stack vm_area_struct. The flags and permissions are updated,
  * the stack is optionally relocated, and some extra space is added.

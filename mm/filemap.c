@@ -1092,6 +1092,10 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	unsigned int prev_offset;
 	int error;
 
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+	int is_sequential = (ra->prev_pos == *ppos) ? 1 : 0;
+#endif
+
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	prev_index = ra->prev_pos >> PAGE_CACHE_SHIFT;
 	prev_offset = ra->prev_pos & (PAGE_CACHE_SIZE-1);
@@ -1174,6 +1178,9 @@ page_ok:
 		 * only mark it as accessed the first time.
 		 */
 		if (prev_index != index || offset != prev_offset)
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+			if (!(filp->f_flags & O_SCFSLOWER))
+#endif
 			mark_page_accessed(page);
 		prev_index = index;
 
@@ -1192,6 +1199,37 @@ page_ok:
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 		prev_offset = offset;
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+#if 1
+		{
+			extern u64 scfs_lowerpage_total_count;
+			if ((filp->f_flags & O_SCFSLOWER) && (!PageScfslower(page) && !PageNocache(page)))
+				scfs_lowerpage_total_count++;
+		}
+#endif
+#if 0
+		if ((filp->f_flags & O_SCFSLOWER) && /* SCFS lower pages */
+			(((ret == PAGE_CACHE_SIZE) || /* Seq.Read : all pages except last one */
+			(PageScfslower(page) && !offset)) /* Seq.Read : last page */
+			|| (ra->size <= 4))) { /* Ran.Read */
+#else
+		if ((filp->f_flags & O_SCFSLOWER) && /* SCFS lower pages */
+			((ret == PAGE_CACHE_SIZE) || /* Internal pages except first and last ones */
+			(PageScfslower(page) && !offset) || /* page was sequentially referenced before due to preceding cluster access */
+#if 0
+			(prev_index >= ra->start))) { /* first or last pages: initial readahead or random read */
+#else
+			!is_sequential)) { /* first or last pages: random read */
+#endif
+#endif
+			SetPageNocache(page);
+			if (PageLRU(page))
+				deactivate_page(page);
+		}
+		else if (filp->f_flags & O_SCFSLOWER)
+			SetPageScfslower(page);
+#endif
 
 		page_cache_release(page);
 		if (ret == nr && desc->count)

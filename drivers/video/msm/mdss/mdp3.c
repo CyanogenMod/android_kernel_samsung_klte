@@ -542,6 +542,31 @@ unsigned long mdp3_get_clk_rate(u32 clk_idx)
 	return clk_rate;
 }
 
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+static inline struct clk *mdp3_get_clk(u32 clk_idx)
+{
+	if (clk_idx < MDP3_MAX_CLK)
+		return mdp3_res->clocks[clk_idx];
+	return NULL;
+}
+
+void mdp3_dump_clk(void)
+{
+	u8 clk_idx = 0;
+	struct clk *clk = NULL;
+
+	pr_info(" ============ %s + ============\n", __func__);
+
+	for(clk_idx = MDP3_CLK_AHB ; clk_idx < MDP3_MAX_CLK ;clk_idx++)
+	{
+		clk = mdp3_get_clk(clk_idx);
+		clock_debug_print_clock2(clk);
+	}
+
+	pr_info(" ============ %s - ============\n", __func__);
+}
+#endif
+
 static int mdp3_clk_register(char *clk_name, int clk_idx)
 {
 	struct clk *tmp;
