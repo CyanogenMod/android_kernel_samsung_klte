@@ -325,6 +325,9 @@ ssize_t chg_therm_store_attrs(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
+ssize_t chg_therm_adc_show_attrs(struct device *dev,
+				struct device_attribute *attr, char *buf);
+
 ssize_t chg_current_show_attrs(struct device *dev,
 				struct device_attribute *attr, char *buf);
 
@@ -358,6 +361,13 @@ ssize_t chg_current_store_attrs(struct device *dev,
 	.attr = {.name = #_name, .mode = 0664},	\
 	.show = chg_therm_show_attrs,			\
 	.store = chg_therm_store_attrs,			\
+}
+
+#define CHG_THERM_ADC_ATTR(_name)				\
+{							\
+	.attr = {.name = #_name, .mode = 0444},	\
+	.show = chg_therm_adc_show_attrs,			\
+	.store = NULL,			\
 }
 
 #define CHG_CURRENT_ATTR(_name)				\

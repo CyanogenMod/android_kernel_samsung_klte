@@ -202,6 +202,7 @@ struct taos_data {
 	int proximity_value;
 	bool offset_cal_high;
 	bool chip_on_success;
+	bool is_requested;
 	int err_cnt;
 };
 
@@ -386,7 +387,8 @@ err_chipon_i2c_error:
 			break;
 	}
 	if (ret < 0)
-		pr_info("[SENSOR] %s : chip_on Failed!\nfail_num : %d, ret : %d\n", __func__, fail_num, ret);
+		pr_info("[SENSOR] %s: chip_on Failed!\n"\
+		"fail_num : %d, ret : %d\n", __func__, fail_num, ret);
 	return ret;
 }
 
@@ -396,17 +398,16 @@ static int taos_chip_off(struct taos_data *taos)
 	u8 reg_cntrl;
 
 	if (taos->chip_on_success) {
-	reg_cntrl = CNTL_REG_CLEAR;
+		reg_cntrl = CNTL_REG_CLEAR;
 		taos->chip_on_success = false;
-	ret = opt_i2c_write(taos, (CMD_REG | CNTRL), &reg_cntrl);
-	if (ret < 0) {
-		gprintk("opt_i2c_write to ctrl reg failed\n");
-		return ret;
-	}
+		ret = opt_i2c_write(taos, (CMD_REG | CNTRL), &reg_cntrl);
+		if (ret < 0) {
+			gprintk("opt_i2c_write to ctrl reg failed\n");
+			return ret;
+		}
 	} else {
-		pr_err("[SENSOR] %s : chip is already turn off!\n", __func__);
+		pr_err("[SENSOR] %s: chip is already turn off!\n", __func__);
 	}
-
 	return ret;
 }
 
@@ -439,7 +440,8 @@ static int taos_get_lux(struct taos_data *taos)
 		(CMD_REG | ALS_CHAN1LO));
 	if (cleardata < 0 || irdata < 0) {
 		taos->err_cnt++;
-		pr_err("[SENSOR] %s : i2c err_cnt:%d. cleardata:%d, irdata:%d\n", __func__, taos->err_cnt, cleardata, irdata);
+		pr_err("[SENSOR] %s: i2c err_cnt:%d. cleardata:%d, irdata:%d\n",
+			__func__, taos->err_cnt, cleardata, irdata);
 		return -1;
 	}
 	pr_debug("[SENSOR] %s, cleardata = %d, irdata = %d\n",
@@ -493,11 +495,11 @@ static void taos_light_enable(struct taos_data *taos)
 	taos_dbgmsg("starting poll timer, delay %lldns\n",
 	ktime_to_ns(taos->light_poll_delay));
 	taos->err_cnt = 0;
-	if (taos->chip_on_success) {
-	hrtimer_start(&taos->timer, taos->light_poll_delay, HRTIMER_MODE_REL);
-	} else {
+	if (taos->chip_on_success)
+		hrtimer_start(&taos->timer, taos->light_poll_delay,
+		HRTIMER_MODE_REL);
+	else
 		pr_err("[SENSOR] %s : taos chip on failed!\n", __func__);
-	}
 }
 
 static void taos_light_disable(struct taos_data *taos)
@@ -523,11 +525,11 @@ static ssize_t poll_delay_store(struct device *dev,
 	int64_t new_delay;
 	int err;
 
-	err = strict_strtoll(buf, 10, &new_delay);
+	err = kstrtoll(buf, 10, &new_delay);
 	if (err < 0)
 		return err;
 
-//	new_delay *= NSEC_PER_MSEC;
+	/* new_delay *= NSEC_PER_MSEC; */
 
 	taos_dbgmsg("new delay = %lldns, old delay = %lldns\n",
 		    new_delay, ktime_to_ns(taos->light_poll_delay));
@@ -549,7 +551,7 @@ static ssize_t light_enable_show(struct device *dev,
 {
 	struct taos_data *taos = dev_get_drvdata(dev);
 	return sprintf(buf, "%d\n",
-		       (taos->power_state & LIGHT_ENABLED) ? 1 : 0);
+		(taos->power_state & LIGHT_ENABLED) ? 1 : 0);
 }
 #endif
 
@@ -558,237 +560,214 @@ static ssize_t proximity_enable_show(struct device *dev,
 {
 	struct taos_data *taos = dev_get_drvdata(dev);
 	return sprintf(buf, "%d\n",
-		       (taos->power_state & PROXIMITY_ENABLED) ? 1 : 0);
+		(taos->power_state & PROXIMITY_ENABLED) ? 1 : 0);
 }
 
 static void taos_power_enable(int en)
 {
-#if defined(CONFIG_MACH_FRESCONEOLTE_CTC)
+#if defined(CONFIG_MACH_VICTORLTE_CTC)
 	int rc;
-	static struct regulator* ldo15;
-	static struct regulator* ldo19;
-	static struct regulator* lvs1;
+	static struct regulator *ldo19;
+	static struct regulator *ldo6;
+	static struct regulator *lvs1;
 
 	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
-	if(!ldo15){
-		ldo15 = regulator_get(NULL,"8226_l15");
-		rc = regulator_set_voltage(ldo15,2800000,2800000);
+	if (!ldo19) {
+		ldo19 = regulator_get(NULL, "8226_l19");
+		rc = regulator_set_voltage(ldo19, 2850000, 2850000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo19 (%d)\n",
+			__func__, rc);
 	}
-	if(!ldo19){
-		ldo19 = regulator_get(NULL,"8226_l19");
-		rc = regulator_set_voltage(ldo19,2850000,2850000);
+	if (!ldo6) {
+		ldo6 = regulator_get(NULL, "8226_l6");
+		rc = regulator_set_voltage(ldo6, 1800000, 1800000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo6 (%d)\n",
+			__func__, rc);
+	}
+	if (!lvs1) {
+		lvs1 = regulator_get(NULL, "8226_lvs1");
+		rc = regulator_set_voltage(lvs1, 1800000, 1800000);
+		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed lvs1 (%d)\n",
+			__func__, rc);
 	}
 
-	if(!lvs1){
-		lvs1 = regulator_get(NULL,"8226_lvs1");
-		rc = regulator_set_voltage(lvs1,1800000,1800000);
-		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	if(en){
-		rc = regulator_enable(ldo15);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
+	if (en) {
 		rc = regulator_enable(ldo19);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-
-		rc = regulator_enable(lvs1);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-	}
-	else{
-		rc = regulator_disable(ldo15);
-		if (rc){
-			printk(KERN_ERR "%s: taos disable failed (%d)\n",__func__, rc);
-		}
-	}
-#elif defined(CONFIG_MACH_VICTORLTE_CTC)
-	int rc;
-	static struct regulator* ldo19;
-	static struct regulator* ldo6;
-	static struct regulator* lvs1;
-
-	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
-	if(!ldo19){
-		ldo19 = regulator_get(NULL,"8226_l19");
-		rc = regulator_set_voltage(ldo19,2850000,2850000);
-		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	if(!ldo6){
-		ldo6 = regulator_get(NULL,"8226_l6");
-		rc = regulator_set_voltage(ldo6,1800000,1800000);
-		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	if(!lvs1){
-		lvs1 = regulator_get(NULL,"8226_lvs1");
-		rc = regulator_set_voltage(lvs1,1800000,1800000);
-		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
-	}
-
-	if(en){
-		rc = regulator_enable(ldo19);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo19 (%d)\n",
+			__func__, rc);
 		rc = regulator_enable(ldo6);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo6 (%d)\n",
+			__func__, rc);
 		rc = regulator_enable(lvs1);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-	}
-	else{
+		if (rc)
+			printk(KERN_ERR "%s: enable failed lvs1 (%d)\n",
+			__func__, rc);
+	} else {
 		rc = regulator_disable(ldo19);
-		if (rc){
-			printk(KERN_ERR "%s: taos disable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: disable failed ldo19 (%d)\n",
+			__func__, rc);
 	}
-#elif defined(CONFIG_MACH_ATLANTICLTE_ATT)
+#elif defined(CONFIG_MACH_FRESCONEOLTE_CTC) ||\
+	defined(CONFIG_SEC_GNOTE_PROJECT)
 	int rc;
-	static struct regulator* ldo19;
-	static struct regulator* lvs1;
+	static struct regulator *ldo15;
+	static struct regulator *ldo19;
+	static struct regulator *lvs1;
+
+	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
+	if (!ldo15) {
+		ldo15 = regulator_get(NULL, "8226_l15");
+		rc = regulator_set_voltage(ldo15, 2800000, 2800000);
+		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo15 (%d)\n",
+			__func__, rc);
+	}
+	if (!ldo19) {
+		ldo19 = regulator_get(NULL, "8226_l19");
+		rc = regulator_set_voltage(ldo19, 2850000, 2850000);
+		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo19 (%d)\n",
+			__func__, rc);
+	}
+
+	if (!lvs1) {
+		lvs1 = regulator_get(NULL, "8226_lvs1");
+		rc = regulator_set_voltage(lvs1, 1800000, 1800000);
+		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed lvs1 (%d)\n",
+			__func__, rc);
+	}
+	if (en) {
+		rc = regulator_enable(ldo15);
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo15 (%d)\n",
+			__func__, rc);
+		rc = regulator_enable(ldo19);
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo19 (%d)\n",
+			__func__, rc);
+		rc = regulator_enable(lvs1);
+		if (rc)
+			printk(KERN_ERR "%s: enable failed lvs1 (%d)\n",
+			__func__, rc);
+	} else {
+		rc = regulator_disable(ldo15);
+		if (rc)
+			printk(KERN_ERR "%s: disable failed ldo15 (%d)\n",
+			__func__, rc);
+	}
+#elif defined(CONFIG_MACH_ATLANTICLTE_ATT) ||\
+	defined(CONFIG_SEC_HESTIA_PROJECT) ||\
+	defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN)
+	int rc;
+	static struct regulator *ldo19;
+	static struct regulator *lvs1;
 
 	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
 
-	if(!ldo19){
-		ldo19 = regulator_get(NULL,"8226_l19");
-		rc = regulator_set_voltage(ldo19,2850000,2850000);
+	if (!ldo19) {
+		ldo19 = regulator_get(NULL, "8226_l19");
+		rc = regulator_set_voltage(ldo19, 2850000, 2850000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo19 (%d)\n",
+			__func__, rc);
 	}
-	if(!lvs1){
-		lvs1 = regulator_get(NULL,"8226_lvs1");
-		rc = regulator_set_voltage(lvs1,1800000,1800000);
+	if (!lvs1) {
+		lvs1 = regulator_get(NULL, "8226_lvs1");
+		rc = regulator_set_voltage(lvs1, 1800000, 1800000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed lvs1 (%d)\n",
+			__func__, rc);
 	}
-	if(en){
+	if (en) {
 		rc = regulator_enable(ldo19);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo19 (%d)\n",
+			__func__, rc);
 
 		rc = regulator_enable(lvs1);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-	}
-	else{
+		if (rc)
+			printk(KERN_ERR "%s: enable failed lvs1 (%d)\n",
+			__func__, rc);
+	} else {
 		rc = regulator_disable(ldo19);
-		if (rc){
-			printk(KERN_ERR "%s: taos disable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: disable failed ldo19 (%d)\n",
+			__func__, rc);
 	}
 #else
 	int rc;
-//	static struct regulator* ldo15;
-	static struct regulator* ldo18;
-	static struct regulator* lvs1;
+	static struct regulator *ldo18;
+	static struct regulator *lvs1;
 
 	printk(KERN_ERR "%s %s\n", __func__, (en) ? "on" : "off");
-/*
-	if(!ldo15){
-		ldo15 = regulator_get(NULL,"8941_l18");
-		rc = regulator_set_voltage(ldo15,2800000,2800000);
+
+	if (!ldo18) {
+		ldo18 = regulator_get(NULL, "8941_l18");
+		rc = regulator_set_voltage(ldo18, 2850000, 2850000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed ldo18 (%d)\n",
+			__func__, rc);
 	}
-*/
-	if(!ldo18){
-		ldo18 = regulator_get(NULL,"8941_l18");
-		rc = regulator_set_voltage(ldo18,2850000,2850000);
+
+	if (!lvs1) {
+		lvs1 = regulator_get(NULL, "8941_lvs1");
+		rc = regulator_set_voltage(lvs1, 1800000, 1800000);
 		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: set_level failed lvs1 (%d)\n",
+			__func__, rc);
 	}
-	
-	if(!lvs1){
-		lvs1 = regulator_get(NULL,"8941_lvs1");
-		rc = regulator_set_voltage(lvs1,1800000,1800000);
-		pr_info("[TMP] %s, %d\n", __func__, __LINE__);
-		if (rc){
-			printk(KERN_ERR "%s: taos set_level failed (%d)\n",__func__, rc);
-		}
-	}
-	if(en){
-/*
-		rc = regulator_enable(ldo15);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-*/
+	if (en) {
 		rc = regulator_enable(ldo18);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-		
+		if (rc)
+			printk(KERN_ERR "%s: enable failed ldo18 (%d)\n",
+			__func__, rc);
 		rc = regulator_enable(lvs1);
-		if (rc){
-			printk(KERN_ERR "%s: taos enable failed (%d)\n",__func__, rc);
-		}
-		
-	}
-	else{
+		if (rc)
+			printk(KERN_ERR "%s: enable failed lvs1 (%d)\n",
+			__func__, rc);
+	} else {
 		rc = regulator_disable(ldo18);
-		if (rc){
-			printk(KERN_ERR "%s: taos disable failed (%d)\n",__func__, rc);
-		}
+		if (rc)
+			printk(KERN_ERR "%s: disable failed ldo18 (%d)\n",
+			__func__, rc);
 	}
 #endif
-	return;
 }
 
-static void taos_request_gpio(struct taos_platform_data *pdata)
+static void taos_request_gpio(struct taos_data *taos)
 {
-	int ret;
-	ret = gpio_request(pdata->en, "prox_en");
-	if(ret)
-		pr_err("[taos]%s: gpio request fail\n",__func__);
-	gpio_tlmm_config(GPIO_CFG(pdata->en, 0,
-			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+	int ret = 0;
+	ret = gpio_request(taos->pdata->en, "prox_en");
 	if (ret) {
+		taos->is_requested = false;
 		pr_err("[taos]%s: unable to request prox_en [%d]\n",
-				__func__, pdata->en);
+			__func__, taos->pdata->en);
 		return;
+	} else {
+		taos->is_requested = true;
 	}
-	ret = gpio_direction_output(pdata->en, 1);
+	ret = gpio_direction_output(taos->pdata->en, 0);
 	if (ret)
-		pr_err("[taos]%s: unable to set_direction for prox_en [%d]\n",__func__, pdata->en);
-
-		pr_info("%s: en: %u \n", __func__, pdata->en);
-
+		pr_err("[taos]%s: unable to set_direction for prox_en [%d]\n",
+		__func__, taos->pdata->en);
+	pr_info("%s: en: %u\n", __func__, taos->pdata->en);
 }
 
 #ifndef CONFIG_OPTICAL_TAOS_TMD2672X
@@ -815,11 +794,12 @@ static ssize_t light_enable_store(struct device *dev,
 		if (!taos->power_state) {
 			taos_power_enable(1);
 			msleep(20);
-			taos->chip_on_success = (taos_chip_on(taos) >= 0)? true : false;
+			taos->chip_on_success = (taos_chip_on(taos) >= 0) ?
+				true : false;
 		}
 		if (taos->chip_on_success) {
-		taos->power_state |= LIGHT_ENABLED;
-		taos_light_enable(taos);
+			taos->power_state |= LIGHT_ENABLED;
+			taos_light_enable(taos);
 		}
 	} else if (!new_value && (taos->power_state & LIGHT_ENABLED)) {
 		taos_light_disable(taos);
@@ -857,6 +837,8 @@ static ssize_t proximity_enable_store(struct device *dev,
 	if (new_value && !(taos->power_state & PROXIMITY_ENABLED)) {
 		if (!taos->power_state)
 			taos_power_enable(1);
+		if (taos->is_requested)
+			gpio_set_value(taos->pdata->en, 1);
 		usleep_range(5000, 6000);
 		ret = proximity_open_offset(taos);
 		if (ret < 0 && ret != -ENOENT)
@@ -882,7 +864,8 @@ static ssize_t proximity_enable_store(struct device *dev,
 		ret = opt_i2c_write_command(taos, temp);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
-		taos->chip_on_success = (taos_chip_on(taos) >= 0)? true : false;
+		taos->chip_on_success = (taos_chip_on(taos) >= 0) ?
+			true : false;
 
 		input_report_abs(taos->proximity_input_dev, ABS_DISTANCE, 1);
 		input_sync(taos->proximity_input_dev);
@@ -899,6 +882,8 @@ static ssize_t proximity_enable_store(struct device *dev,
 			taos_chip_off(taos);
 			taos_power_enable(0);
 		}
+		if (taos->is_requested)
+			gpio_set_value(taos->pdata->en, 0);
 	}
 	mutex_unlock(&taos->power_lock);
 	return size;
@@ -1316,14 +1301,14 @@ static struct attribute_group proximity_attribute_group = {
 static struct device_attribute dev_attr_proximity_raw_data =
 	__ATTR(raw_data, S_IRUGO, proximity_state_show, NULL);
 
-static DEVICE_ATTR(state, S_IRUGO|S_IWUSR, proximity_state_show, NULL);
-static DEVICE_ATTR(prox_avg, S_IRUGO|S_IWUSR, proximity_avg_show,
+static DEVICE_ATTR(state, S_IRUGO | S_IWUSR, proximity_state_show, NULL);
+static DEVICE_ATTR(prox_avg, S_IRUGO | S_IWUSR, proximity_avg_show,
 	proximity_avg_store);
 static DEVICE_ATTR(prox_cal, S_IRUGO | S_IWUSR, proximity_cal_show,
 	proximity_cal_store);
-static DEVICE_ATTR(prox_offset_pass, S_IRUGO|S_IWUSR,
+static DEVICE_ATTR(prox_offset_pass, S_IRUGO | S_IWUSR,
 	prox_offset_pass_show, NULL);
-static DEVICE_ATTR(prox_thresh, S_IRUGO, proximity_thresh_show,
+static DEVICE_ATTR(prox_thresh, S_IRUGO | S_IWUSR, proximity_thresh_show,
 	proximity_thresh_store);
 
 static struct device_attribute *prox_sensor_attrs[] = {
@@ -1420,7 +1405,7 @@ static void taos_work_func_light(struct work_struct *work)
 			taos_chip_off(taos);
 			taos->pdata->power(false);
 		}
-		taos_light_disable(taos);
+		hrtimer_cancel(&taos->timer);
 		return;
 	}
 	input_report_rel(taos->light_input_dev, REL_MISC, adc+1);
@@ -1448,22 +1433,25 @@ static void taos_work_func_prox(struct work_struct *work)
 
 	/* change Threshold */
 #if defined(CONFIG_SEC_LOCALE_KOR_FRESCO)
-	for(i = 0; i < 3; i++) {
+	for (i = 0; i < 3; i++) {
 		mutex_lock(&taos->prox_mutex);
-		adc_data = i2c_smbus_read_word_data(taos->i2c_client, CMD_REG | PRX_LO);
+		adc_data = i2c_smbus_read_word_data(taos->i2c_client,
+			CMD_REG | PRX_LO);
 		mutex_unlock(&taos->prox_mutex);
-		if(adc_data < TAOS_PROX_MAX+1)
+		if (adc_data < TAOS_PROX_MAX+1)
 			break;
-		pr_err("%s : adc value read fail %d times!(%d)\n", __func__, i+1, adc_data);
-		msleep(15);
+		pr_err("%s : adc value read fail %d times!(%d)\n",
+			__func__, i+1, adc_data);
+		msleep(20);
 	}
 	threshold_high = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | PRX_MAXTHRESHLO));
 	threshold_low = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | PRX_MINTHRESHLO));
 
-	pr_info("%s: adc = %d, hi = %d, %d, low = %d, %d\n", __func__,
-		adc_data, threshold_high, taos->threshold_high, threshold_low, taos->threshold_low);
+	pr_info("%s: adc = %d, hi = %d, %d, low = %d, %d\n", __func__, adc_data,
+		threshold_high, taos->threshold_high,
+		threshold_low, taos->threshold_low);
 
 #else
 	mutex_lock(&taos->prox_mutex);
@@ -1750,15 +1738,52 @@ static int taos_get_initial_offset(struct taos_data *taos)
 static int taos_parse_dt(struct device *dev,
 			struct  taos_platform_data *pdata)
 {
-
 	struct device_node *np = dev->of_node;
-	/*irq */
-	/*pdata->i2c_pull_up = of_property_read_bool(np, "capella,i2c-pull-up");*/
-	pdata->als_int = of_get_named_gpio_flags(np, "taos,irq_gpio",0, &pdata->als_int_flags);
+	pdata->als_int = of_get_named_gpio_flags(np, "taos,irq_gpio",
+		0, &pdata->als_int_flags);
 
-	pdata->en = of_get_named_gpio_flags(np, "taos,en", 0, &pdata->ldo_gpio_flags);
-	   pr_info("%s: en: %u \n", __func__, pdata->en);
-#if defined(CONFIG_SEC_LOCALE_KOR_FRESCO)
+	pdata->en = of_get_named_gpio_flags(np, "taos,en",
+		0, &pdata->ldo_gpio_flags);
+	pr_info("%s: en: %u\n", __func__, pdata->en);
+
+	/* Recommended */
+#if defined(CONFIG_MACH_VICTORLTE_CTC)
+	of_property_read_u32(np, "taos,prox_thresh_hi",
+		&pdata->prox_thresh_hi);
+	of_property_read_u32(np, "taos,prox_thresh_low",
+		&pdata->prox_thresh_low);
+	of_property_read_u32(np, "taos,prox_th_hi_cal",
+		&pdata->prox_th_hi_cal);
+	of_property_read_u32(np, "taos,prox_th_low_cal",
+		&pdata->prox_th_low_cal);
+	of_property_read_u32(np, "taos,als_time", &pdata->als_time);
+	of_property_read_u32(np, "taos,intr_filter", &pdata->intr_filter);
+	of_property_read_u32(np, "taos,prox_pulsecnt", &pdata->prox_pulsecnt);
+	of_property_read_u32(np, "taos,prox_gain", &pdata->prox_gain);
+	of_property_read_u32(np, "taos,coef_atime", &pdata->coef_atime);
+	of_property_read_u32(np, "taos,ga", &pdata->ga);
+	of_property_read_u32(np, "taos,coef_a", &pdata->coef_a);
+	of_property_read_u32(np, "taos,coef_b", &pdata->coef_b);
+	of_property_read_u32(np, "taos,coef_c", &pdata->coef_c);
+	of_property_read_u32(np, "taos,coef_d", &pdata->coef_d);
+	pr_info("%s: prox_thresh_hi: %u\n", __func__, pdata->prox_thresh_hi);
+	pr_info("%s: prox_thresh_low: %u\n", __func__, pdata->prox_thresh_low);
+	pr_info("%s: prox_th_hi_cal: %u\n", __func__, pdata->prox_th_hi_cal);
+	pr_info("%s: prox_th_low_cal: %u\n", __func__, pdata->prox_th_low_cal);
+	pr_info("%s: als_time: %u\n", __func__, pdata->als_time);
+	pr_info("%s: intr_filter: %u\n", __func__, pdata->intr_filter);
+	pr_info("%s: prox_pulsecnt: %u\n", __func__, pdata->prox_pulsecnt);
+	pr_info("%s: prox_gain: %u\n", __func__, pdata->prox_gain);
+	pr_info("%s: coef_atime: %u\n", __func__, pdata->coef_atime);
+	pr_info("%s: ga: %u\n", __func__, pdata->ga);
+	pr_info("%s: coef_a: %u\n", __func__, pdata->coef_a);
+	pr_info("%s: coef_b: %u\n", __func__, pdata->coef_b);
+	pr_info("%s: coef_c: %u\n", __func__, pdata->coef_c);
+	pr_info("%s: coef_d: %u\n", __func__, pdata->coef_d);
+	pdata->min_max = MIN;
+	pdata->max_data = true;
+	/* Deprecated */
+#elif defined(CONFIG_SEC_LOCALE_KOR_FRESCO)
 	pdata->prox_thresh_hi = 420;
 	pdata->prox_thresh_low = 245;
 	pdata->prox_th_hi_cal = 470;
@@ -1775,7 +1800,6 @@ static int taos_parse_dt(struct device *dev,
 	pdata->coef_d = 870;
 	pdata->min_max = MIN;
 	pdata->max_data = true;
-
 #else
 	pdata->prox_thresh_hi = 180;
 	pdata->prox_thresh_low = 105;
@@ -1827,40 +1851,40 @@ static int taos_i2c_probe(struct i2c_client *client,
 
 	taos = kzalloc(sizeof(struct taos_data), GFP_KERNEL);
 	if (!taos) {
-		pr_err("%s: failed to alloc memory for module data\n", __func__);
+		pr_err("%s: failed to alloc memory for module data\n",
+			__func__);
 		ret = -ENOMEM;
 		goto exit;
 	}
-	
-	if(client->dev.of_node) {
-		pdata = devm_kzalloc (&client->dev ,
-			sizeof(struct taos_platform_data ), GFP_KERNEL);
-		if(!pdata) {
-		dev_err(&client->dev, "Failed to allocate memory\n");
-			if(taos)
+	if (client->dev.of_node) {
+		pdata = devm_kzalloc(&client->dev,
+			sizeof(struct taos_platform_data), GFP_KERNEL);
+		if (!pdata) {
+			dev_err(&client->dev, "Failed to allocate memory\n");
+			if (taos)
 				kfree(taos);
-		return -ENOMEM;
+			return -ENOMEM;
 		}
 		err = taos_parse_dt(&client->dev, pdata);
-		if(err)
+		if (err)
 			goto err_devicetree;
 	} else
 		pdata = client->dev.platform_data;
-    if (!pdata) {
+	if (!pdata) {
 		pr_err("%s: missing pdata!\n", __func__);
-		if(taos)
+		if (taos)
 			kfree(taos);
 		return ret;
 	}
-
-	taos_request_gpio(pdata);
-
-	mdelay(100);
 
 	taos->offset_cal_high = false;
 	taos->pdata = pdata;
 	taos->i2c_client = client;
 	i2c_set_clientdata(client, taos);
+
+	taos_request_gpio(taos);
+
+	msleep(100);
 
 
 	chipid = i2c_smbus_read_byte_data(client, CMD_REG | CHIPID);
@@ -1899,7 +1923,8 @@ static int taos_i2c_probe(struct i2c_client *client,
 	taos_dbgmsg("registering proximity input device\n");
 	ret = input_register_device(input_dev);
 	if (ret < 0) {
-		pr_err("%s: could not register proximity input device\n", __func__);
+		pr_err("%s: could not register proximity input device\n",
+			__func__);
 		input_free_device(input_dev);
 		goto err_input_device_proximity;
 	}
@@ -2020,7 +2045,7 @@ static int taos_i2c_probe(struct i2c_client *client,
 
 	/* error, unwind it all */
 err_devicetree:
-printk("\n error in device tree");
+	pr_warn("\n error in device tree");
 
 #ifndef CONFIG_OPTICAL_TAOS_TMD2672X
 err_light_sensor_register_failed:
@@ -2080,6 +2105,8 @@ static int taos_suspend(struct device *dev)
 		taos_chip_off(taos);
 		taos_power_enable(0);
 	}
+	if (taos->power_state & PROXIMITY_ENABLED)
+		disable_irq(taos->irq);
 	return 0;
 }
 
@@ -2092,12 +2119,16 @@ static int taos_resume(struct device *dev)
 	if (taos->power_state == LIGHT_ENABLED) {
 		taos_power_enable(1);
 		msleep(20);
-		taos->chip_on_success = (taos_chip_on(taos) >= 0)? true : false;
+		taos->chip_on_success = (taos_chip_on(taos) >= 0) ?
+			true : false;
 	}
 #ifndef CONFIG_OPTICAL_TAOS_TMD2672X
 	if (taos->power_state & LIGHT_ENABLED)
 		taos_light_enable(taos);
 #endif
+	if (taos->power_state & PROXIMITY_ENABLED)
+		enable_irq(taos->irq);
+
 	return 0;
 }
 

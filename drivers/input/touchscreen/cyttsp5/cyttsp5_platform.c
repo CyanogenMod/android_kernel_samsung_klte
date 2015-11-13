@@ -32,17 +32,14 @@
 
 #define GPIO_TSP_nINT_SECURE	17
 
-#ifdef CONFIG_SEC_ATLANTIC_PROJECT
+#if defined(CONFIG_SEC_ATLANTIC_PROJECT)
 #include <linux/of_gpio.h>
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_FW_UPGRADE
 /* #include "TSG5M_Kmini_rev_0C HW0x01FW0x0200.h" */
 #include "cyttsp5_firmware.h"
-//#ifdef SAMSUNG_TSP_INFO	
-#define HW_VERSION 0x01
-#define FW_VERSION 0x0200
-//#endif
+
 static struct cyttsp5_touch_firmware cyttsp5_firmware = {
 	.img = cyttsp4_img,
 	.size = ARRAY_SIZE(cyttsp4_img),
@@ -112,14 +109,15 @@ static int cyttsp5_hw_power(struct cyttsp5_core_platform_data *pdata, int on)
 
 
 #ifdef CONFIG_SEC_ATLANTIC_PROJECT
+
 	int ret;
 
         if(on){
                 if (iovdd_vreg)
                         regulator_enable(iovdd_vreg);
         }else{
-                if (iovdd_vreg)
-                        regulator_disable(iovdd_vreg);
+			if (iovdd_vreg)
+				regulator_disable(iovdd_vreg);
         }
 
 	ret = gpio_direction_output(avdd_gpio, on);
@@ -128,7 +126,6 @@ static int cyttsp5_hw_power(struct cyttsp5_core_platform_data *pdata, int on)
 			 __func__, avdd_gpio, ret);
 		return -EINVAL;
 	}
-	msleep(100);
 #else
 	int ret;
 
@@ -145,11 +142,10 @@ static int cyttsp5_hw_power(struct cyttsp5_core_platform_data *pdata, int on)
 			 __func__, pwr_3p3);
 		return -EINVAL;
 	}
-	msleep(100);
+	msleep(50);
 #endif
 	return 0;
 }
-
 
 int cyttsp5_xres(struct cyttsp5_core_platform_data *pdata,
 		struct device *dev)
@@ -208,7 +204,8 @@ int cyttsp5_init(struct cyttsp5_core_platform_data *pdata,
 		cyttsp5_hw_power(pdata, 1);
 	} else {
 		cyttsp5_hw_power(pdata, 0);
-		gpio_free(irq_gpio);
+		if(!gpio_is_valid(irq_gpio))
+			gpio_free(irq_gpio);
 	}
 
 	dev_info(dev,
@@ -319,7 +316,7 @@ struct cyttsp5_platform_data _cyttsp5_platform_data = {
 	.core_pdata = &_cyttsp5_core_platform_data,
 	.mt_pdata = &_cyttsp5_mt_platform_data,
 	.loader_pdata = &_cyttsp5_loader_platform_data,
-#if !defined(CONFIG_SEC_ATLANTIC_PROJECT)
+#if !defined(CONFIG_SEC_ATLANTIC_PROJECT) && !defined(CONFIG_SEC_PATEK_PROJECT)
 	.btn_pdata = &_cyttsp5_btn_platform_data,
 #endif
 };

@@ -94,6 +94,7 @@ struct mmc_ext_csd {
 	u8			raw_erased_mem_count;	/* 181 */
 	u8			raw_ext_csd_structure;	/* 194 */
 	u8			raw_card_type;		/* 196 */
+	u8			raw_drive_strength;	/* 197 */
 	u8			out_of_int_time;	/* 198 */
 	u8			raw_s_a_timeout;		/* 217 */
 	u8			raw_hc_erase_gap_size;	/* 221 */
@@ -371,6 +372,8 @@ struct mmc_card {
 /* Skip data-timeout advertised by card */
 #define MMC_QUIRK_BROKEN_DATA_TIMEOUT	(1<<13)
 
+#define MMC_QUIRK_CACHE_DISABLE (1 << 14)       /* prevent cache enable */
+
 	unsigned int		erase_size;	/* erase size in sectors */
  	unsigned int		erase_shift;	/* if erase unit is power 2 */
  	unsigned int		pref_erase;	/* in sectors */
@@ -471,6 +474,7 @@ struct mmc_fixup {
 #define CID_MANFID_TOSHIBA	0x11
 #define CID_MANFID_MICRON	0x13
 #define CID_MANFID_SAMSUNG	0x15
+#define CID_MANFID_KINGSTON	0x70
 #define CID_MANFID_HYNIX	0x90
 
 #define END_FIXUP { 0 }

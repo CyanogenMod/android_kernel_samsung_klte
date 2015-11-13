@@ -29,6 +29,7 @@
 #define YAS_MAG_DRIVER_YAS533			(4) /*!< YAS 533 (MS-3F) */
 #define YAS_MAG_DRIVER_YAS535			(5) /*!< YAS 535 (MS-6C) */
 #define YAS_MAG_DRIVER_YAS536			(6) /*!< YAS 536 (MS-3W) */
+#define YAS_MAG_DRIVER_YAS537			(7) /*!< YAS 537 (MS-3T) */
 #define YAS_MAG_DRIVER_YAS53x			(0x7fff) /*!< YAS XXX */
 
 #define YAS_ACC_DRIVER_NONE			(0) /*!< No Accelerometer */
@@ -40,51 +41,53 @@
 #define YAS_ACC_DRIVER_BMA250			(6) /*!< BMA 250 */
 #define YAS_ACC_DRIVER_BMA250E			(7) /*!< BMA 250E */
 #define YAS_ACC_DRIVER_BMA254			(8) /*!< BMA 254 */
-#define YAS_ACC_DRIVER_BMI055			(9) /*!< BMI 055 */
-#define YAS_ACC_DRIVER_BMI058			(10) /*!< BMI 058 */
-#define YAS_ACC_DRIVER_DMARD08			(11) /*!< DMARD08 */
-#define YAS_ACC_DRIVER_KXSD9			(12) /*!< KXSD9 */
-#define YAS_ACC_DRIVER_KXTE9			(13) /*!< KXTE9 */
-#define YAS_ACC_DRIVER_KXTF9			(14) /*!< KXTF9 */
-#define YAS_ACC_DRIVER_KXTI9			(15) /*!< KXTI9 */
-#define YAS_ACC_DRIVER_KXTJ2			(16) /*!< KXTJ2 */
-#define YAS_ACC_DRIVER_KXUD9			(17) /*!< KXUD9 */
-#define YAS_ACC_DRIVER_LIS331DL			(18) /*!< LIS331DL */
-#define YAS_ACC_DRIVER_LIS331DLH		(19) /*!< LIS331DLH */
-#define YAS_ACC_DRIVER_LIS331DLM		(20) /*!< LIS331DLM */
-#define YAS_ACC_DRIVER_LIS3DH			(21) /*!< LIS3DH */
-#define YAS_ACC_DRIVER_LSM330DLC		(22) /*!< LSM330DLC */
-#define YAS_ACC_DRIVER_MMA8452Q			(23) /*!< MMA8452Q */
-#define YAS_ACC_DRIVER_MMA8453Q			(24) /*!< MMA8453Q */
-#define YAS_ACC_DRIVER_U2DH			(25) /*!< U2DH */
-#define YAS_ACC_DRIVER_YAS535			(26) /*!< YAS 535 (MS-6C) */
+#define YAS_ACC_DRIVER_BMA255			(9) /*!< BMA 255 */
+#define YAS_ACC_DRIVER_BMI055			(10) /*!< BMI 055 */
+#define YAS_ACC_DRIVER_BMI058			(11) /*!< BMI 058 */
+#define YAS_ACC_DRIVER_DMARD08			(12) /*!< DMARD08 */
+#define YAS_ACC_DRIVER_KXSD9			(13) /*!< KXSD9 */
+#define YAS_ACC_DRIVER_KXTE9			(14) /*!< KXTE9 */
+#define YAS_ACC_DRIVER_KXTF9			(15) /*!< KXTF9 */
+#define YAS_ACC_DRIVER_KXTI9			(16) /*!< KXTI9 */
+#define YAS_ACC_DRIVER_KXTJ2			(17) /*!< KXTJ2 */
+#define YAS_ACC_DRIVER_KXUD9			(18) /*!< KXUD9 */
+#define YAS_ACC_DRIVER_LIS331DL			(19) /*!< LIS331DL */
+#define YAS_ACC_DRIVER_LIS331DLH		(20) /*!< LIS331DLH */
+#define YAS_ACC_DRIVER_LIS331DLM		(21) /*!< LIS331DLM */
+#define YAS_ACC_DRIVER_LIS3DH			(22) /*!< LIS3DH */
+#define YAS_ACC_DRIVER_LSM330DLC		(23) /*!< LSM330DLC */
+#define YAS_ACC_DRIVER_MMA8452Q			(24) /*!< MMA8452Q */
+#define YAS_ACC_DRIVER_MMA8453Q			(25) /*!< MMA8453Q */
+#define YAS_ACC_DRIVER_U2DH			(26) /*!< U2DH */
+#define YAS_ACC_DRIVER_YAS535			(27) /*!< YAS 535 (MS-6C) */
 #define YAS_ACC_DRIVER_YAS53x			(0x7fff) /*!< YAS XXX */
 
 #define YAS_GYRO_DRIVER_NONE			(0) /*!< No Gyroscope */
-#define YAS_GYRO_DRIVER_BMI055			(1) /*!< BMI055 */
-#define YAS_GYRO_DRIVER_BMI058			(2) /*!< BMI058 */
-#define YAS_GYRO_DRIVER_EWTZMU			(3) /*!< EWTZMU */
-#define YAS_GYRO_DRIVER_ITG3200			(4) /*!< ITG3200 */
-#define YAS_GYRO_DRIVER_ITG3500			(5) /*!< ITG3500 */
-#define YAS_GYRO_DRIVER_L3G3200D		(6) /*!< L3G3200D */
-#define YAS_GYRO_DRIVER_L3G4200D		(7) /*!< L3G4200D */
-#define YAS_GYRO_DRIVER_LSM330DLC		(8) /*!< LSM330DLC */
-#define YAS_GYRO_DRIVER_MPU3050			(9) /*!< MPU3050 */
-#define YAS_GYRO_DRIVER_MPU6050			(10) /*!< MPU6050 */
+#define YAS_GYRO_DRIVER_BMG160			(1) /*!< BMG160 */
+#define YAS_GYRO_DRIVER_BMI055			(2) /*!< BMI055 */
+#define YAS_GYRO_DRIVER_BMI058			(3) /*!< BMI058 */
+#define YAS_GYRO_DRIVER_EWTZMU			(4) /*!< EWTZMU */
+#define YAS_GYRO_DRIVER_ITG3200			(5) /*!< ITG3200 */
+#define YAS_GYRO_DRIVER_ITG3500			(6) /*!< ITG3500 */
+#define YAS_GYRO_DRIVER_L3G3200D		(7) /*!< L3G3200D */
+#define YAS_GYRO_DRIVER_L3G4200D		(8) /*!< L3G4200D */
+#define YAS_GYRO_DRIVER_LSM330DLC		(9) /*!< LSM330DLC */
+#define YAS_GYRO_DRIVER_MPU3050			(10) /*!< MPU3050 */
+#define YAS_GYRO_DRIVER_MPU6050			(11) /*!< MPU6050 */
 #define YAS_GYRO_DRIVER_YAS53x			(0x7fff) /*!< YAS XXX */
 
 /*----------------------------------------------------------------------------
  *                               Configuration
  *----------------------------------------------------------------------------*/
 
-#define YAS_ACC_DRIVER				(YAS_ACC_DRIVER_NONE)
+#define YAS_ACC_DRIVER				(YAS_ACC_DRIVER_KXTJ2)
 #define YAS_MAG_DRIVER				(YAS_MAG_DRIVER_YAS532)
 #define YAS_GYRO_DRIVER				(YAS_GYRO_DRIVER_NONE)
 
 /*! Magnetic minimum calibration enable (0:Disable, 1: Enable) */
 #define YAS_MAG_CALIB_MINI_ENABLE		(0)
 /*! Magnetic floating point calibration enable (0:Disable, 1: Enable) */
-#define YAS_MAG_CALIB_FLOAT_ENABLE		(1)
+#define YAS_MAG_CALIB_FLOAT_ENABLE		(0)
 /*! Magnetic sphere calibration enable (0:Disable, 1: Enable) */
 #define YAS_MAG_CALIB_SPHERE_ENABLE		(1)
 /*! Magnetic ellipsoid calibration enable (0:Disable, 1: Enable) */
@@ -120,6 +123,10 @@
 #define YAS_GAMEVEC_ENABLE			(1)
 /*! Magnetic average filter enable (0:Disable, 1:Enable) */
 #define YAS_MAG_AVERAGE_FILTER_ENABLE		(0)
+/*! step counter enable (0:Disable, 1:Enable) */
+#define YAS_STEPCOUNTER_ENABLE			(0)
+/*! Significant motion enable (0:Disable, 1:Enable) */
+#define YAS_SIGNIFICANT_MOTION_ENABLE		(0)
 /*! Software gyroscope enable (0:Disable, 1:Enable) */
 #define YAS_SOFTWARE_GYROSCOPE_ENABLE		(0)
 /*! Log enable (0:Disable, 1:Enable) */
@@ -158,6 +165,13 @@
  *                           Other Configuration
  *--------------------------------------------------------------------------- */
 
+#if YAS_ACC_DRIVER == YAS_ACC_DRIVER_NONE
+#undef YAS_STEPCOUNTER_ENABLE
+#define YAS_STEPCOUNTER_ENABLE			(0)
+#undef YAS_SIGNIFICANT_MOTION_ENABLE
+#define YAS_SIGNIFICANT_MOTION_ENABLE		(0)
+#endif
+
 #if YAS_MAG_DRIVER == YAS_MAG_DRIVER_NONE
 #undef YAS_MAG_CALIB_ENABLE
 #define YAS_MAG_CALIB_ENABLE			(0)
@@ -175,6 +189,12 @@
 #define YAS_SOFTWARE_GYROSCOPE_ENABLE		(0)
 #undef YAS_FUSION_ENABLE
 #define YAS_FUSION_ENABLE			(0)
+#endif
+
+#if YAS_ACC_DRIVER == YAS_ACC_DRIVER_NONE \
+		    || YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_NONE
+#undef YAS_GAMEVEC_ENABLE
+#define YAS_GAMEVEC_ENABLE			(0)
 #endif
 
 #if YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_NONE \
@@ -207,6 +227,10 @@
 #define YAS_MAG_NAME		"yas_magnetometer"
 /*! yas accelerometer name */
 #define YAS_ACC_NAME		"yas_accelerometer"
+/*! yas accelerometer and magnetometer 6axis sensor name */
+#define YAS_ACC_MAG_NAME	"yas_acc_mag_6axis"
+/*! yas accelerometer and gyroscope 6axis sensor name */
+#define YAS_ACC_GYRO_NAME	"yas_acc_gyro_6axis"
 /*! yas gyroscope name */
 #define YAS_GYRO_NAME		"yas_gyroscope"
 

@@ -58,7 +58,15 @@ Copyright (C) 2012, Samsung Electronics. All rights reserved.
 
 /* EA8061V ldi id3 */
 #define EVT0_EA8061V_REV_A 0x82
+#define EVT2_EA8061V_REV_C 0x95
+#define EVT2_EA8061V_REV_D 0x96
+#define EVT2_EA8061V_REV_E 0x97
 #define EVT0_EA8061V_KMINI_REV_A 0x84
+
+/* EA8061 ldi id3 */
+#define EVT2_EA8061_HESTIA_REV_I 0x47
+#define EVT2_EA8061_HESTIA_REV_J 0x48
+#define EVT2_EA8061_HESTIA_REV_A 0x40
 
 /*
 *	From 4.8 inch model use AID function
@@ -86,6 +94,8 @@ enum {
 
 /*6.3*4194304 */
 #define EA8061V_VREG0_REF_6P3 26424115
+/*6.0*4194304 */
+#define EA8061V_VREG0_REF_6P0 25165824
 
 /*V0,V3,V11,V23,V35,V51,V87,V151,V203,V255*/
 #define EA8061V_MAX 11

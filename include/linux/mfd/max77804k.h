@@ -32,6 +32,9 @@
 #include <linux/battery/sec_charger.h>
 
 enum {
+#if defined (CONFIG_MUIC_MAX77804K_SUPPORT_LANHUB)
+	MAX77804K_MUIC_NONE = -1,
+#endif
 	MAX77804K_MUIC_DETACHED = 0,
 	MAX77804K_MUIC_ATTACHED
 };
@@ -164,6 +167,10 @@ extern int muic_otg_control(int enable);
 extern struct max77804k_haptic_platform_data max77804k_haptic_pdata;
 extern struct max77804k_led_platform_data max77804k_led_pdata;
 extern int max77804k_muic_set_safeout(int path);
+#ifndef CONFIG_USB_DWC3
+extern void sec_otg_set_vbus_state(int online);
+extern int sec_otg_notify(int event);
+#endif
 #endif
 #if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
 int acc_register_notifier(struct notifier_block *nb);

@@ -360,12 +360,14 @@ static int cmp_bss_core(struct cfg80211_bss *a,
 {
 	int r;
 
-#if !(defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
-	|| defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) \
-	|| defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE))
+#if !(defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) \
+        || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
+        || defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE) \
+        || defined(CONFIG_BCM4356) || defined(CONFIG_BCM4356_MODULE) \
+        || defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE))
 	if (a->channel != b->channel)
 		return b->channel->center_freq - a->channel->center_freq;
-#endif /* CONFIG_BCM4335 || CONFIG_BCM4339 || CONFIG_BCM4354 */
+#endif /* CONFIG_BCM43xx */
 	if (is_mesh_bss(a) && is_mesh_bss(b)) {
 		r = cmp_ies(WLAN_EID_MESH_ID,
 			    a->information_elements,
@@ -382,14 +384,16 @@ static int cmp_bss_core(struct cfg80211_bss *a,
 	}
 
 	r = memcmp(a->bssid, b->bssid, ETH_ALEN);
-#if (defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
-	|| defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) \
-	|| defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE))
+#if (defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) \
+        || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE) \
+        || defined(CONFIG_BCM4354) || defined(CONFIG_BCM4354_MODULE) \
+        || defined(CONFIG_BCM4356) || defined(CONFIG_BCM4356_MODULE) \
+        || defined(CONFIG_BCM4358) || defined(CONFIG_BCM4358_MODULE))
 	if (r)
 		return r;
 	if (a->channel != b->channel)
 		return b->channel->center_freq - a->channel->center_freq;
-#endif /* CONFIG_BCM4335 || CONFIG_BCM4339 || CONFIG_BCM4354 */
+#endif /* CONFIG_BCM43xx */
 	return r;
 }
 
@@ -1026,8 +1030,6 @@ int cfg80211_wext_siwscan(struct net_device *dev,
 		if (wreq->scan_type == IW_SCAN_TYPE_PASSIVE)
 			creq->n_ssids = 0;
 	}
-	for (i = 0; i < IEEE80211_NUM_BANDS; i++)
-		creq->rates[i] = (1 << wiphy->bands[i]->n_bitrates) - 1;
 
 	for (i = 0; i < IEEE80211_NUM_BANDS; i++)
 		if (wiphy->bands[i])

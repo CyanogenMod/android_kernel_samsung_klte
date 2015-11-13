@@ -26,5 +26,7 @@ int sensors_register(struct device *, void *,
 void sensors_unregister(struct device *, struct device_attribute *[]);
 void destroy_sensor_class(void);
 void remap_sensor_data(s16 *, int);
+void remap_sensor_data_32(int *, int);
+
 
 #endif

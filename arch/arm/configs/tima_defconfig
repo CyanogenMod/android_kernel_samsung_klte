@@ -14,6 +14,7 @@
 # these might also be dependent on PKM, Attestation and Keystore.
 # So its best to always keep them turned on even though LKM is 
 # disabled.
+CONFIG_TIMA=y
 CONFIG_TIMA_UEVENT=y
 CONFIG_TIMA_LOG=y
 #CONFIG_TIMA_TEST_INFRA=m

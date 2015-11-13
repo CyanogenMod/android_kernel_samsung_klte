@@ -236,12 +236,22 @@ static void bluesleep_tx_data_wakeup(void)
 		wake_lock(&bsi->wake_lock);
 		/* Start the timer */
 		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
-		if (bsi->has_ext_wake == 1) {
-			int ret;
-			ret = ice_gpiox_set(bsi->ext_wake, 1);
-			if (ret)
-				BT_ERR("(bluesleep_tx_data_wakeup) failed to set ext_wake 1.");
-		}
+        if (bsi->has_ext_wake == 1) {
+            int ret;
+            ret = ice_gpiox_set(bsi->ext_wake, 1);
+            if (ret)
+            {
+                int retry_cnt;
+                BT_ERR("(bluesleep_tx_data_wakeup) failed to set ext_wake 1.");
+                for(retry_cnt=0 ; retry_cnt < 5 ; retry_cnt ++){
+                    usleep(5000);
+                    ret = ice_gpiox_set(bsi->ext_wake, 1);
+                    BT_ERR("retry_cnt = %d", retry_cnt);
+                    if(ret == 0)
+                        break;
+                }
+            }
+        }
 		set_bit(BT_EXT_WAKE, &flags);
 		clear_bit(BT_ASLEEP, &flags);
 	}

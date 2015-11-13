@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -525,6 +525,8 @@ enum slim_clk_state {
  * @port_xfer_status: Called by framework when client calls get_xfer_status
  *	API. Returns how much buffer is actually processed and the port
  *	errors (e.g. overflow/underflow) if any.
+ * @xfer_user_msg: Send user message to specified logical address. Underlying
+ *	controller has to support sending user messages. Returns error if any.
  */
 struct slim_controller {
 	struct device		dev;
@@ -567,10 +569,13 @@ struct slim_controller {
 	int			(*framer_handover)(struct slim_controller *ctrl,
 				struct slim_framer *new_framer);
 	int			(*port_xfer)(struct slim_controller *ctrl,
-				u8 pn, u8 *iobuf, u32 len,
+				u8 pn, phys_addr_t iobuf, u32 len,
 				struct completion *comp);
 	enum slim_port_err	(*port_xfer_status)(struct slim_controller *ctr,
-				u8 pn, u8 **done_buf, u32 *done_len);
+				u8 pn, phys_addr_t *done_buf, u32 *done_len);
+	int			(*xfer_user_msg)(struct slim_controller *ctrl,
+				u8 la, u8 mt, u8 mc,
+				struct slim_ele_access *msg, u8 *buf, u8 len);
 };
 #define to_slim_controller(d) container_of(d, struct slim_controller, dev)
 
@@ -586,6 +591,9 @@ struct slim_controller {
  * @device_down: This callback is called when device reports absent, or the
  *		bus goes down. Device will report present when bus is up and
  *		device_up callback will be called again when that happens
+ * @reset_device: This callback is called after framer is booted.
+ *		Driver should do the needful to reset the device,
+ *		so that device acquires sync and be operational.
  * @driver: Slimbus device drivers should initialize name and owner field of
  *	this structure
  * @id_table: List of slimbus devices supported by this driver
@@ -600,7 +608,8 @@ struct slim_driver {
 	int				(*device_up)(struct slim_device *sldev);
 	int				(*device_down)
 						(struct slim_device *sldev);
-
+	int				(*reset_device)
+						(struct slim_device *sldev);
 	struct device_driver		driver;
 	const struct slim_device_id	*id_table;
 };
@@ -629,6 +638,10 @@ struct slim_pending_ch {
  *  @driver: Device's driver. Pointer to access routines.
  *  @ctrl: Slimbus controller managing the bus hosting this device.
  *  @laddr: 1-byte Logical address of this device.
+ *  @reported: Flag to indicate whether this device reported present. The flag
+ *	is set when device reports present, and is reset when it reports
+ *	absent. This flag alongwith notified flag below is used to call
+ *	device_up, or device_down callbacks for driver of this device.
  *  @mark_define: List of channels pending definition/activation.
  *  @mark_suspend: List of channels pending suspend.
  *  @mark_removal: List of channels pending removal.
@@ -652,6 +665,7 @@ struct slim_device {
 	struct slim_driver	*driver;
 	struct slim_controller	*ctrl;
 	u8			laddr;
+	bool			reported;
 	struct list_head	mark_define;
 	struct list_head	mark_suspend;
 	struct list_head	mark_removal;
@@ -734,6 +748,20 @@ extern int slim_request_clear_inf_element(struct slim_device *sb,
 extern int slim_xfer_msg(struct slim_controller *ctrl,
 			struct slim_device *sbdev, struct slim_ele_access *msg,
 			u16 mc, u8 *rbuf, const u8 *wbuf, u8 len);
+
+/*
+ * User message:
+ * slim_user_msg: Send user message that is interpreted by destination device
+ * @sb: Client handle sending the message
+ * @la: Destination device for this user message
+ * @mt: Message Type (Soruce-referred, or Destination-referred)
+ * @mc: Message Code
+ * @msg: Message structure (start offset, number of bytes) to be sent
+ * @buf: data buffer to be sent
+ * @len: data buffer size in bytes
+ */
+extern int slim_user_msg(struct slim_device *sb, u8 la, u8 mt, u8 mc,
+				struct slim_ele_access *msg, u8 *buf, u8 len);
 /* end of message apis */
 
 /* Port management for manager device APIs */
@@ -773,8 +801,8 @@ extern int slim_dealloc_mgrports(struct slim_device *sb, u32 *hdl, int hsz);
  * Client will call slim_port_get_xfer_status to get error and/or number of
  * bytes transferred if used asynchronously.
  */
-extern int slim_port_xfer(struct slim_device *sb, u32 ph, u8 *iobuf, u32 len,
-				struct completion *comp);
+extern int slim_port_xfer(struct slim_device *sb, u32 ph, phys_addr_t iobuf,
+				u32 len, struct completion *comp);
 
 /*
  * slim_port_get_xfer_status: Poll for port transfers, or get transfer status
@@ -796,7 +824,7 @@ extern int slim_port_xfer(struct slim_device *sb, u32 ph, u8 *iobuf, u32 len,
  * processed from the multiple transfers.
  */
 extern enum slim_port_err slim_port_get_xfer_status(struct slim_device *sb,
-			u32 ph, u8 **done_buf, u32 *done_len);
+			u32 ph, phys_addr_t *done_buf, u32 *done_len);
 
 /*
  * slim_connect_src: Connect source port to channel.
@@ -1034,6 +1062,16 @@ extern int slim_assign_laddr(struct slim_controller *ctrl, const u8 *e_addr,
  * @sbdev: Device that cannot be reached, or that sent report absent
  */
 void slim_report_absent(struct slim_device *sbdev);
+
+/*
+ * slim_framer_booted: This function is called by controller after the active
+ * framer has booted (using Bus Reset sequence, or after it has shutdown and has
+ * come back up). Components, devices on the bus may be in undefined state,
+ * and this function triggers their drivers to do the needful
+ * to bring them back in Reset state so that they can acquire sync, report
+ * present and be operational again.
+ */
+void slim_framer_booted(struct slim_controller *ctrl);
 
 /*
  * slim_msg_response: Deliver Message response received from a device to the

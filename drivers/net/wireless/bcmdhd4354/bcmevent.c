@@ -20,7 +20,7 @@
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: bcmevent.c 440870 2013-12-04 05:23:45Z $
+ * $Id: bcmevent.c 487871 2014-06-27 07:48:00Z $
  */
 
 #include <typedefs.h>
@@ -155,6 +155,7 @@ const bcmevent_name_t bcmevent_names[] = {
 #ifdef WLAIBSS
 	BCMEVENT_NAME(WLC_E_AIBSS_TXFAIL),
 #endif /* WLAIBSS */
+	BCMEVENT_NAME(WLC_E_RMC_EVENT),
 };
 
 const int bcmevent_names_size = ARRAYSIZE(bcmevent_names);

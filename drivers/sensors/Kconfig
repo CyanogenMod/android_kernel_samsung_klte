@@ -64,6 +64,20 @@ config SENSORS_CM36653
 
 	  Say N here if you do not use cm36653.
 
+config SENSORS_CM36686
+	depends on I2C
+	tristate "CM36686 driver"
+	default n
+	help
+	  This option enables proximity & light sensors using CM36686 driver.
+
+config SENSORS_CM36686_LEDA_EN_GPIO
+	depends on I2C
+	tristate "CM36686 leda_en controlled by GPIO"
+	default n
+	help
+	  This option enables leda_en controlled by GPIO using CM36686 driver.
+
 config SENSORS_GP2A030A
 	depends on I2C
 	tristate "GP2A030A Light Driver"
@@ -122,6 +136,19 @@ config SENSORS_SX9500
 	  SemTech sx9500 device driver.
 
 	  Say N here if you do not use sx9500.
+
+config SENSORS_GRIP_ADJDET
+	depends on I2C
+	tristate "GRIP sensor adj cable detect"
+	default n
+	help
+	  GRIP sensor adj cable detect
+
+config SENSORS_SX9500_REGULATOR_ONOFF
+	tristate "GRIP sensor regulator onoff function"
+	default n
+	help
+	  GRIP sensor regulator onoff
 
 config SENSORS_SX9500_INIT_TOUCH_THRESHOLD
 	int "SX9500 Grip sensor threshold for init touch"
@@ -208,6 +235,12 @@ config INPUT_MPU6500
 	  To compile this driver as a module, choose M here: the
 	  module will be called MPU6500.
 
+config MPU6500_ADJUST_SMART_ALERT
+	bool "MPU6500 sensor smart alert adjustment"
+	default n
+	help
+	  Say Y here if you want to adjust smart alert for mpu6500 sensor
+
 config INPUT_MPU6500_SELFTEST
 	bool "Self-test of Invensense MPU-6500 sensor"
 	default n
@@ -267,5 +300,22 @@ config SENSORS_CM36651
 	default n
 	help
 	  This option enables proximity & light sensors using CM3663 driver.
+
+config SENSORS_MAX86900
+	tristate "MAXIM MAX86900 HRM Sensor"
+	default n
+	depends on I2C && SYSFS
+	help
+	  If you say yes here you get support for the MAX86900
+	  HRM sensor.
+	  This driver can also be built as a module.  If so, the module
+	  will be called max86900.
+
+config SENSORS_K303C
+	depends on I2C
+	tristate "ST K303C accel,magnetic combo"
+	default n
+	help
+	  This option enables st k303c accel and mag driver
 
 source "drivers/sensors/yas532/Kconfig"

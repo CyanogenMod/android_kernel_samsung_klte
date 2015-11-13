@@ -58,6 +58,9 @@ s64 get_time_ns(void)
 /* This is for compatibility for power state. Should remove once HAL
    does not use power_state sysfs entry */
 static bool fake_asleep;
+#ifdef CONFIG_SEC_LOCALE_KOR_FRESCO
+static char chip_ver;
+#endif
 
 static const struct inv_hw_s hw_info[INV_NUM_PARTS] = {
 	{119, "ITG3500"},
@@ -217,6 +220,9 @@ static int accel_open_calibration(struct inv_mpu_state *st)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
+#ifdef CONFIG_SEC_LOCALE_KOR_FRESCO
+	pr_err("%d\n", chip_ver);
+#endif
 	cal_filp = filp_open(MPU6500_ACCEL_CAL_PATH,
 		O_RDONLY, S_IRUGO | S_IWUSR | S_IWGRP);
 	if (IS_ERR(cal_filp)) {
@@ -3097,6 +3103,9 @@ static int inv_check_chip_type(struct inv_mpu_state *st,
 		st->chip_type = INV_MPU3050;
 	} else if (!strcmp(id->name, "mpu6050")) {
 		st->chip_type = INV_MPU6050;
+#ifdef CONFIG_SEC_LOCALE_KOR_FRESCO
+		chip_ver = 50;
+#endif
 	} else if (!strcmp(id->name, "mpu9150")) {
 		st->chip_type = INV_MPU6050;
 		plat->sec_slave_type = SECONDARY_SLAVE_TYPE_COMPASS;
@@ -3119,6 +3128,9 @@ static int inv_check_chip_type(struct inv_mpu_state *st,
 		return -EPERM;
 	} else if (!strcmp(id->name, "mpu6515")) {
 		st->chip_type = INV_MPU6500;
+#ifdef CONFIG_SEC_LOCALE_KOR_FRESCO
+		chip_ver = 15;
+#endif
 	} else {
 		return -EPERM;
 	}

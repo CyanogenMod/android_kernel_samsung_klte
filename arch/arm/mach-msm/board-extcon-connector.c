@@ -25,7 +25,10 @@
 #include <linux/regulator/machine.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-
+#ifndef CONFIG_USB_DWC3
+#include <linux/mfd/max77804k.h>
+#include <linux/host_notify.h>
+#endif
 
 static int jig_state;
 struct muic_cable {
@@ -46,10 +49,19 @@ int get_jig_state(void)
 static struct switch_dev switch_dock = {
 	.name = "dock",
 };
-
 struct device *switch_dev;
 EXPORT_SYMBOL(switch_dev);
 static struct muic_cable support_cable_list[] = {
+#ifndef CONFIG_USB_DWC3
+	{ .cable_type = EXTCON_USB, },
+	{ .cable_type = EXTCON_CHARGE_DOWNSTREAM, },
+	{ .cable_type = EXTCON_USB_HOST, },
+	{ .cable_type = EXTCON_USB_HOST_5V, },
+#if defined (CONFIG_MUIC_MAX77804K_SUPPORT_LANHUB)
+	{ .cable_type = EXTCON_LANHUB, },
+	{ .cable_type = EXTCON_LANHUB_TA, },
+#endif
+#endif
 	{ .cable_type = EXTCON_DESKDOCK, },
 	{ .cable_type = EXTCON_CARDOCK, },
 	{ .cable_type = EXTCON_AUDIODOCK, },
@@ -73,6 +85,38 @@ static void muic_cable_event_worker(struct work_struct *work)
 			cable->cable_state ? "attached" : "detached");
 
 	switch (cable->cable_type) {
+#ifndef CONFIG_USB_DWC3
+	case EXTCON_USB:	/*	USB cable VBUS update*/
+	case EXTCON_CHARGE_DOWNSTREAM:
+		sec_otg_set_vbus_state(cable->cable_state);
+		break;
+	case EXTCON_USB_HOST:
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_ID);
+		else
+			sec_otg_notify(HNOTIFY_ID_PULL);
+		break;
+	case EXTCON_USB_HOST_5V:
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_OTG_POWER_ON);
+		else
+			sec_otg_notify(HNOTIFY_OTG_POWER_OFF);
+		break;
+#if defined (CONFIG_MUIC_MAX77804K_SUPPORT_LANHUB)
+	case EXTCON_LANHUB:
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_LANHUB_ON);
+		else
+			sec_otg_notify(HNOTIFY_LANHUB_OFF);
+		break;
+	case EXTCON_LANHUB_TA:
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_LANHUBTA_ON);
+		else
+			sec_otg_notify(HNOTIFY_LANHUBTA_OFF);
+		break;
+#endif
+#endif
 	case EXTCON_DESKDOCK:	/*	Deskdock	#1	*/
 		switch_set_state(&switch_dock, cable->cable_state ? 1 : 0);
 		break;

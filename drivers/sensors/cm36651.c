@@ -247,7 +247,7 @@ static void cm36651_light_disable(struct cm36651_data *cm36651)
 {
 	/* disable setting */
 	cm36651_i2c_write_byte(cm36651, CM36651_ALS, CS_CONF1,
-			       0x04);
+			       0x01);
 	hrtimer_cancel(&cm36651->light_timer);
 	cancel_work_sync(&cm36651->work_light);
 }
@@ -1424,7 +1424,6 @@ static int cm36651_suspend(struct device *dev)
 		cm36651_light_disable(cm36651);
 	if (!(cm36651->power_state & PROXIMITY_ENABLED)) {
 		gpio_free(cm36651->pdata->p_out);
-		sensor_power_on_vdd(cm36651,0);
 	}
 
 	return 0;
@@ -1440,7 +1439,6 @@ static int cm36651_resume(struct device *dev)
 			pr_err("%s gpio request %d err\n", __func__,
 				cm36651->pdata->p_out);
 		}
-		sensor_power_on_vdd(cm36651,1);
 	}
 	if (cm36651->power_state & LIGHT_ENABLED)
 		cm36651_light_enable(cm36651);

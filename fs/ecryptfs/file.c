@@ -40,7 +40,13 @@
 #define ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE 0x0100
 #endif
 #ifdef CONFIG_SDP
-#define ECRYPTFS_IOCTL_GET_SDP          _IOR('l', 0x11, __u32)
+#if 0
+#include <linux/fs.h>
+#include <linux/syscalls.h>
+#include <linux/atomic.h>
+#endif
+#include "ecryptfs_dek.h"
+#include "mm.h"
 #endif
 
 
@@ -312,6 +318,47 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 	rc = read_or_initialize_metadata(ecryptfs_dentry);
 	if (rc)
 		goto out_put;
+#ifdef CONFIG_SDP
+	if (crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
+		if (ecryptfs_is_persona_locked(crypt_stat->userid)) {
+			ecryptfs_printk(KERN_INFO, "ecryptfs_open: persona is locked, rc=%d\n", rc);
+			if (file->f_flags & O_SDP) {
+				ecryptfs_printk(KERN_INFO, "ecryptfs_open: O_SDP is set, allow open, rc=%d\n", rc);
+				mutex_lock(&crypt_stat->cs_mutex);
+				crypt_stat->flags &= ~(ECRYPTFS_KEY_VALID);
+				mutex_unlock(&crypt_stat->cs_mutex);
+			} else {
+				mutex_lock(&crypt_stat->cs_mutex);
+				crypt_stat->flags &= ~(ECRYPTFS_KEY_VALID);
+				mutex_unlock(&crypt_stat->cs_mutex);
+				rc = -EACCES;
+				goto out_put;
+			}
+		} else {
+			int dek_type = crypt_stat->sdp_dek.type;
+
+			ecryptfs_printk(KERN_INFO, "ecryptfs_open: persona is unlocked, rc=%d\n", rc);
+			if(dek_type != DEK_TYPE_AES_ENC) {
+				ecryptfs_printk(KERN_DEBUG, "converting dek...\n");
+				rc = ecryptfs_sdp_convert_dek(ecryptfs_dentry);
+				ecryptfs_printk(KERN_DEBUG, "conversion ready, rc=%d\n", rc);
+				rc = 0; // TODO: Do we need to return error if conversion fails?
+				/*
+				if(!(file->f_flags & O_SDP)){
+					ecryptfs_printk(KERN_WARNING, "Busy sensitive file (try again later)\n");
+					rc = -EBUSY;
+					goto out_put;
+				}
+				*/
+			}
+		}
+	}
+#if ECRYPTFS_DEK_DEBUG
+	else {
+		ecryptfs_printk(KERN_INFO, "ecryptfs_open: dek_file_type is protected");
+	}
+#endif
+#endif
 	ecryptfs_printk(KERN_DEBUG, "inode w/ addr = [0x%p], i_ino = "
 			"[0x%.16lx] size: [0x%.16llx]\n", inode, inode->i_ino,
 			(unsigned long long)i_size_read(inode));
@@ -339,6 +386,42 @@ static int ecryptfs_flush(struct file *file, fl_owner_t td)
 
 static int ecryptfs_release(struct inode *inode, struct file *file)
 {
+#ifdef CONFIG_SDP
+	struct ecryptfs_crypt_stat *crypt_stat;
+
+	crypt_stat = &ecryptfs_inode_to_private(inode)->crypt_stat;
+
+	if((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) &&
+			ecryptfs_is_persona_locked(crypt_stat->userid)) {
+#if 0
+#ifdef SYNC_ONLY_CURRENT_SB
+		struct super_block *sb = inode->i_sb;
+
+		sync_inodes_sb(sb);
+		writeback_inodes_sb(sb, WB_REASON_SYNC);
+#else
+		sys_sync();
+#endif
+		printk("%s() sensitive inode being closed. [ino:%lu, state:%lu ref_count:%d efs_flag:0x%0.8x]\n",
+				__func__, inode->i_ino,  inode->i_state, atomic_read(&inode->i_count),
+				crypt_stat->flags);
+
+		spin_lock(&inode->i_lock);
+
+		if ((inode->i_state & (I_FREEING|I_WILL_FREE|I_NEW)) ||
+				(inode->i_mapping->nrpages == 0)) {
+			spin_unlock(&inode->i_lock);
+		} else {
+			printk("freeing sensitive inode\n");
+			invalidate_mapping_pages(inode->i_mapping, 0, -1);
+		}
+		spin_unlock(&inode->i_lock);
+#else
+		ecryptfs_mm_drop_cache(crypt_stat->userid);
+	}
+#endif
+#endif
+
 	ecryptfs_put_lower_file(inode);
 	kmem_cache_free(ecryptfs_file_info_cache,
 			ecryptfs_file_to_private(file));
@@ -407,31 +490,12 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #endif
 
 #ifdef CONFIG_SDP
-	if (cmd == ECRYPTFS_IOCTL_GET_SDP) {
-		u32 __user *user_attr = (u32 __user *)arg;
-		u32 attr = 0;
-		char filename[NAME_MAX+1] = {0};
-		struct dentry *ecryptfs_dentry = file->f_path.dentry;
-
-		struct inode *inode = ecryptfs_dentry->d_inode;
-		struct ecryptfs_crypt_stat *crypt_stat =
-				&ecryptfs_inode_to_private(inode)->crypt_stat;
-		struct dentry *fp_dentry =
-				ecryptfs_inode_to_private(inode)->lower_file->f_dentry;
-		if (fp_dentry->d_name.len <= NAME_MAX)
-			memcpy(filename, fp_dentry->d_name.name,
-					fp_dentry->d_name.len + 1);
-
-		mutex_lock(&crypt_stat->cs_mutex);
-		if (crypt_stat->flags & ECRYPTFS_DEK_SDP_ENABLED) {
-			attr = 1;
-		} else {
-			attr = 0;
-		}
-		mutex_unlock(&crypt_stat->cs_mutex);
-		put_user(attr, user_attr);
-		return 0;
+	rc = ecryptfs_do_sdp_ioctl(file, cmd, arg);
+	if (rc == 0) {
+		return rc;
 	}
+#else
+	printk("%s CONFIG_SDP not enabled \n", __func__);
 #endif
 	if (ecryptfs_file_to_private(file))
 		lower_file = ecryptfs_file_to_lower(file);

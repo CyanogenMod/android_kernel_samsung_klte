@@ -15,12 +15,17 @@
 #include "ssp.h"
 
 #define SSP_FIRMWARE_REVISION		101901
-#define SSP_FIRMWARE_REVISION_03	14011600/*MCU L5, 6500*/
+#if defined(CONFIG_MACH_JACTIVESKT)
+#define SSP_FIRMWARE_REVISION_03	14032500 /*MCU L5, 6500 fortius-skt*/
+#else
+#define SSP_FIRMWARE_REVISION_03	14082100/*MCU L5, 6500*/
+#endif
 
 /* Bootload mode cmd */
 #define BL_FW_NAME_L0			"ssp_L0.fw"
 #define BL_FW_NAME			"ssp.fw"
 #define BL_FW_NAME_03			"ssp_rev03.fw"
+#define BL_FW_NAME_FORTIUS		"ssp_fortius.fw"
 #define BL_UMS_FW_NAME			"ssp.bin"
 #define BL_CRASHED_FW_NAME		"ssp_crashed.fw"
 
@@ -440,8 +445,13 @@ static int update_mcu_bin(struct ssp_data *data, int iBinType)
 			iRet = load_kernel_fw_bootmode(data->client,
 				BL_FW_NAME_L0);
 		else /* SSP_MCU_L5 */
+#if defined(CONFIG_MACH_JACTIVESKT)
+			iRet = load_kernel_fw_bootmode(data->client,
+				BL_FW_NAME_FORTIUS); // for fortius-kor models
+#else
 			iRet = load_kernel_fw_bootmode(data->client,
 				BL_FW_NAME_03);
+#endif
 		break;
 	case KERNEL_CRASHED_BINARY:
 		iRet = load_kernel_fw_bootmode(data->client,

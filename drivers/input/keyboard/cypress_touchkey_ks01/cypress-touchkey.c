@@ -507,7 +507,7 @@ static ssize_t cypress_touchkey_brightness_level_show(struct device *dev,
 	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
 	int count;
 
-	count = snprintf(buf, sizeof(buf), "%d\n", vol_mv_level);
+	count = snprintf(buf, 20, "%d\n", vol_mv_level);
 
 	dev_info(&info->client->dev,
 			"%s: Touch LED voltage = %d\n",
@@ -931,13 +931,28 @@ static int cypress_touchkey_led_off(struct cypress_touchkey_info *info)
 	u8 buf = CYPRESS_LED_OFF;
 	int ret;
 
+	if ((!info->enabled)) {
+		touchled_cmd_reserved = 1;
+		touchkey_led_status = buf;
+		dev_info(&info->client->dev, "%s: Touchkey is not enabled.\n",
+				__func__);
+		return -1;
+	}
+
 	mutex_lock(&info->touchkey_mutex);
 
 	ret = i2c_smbus_write_byte_data(info->client, CYPRESS_GEN, buf);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_info(&info->client->dev,
 				"%s: i2c write error [%d]\n", __func__, ret);
+		touchled_cmd_reserved = 1;
+		touchkey_led_status = buf;
+		goto out;
+	}
 
+	msleep(30);
+
+out :
 	mutex_unlock(&info->touchkey_mutex);
 
 	return ret;

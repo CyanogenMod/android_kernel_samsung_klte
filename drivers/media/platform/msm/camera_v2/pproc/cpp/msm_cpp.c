@@ -53,7 +53,11 @@
 #define CPP_CMD_TIMEOUT_MS 300
 #define MSM_CPP_MAX_TIMEOUT_TRIAL 10
 
+#if defined (CONFIG_SEC_S_PROJECT)
+#define MSM_CPP_NOMINAL_CLOCK 266670000//320000000
+#else
 #define MSM_CPP_NOMINAL_CLOCK 320000000
+#endif
 #define MSM_CPP_TURBO_CLOCK 465000000
 
 
@@ -931,7 +935,15 @@ static void cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin)
 
 		/*Start firmware loading*/
 		msm_cpp_write(MSM_CPP_CMD_FW_LOAD, cpp_dev->base);
-		msm_cpp_write(MSM_CPP_END_ADDRESS, cpp_dev->base);
+		if(fw == NULL)
+		{
+			pr_err("fw is null\n");
+			return;
+		}
+		else
+		{
+			msm_cpp_write(fw->size, cpp_dev->base);
+		}
 		msm_cpp_write(MSM_CPP_START_ADDRESS, cpp_dev->base);
 
 		if (ptr_bin) {
@@ -1545,6 +1557,11 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		return -EINVAL;
 	}
 
+	if (cpp_dev == NULL) {
+		pr_err("cpp_dev is null\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&cpp_dev->mutex);
 	CPP_DBG("E cmd: %d\n", cmd);
 	switch (cmd) {
@@ -1756,8 +1773,10 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		}
 
 		if ((ioctl_ptr->len == 0) ||
-		    (ioctl_ptr->len > sizeof(uint32_t)))
+			(ioctl_ptr->len > sizeof(uint32_t))) {
+			mutex_unlock(&cpp_dev->mutex);
 			return -EINVAL;
+		}
 
 		rc = (copy_from_user(&identity,
 				     (void __user*)ioctl_ptr->ioctl_ptr,
@@ -1849,7 +1868,7 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 
 	case VIDIOC_MSM_CPP_SET_CLOCK: {
 		long clock_rate = 0;
-		if (ioctl_ptr->len == 0 || (ioctl_ptr->len > sizeof(long))) {
+		if ((ioctl_ptr->len == 0) || (ioctl_ptr->len > sizeof(long))) {
 			pr_err("ioctl_ptr->len is 0\n");
 			mutex_unlock(&cpp_dev->mutex);
 			return -EINVAL;
@@ -1884,10 +1903,11 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		while (cpp_dev->cpp_open_cnt != 0)
 			cpp_close_node(sd, NULL);
 		rc = 0;
-		break;
+		goto mutex_unlock_free_ret;
 	}
 	}
 	mutex_unlock(&cpp_dev->mutex);
+	mutex_unlock_free_ret:
 	CPP_DBG("X\n");
 	return rc;
 }
@@ -2140,6 +2160,11 @@ static int __devinit cpp_probe(struct platform_device *pdev)
 	cpp_dev->work =
 		(struct msm_cpp_work_t *)kmalloc(sizeof(struct msm_cpp_work_t),
 						 GFP_KERNEL);
+	if (!cpp_dev->work) {
+		pr_err("cpp_dev->work is NULL\n");
+		rc = -ENOMEM;
+		goto ERROR3;
+	}
 	INIT_WORK((struct work_struct *)cpp_dev->work, msm_cpp_do_timeout_work);
 	cpp_dev->cpp_open_cnt = 0;
 	cpp_dev->is_firmware_loaded = 0;

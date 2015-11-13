@@ -33,6 +33,7 @@ uint16_t back_cam_fw_version = 0;
 #endif
 int led_torch_en;
 int led_flash_en;
+struct task_struct	*qdaemon_task;
 
 static int32_t msm_sensor_get_dt_data(struct device_node *of_node,
 				      struct msm_sensor_ctrl_t *s_ctrl)
@@ -301,6 +302,8 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl,
 		return -EINVAL;
 	}
 
+	qdaemon_task = current;
+
 	pr_warn("[%s:%d] %s", __func__, __LINE__,
 		sensor_name);
 	pr_warn("%s : camera_id %d", __func__, s_ctrl->cci_i2c_master);
@@ -311,7 +314,7 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl,
 		return rc;
 	}
 	s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
-#if 0
+#if defined(CONFIG_SEC_S_PROJECT)
 	rc = msm_sensor_check_id(s_ctrl, sensor_i2c_client, slave_info,
 				 sensor_name);
 	if (rc < 0)
@@ -753,6 +756,8 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			rc = -EFAULT;
 			break;
 		}
+		kfree(stop_setting->reg_setting);
+		stop_setting->reg_setting =NULL;
 		break;
 	}
 	case CFG_SET_GPIO_STATE: {

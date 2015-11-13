@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,11 +14,7 @@
 
 #define pr_fmt(fmt) "AXI: %s(): " fmt, __func__
 
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_MILLETLTE_COMMON) || \
-	defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT) || \
-	defined(CONFIG_SEC_S_PROJECT)
 #define DEBUG_MSM_BUS_ARB_REQ
-#endif
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -315,7 +311,6 @@ static int getpath(int src, int dest)
 	return CREATE_PNODE_ID(src, pnode_num);
 }
 
-#ifdef CONFIG_BW_LIMITER_FIX
 static uint64_t get_node_maxib(struct msm_bus_inode_info *info)
 {
 	int i, ctx;
@@ -327,11 +322,10 @@ static uint64_t get_node_maxib(struct msm_bus_inode_info *info)
 	}
 
 	MSM_BUS_DBG("%s: Node %d numpnodes %d maxib %llu", __func__,
-	info->num_pnodes, info->node_info->id, maxib);
-
+		info->num_pnodes, info->node_info->id, maxib);
 	return maxib;
 }
-#endif
+
 /**
  * update_path() - Update the path with the bandwidth and clock values, as
  * requested by the client.
@@ -379,17 +373,6 @@ static int update_path(int curr, int pnode, uint64_t req_clk, uint64_t req_bw,
 		return -ENXIO;
 	}
 
-#ifndef CONFIG_BW_LIMITER_FIX
-	/**
-	 * If master supports dual configuration, check if
-	 * the configuration needs to be changed based on
-	 * incoming requests
-	 */
-	if (info->node_info->dual_conf)
-		fabdev->algo->config_master(fabdev, info,
-			req_clk, req_bw);
-#endif
-
 	info->link_info.sel_bw = &info->link_info.bw[ctx];
 	info->link_info.sel_clk = &info->link_info.clk[ctx];
 	*info->link_info.sel_bw += add_bw;
@@ -403,22 +386,20 @@ static int update_path(int curr, int pnode, uint64_t req_clk, uint64_t req_bw,
 	info->pnode[index].sel_clk = &info->pnode[index].clk[ctx &
 		cl_active_flag];
 	*info->pnode[index].sel_bw += add_bw;
-
-#ifdef CONFIG_BW_LIMITER_FIX
 	*info->pnode[index].sel_clk = req_clk;
 
 	/**
-	* If master supports dual configuration, check if
-	* the configuration needs to be changed based on
-	* incoming requests
-	*/
+	 * If master supports dual configuration, check if
+	 * the configuration needs to be changed based on
+	 * incoming requests
+	 */
 	if (info->node_info->dual_conf) {
 		uint64_t node_maxib = 0;
 		node_maxib = get_node_maxib(info);
 		fabdev->algo->config_master(fabdev, info,
 			node_maxib, req_bw);
 	}
-#endif
+
 	info->link_info.num_tiers = info->node_info->num_tiers;
 	info->link_info.tier = info->node_info->tier;
 	master_tiers = info->node_info->tier;
@@ -691,7 +672,8 @@ int msm_bus_scale_client_update_request(uint32_t cl, unsigned index)
 	pdata = client->pdata;
 	if (!pdata) {
 		MSM_BUS_ERR("Null pdata passed to update-request\n");
-		return -ENXIO;
+		ret = -ENXIO;
+		goto err;
 	}
 
 	if (index >= pdata->num_usecases) {

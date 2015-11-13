@@ -1396,7 +1396,7 @@ munmap_back:
 				|| strstr(pathname, "dalvik-mark-stack") != NULL
 				|| strstr(pathname, "dalvik-card-table") != NULL) {
 			//printk("PROC %s\tFILE %s\tSTART %lx\tLEN %lx\n", current->comm, pathname, addr, len);
-			tima_send_cmd2(addr, len, 0x3f830221);
+			tima_send_cmd2(addr, len, 0x30);
 		}
 
 		/* do something here with pathname */

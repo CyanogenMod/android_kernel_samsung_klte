@@ -75,9 +75,8 @@ static DECLARE_WORK(tdmb_work, tdmb_pull_data);
 
 irqreturn_t tdmb_irq_handler(int irq, void *dev_id)
 {
-	int ret = 0;
-
 	if (tdmb_workqueue) {
+	int ret = 0;
 		ret = queue_work(tdmb_workqueue, &tdmb_work);
 		if (ret == 0)
 			DPRINTK("failed in queue_work\n");
@@ -150,8 +149,6 @@ static int __add_to_ringbuffer(unsigned char *data, unsigned long data_size)
 	unsigned int size;
 	unsigned int head;
 	unsigned int tail;
-	unsigned int dist;
-	unsigned int temp_size;
 
 	if (tdmb_ts_size == 0)
 		return 0;
@@ -163,6 +160,7 @@ static int __add_to_ringbuffer(unsigned char *data, unsigned long data_size)
 	if (size > tdmb_ts_size) {
 		DPRINTK("Error - size too large\n");
 	} else {
+		unsigned int dist;
 		if (head >= tail)
 			dist = head-tail;
 		else
@@ -186,6 +184,7 @@ static int __add_to_ringbuffer(unsigned char *data, unsigned long data_size)
 				if (head == tdmb_ts_size)
 					head = 0;
 			} else {
+				unsigned int temp_size;
 				temp_size = tdmb_ts_size-head;
 				temp_size = (temp_size/DMB_TS_SIZE)*DMB_TS_SIZE;
 
@@ -219,13 +218,13 @@ static int __add_to_ringbuffer(unsigned char *data, unsigned long data_size)
 
 static int __add_ts_data(unsigned char *data, unsigned long data_size)
 {
-	int j = 0;
-	int maxi = 0;
 	if (first_packet) {
+	int j = 0;
 		DPRINTK("! first sync Size = %ld !\n", data_size);
 
 		for (j = 0; j < data_size; j++) {
 			if (data[j] == 0x47) {
+				int maxi;
 				DPRINTK("!!!!! first sync j = %d !!!!!\n", j);
 				maxi = (data_size - j) / TS_PACKET_SIZE;
 				ts_buff_pos = (data_size - j) % TS_PACKET_SIZE;
@@ -240,8 +239,6 @@ static int __add_ts_data(unsigned char *data, unsigned long data_size)
 			}
 		}
 	} else {
-		maxi = (data_size) / TS_PACKET_SIZE;
-
 		if (ts_buff_pos > 0) {
 			if (data[TS_PACKET_SIZE - ts_buff_pos] != 0x47) {
 				DPRINTK("! error 0x%x,0x%x !\n",
@@ -287,18 +284,12 @@ static int __get_mp2_len(unsigned char *pkt)
 	int bitrate_index;
 	int fs_index;
 	int samplerate;
-	int protection;
 	int bitrate;
 	int length;
 
 	id = (pkt[1]>>3)&0x01; /* 1: ISO/IEC 11172-3, 0:ISO/IEC 13818-3 */
 	layer_index = (pkt[1]>>1)&0x03; /* 2 */
-	protection = pkt[1]&0x1;
-/*
-	if (protection != 0) {
-		;
-	}
-*/
+
 	bitrate_index = (pkt[2]>>4);
 	fs_index = (pkt[2]>>2)&0x3; /* 1 */
 
@@ -335,13 +326,11 @@ static int __get_mp2_len(unsigned char *pkt)
 static int
 __add_msc_data(unsigned char *data, unsigned long data_size, int sub_ch_id)
 {
-	int j;
-	int readpos = 0;
 	unsigned char pOutAddr[TS_PACKET_SIZE];
-	int remainbyte = 0;
 	static int first = 1;
 
 	if (first_packet) {
+		int j;
 		for (j = 0; j < data_size-4; j++) {
 			if (data[j] == 0xFF && ((data[j+1]>>4) == 0xF)) {
 				mp2_len = __get_mp2_len(&data[j]);
@@ -357,6 +346,7 @@ __add_msc_data(unsigned char *data, unsigned long data_size, int sub_ch_id)
 			}
 		}
 	} else {
+		int remainbyte = 0;
 		if (mp2_len <= 0 || mp2_len > MSC_BUF_SIZE) {
 			msc_buff_pos = 0;
 			first_packet = 1;
@@ -376,6 +366,7 @@ __add_msc_data(unsigned char *data, unsigned long data_size, int sub_ch_id)
 		}
 
 		if (msc_buff_pos == mp2_len) {
+			int readpos = 0;
 			while (msc_buff_pos > readpos) {
 				if (first) {
 					pOutAddr[0] = 0xDF;
@@ -443,8 +434,6 @@ __add_msc_data(unsigned char *data, unsigned long data_size, int sub_ch_id)
 
 bool tdmb_store_data(unsigned char *data, unsigned long len)
 {
-	unsigned long i;
-	unsigned long maxi;
 	unsigned long subch_id = tdmb_get_chinfo();
 
 	if (subch_id == 0) {
@@ -455,6 +444,8 @@ bool tdmb_store_data(unsigned char *data, unsigned long len)
 		if (subch_id >= 64) {
 			__add_ts_data(data, len);
 		} else {
+			unsigned long i;
+			unsigned long maxi;
 			maxi = len/TS_PACKET_SIZE;
 			for (i = 0 ; i < maxi ; i++) {
 				__add_msc_data(data, TS_PACKET_SIZE, subch_id);

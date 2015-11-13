@@ -21,6 +21,7 @@
 #include <linux/mfd/max77888.h>
 #include <linux/mfd/max77888-private.h>
 #include <linux/regulator/machine.h>
+#include <linux/battery/sec_battery.h>
 
 #if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01KTT) || \
 	defined(CONFIG_MACH_KS01LGT) || defined(CONFIG_MACH_JACTIVESKT)
@@ -134,6 +135,7 @@
 #define SOFT_CHG_START_DUR	100	/* ms */
 #define SOFT_CHG_CURR_STEP	200	/* mA */
 #define SOFT_CHG_STEP_DUR	20	/* ms */
+extern int sec_bat_check_battery_company(void);
 
 enum {
 	POWER_SUPPLY_VBUS_UNKNOWN = 0,

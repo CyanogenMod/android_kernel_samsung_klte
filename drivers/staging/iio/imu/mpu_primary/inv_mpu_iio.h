@@ -179,10 +179,14 @@
 #define BIT_ACCEL_INTEL_MODE            0x40
 
 /* data definitions */
-#define DMP_START_ADDR           0x400
+#define DMP_START_ADDR           0x500
 #define DMP_MASK_TAP             0x3f
 #define DMP_MASK_DIS_ORIEN       0xC0
 #define DMP_DIS_ORIEN_SHIFT      6
+/* this is derived from 1000 divided by 50, which is the pedometer
+   running frequency */
+#define MS_PER_PED_TICKS         20
+#define SHEALTH_CADENCE_LEN 20
 
 #define BYTES_FOR_DMP            8
 #define BYTES_FOR_EVENTS         4
@@ -190,13 +194,13 @@
 #define BYTES_PER_SENSOR         6
 #define MPU3050_FOOTER_SIZE      2
 #define FIFO_COUNT_BYTE          2
-#define FIFO_THRESHOLD           800
-#define FIFO_SIZE                800
-#define HARDWARE_FIFO_SIZE       1024
+#define FIFO_THRESHOLD           450
+#define FIFO_SIZE                400
+#define HARDWARE_FIFO_SIZE       512
 #define MAX_READ_SIZE            64
 #define POWER_UP_TIME            100
 #define SENSOR_UP_TIME           30
-#define REG_UP_TIME              5
+#define REG_UP_TIME              10
 #define INV_MPU_SAMPLE_RATE_CHANGE_STABLE 50
 #define MPU_MEM_BANK_SIZE        256
 #define SELF_TEST_GYRO_FULL_SCALE 250
@@ -237,7 +241,7 @@
 #define MPU_MIN_A_OFFSET_VALUE     -16384
 #define MPU_MAX_G_OFFSET_VALUE     32767
 #define MPU_MIN_G_OFFSET_VALUE     -32767
-#define MPU6XXX_MAX_MPU_MEM      (256 * 12)
+#define MPU6XXX_MAX_MPU_MEM      (256 * 14)
 
 #define INIT_MOT_DUR             128
 #define INIT_MOT_THR             128
@@ -278,7 +282,7 @@
 #define CRC_FIRMWARE_SEED        0
 #define SELF_TEST_SUCCESS        1
 #define MS_PER_DMP_TICK          20
-#define DMP_IMAGE_SIZE           2790
+#define DMP_IMAGE_SIZE           3533
 
 /* init parameters */
 #define INIT_FIFO_RATE           50
@@ -288,6 +292,9 @@
 #define INIT_TAP_TIME            100
 #define INIT_TAP_MIN_COUNT       2
 #define INIT_SAMPLE_DIVIDER      4
+#define INIT_QSHOT_START_ANGLE   20
+#define INIT_QSHOT_FINISH_ANGLE  30
+
 #define MPU_INIT_SMD_DELAY_THLD  3
 #define MPU_INIT_SMD_DELAY2_THLD 1
 #define MPU_INIT_SMD_THLD        1500
@@ -600,6 +607,20 @@ struct inv_lcd_pos {
 };
 
 /**
+ *  struct inv_qshot structure to store qshot data structure.
+ *  @start_int_enable: start interrupt enable.
+ *  @finish_int_enable: finish interrupt enable.
+ *  @start_angle: start angle.
+ *  @finish_angle: finish angle.
+ */
+struct inv_qshot {
+	bool start_int_enable;
+	bool finish_int_enable;
+	int start_angle;
+	int finish_angle;
+};
+
+/**
  *  struct accel_mot_int_s structure to store motion interrupt data
  *  @mot_thr:    motion threshold.
  *  @mot_dur:    motion duration.
@@ -633,6 +654,44 @@ struct inv_smd {
 	u32 threshold;
 	u32 delay;
 	u32 delay2;
+};
+
+
+#define SHEALTH_INT_CADENCE			0x01
+#define SHEALTH_INT_STEP_COUNTER		0x02
+#define SHEALTH_INT_START_WALKING		0x04
+#define SHEALTH_INT_STOP_WALKING		0x08
+
+#define SHEALTH_STAT_STOP 0x0
+#define SHEALTH_STAT_WALK 0x1
+
+
+struct inv_shealth {
+	s32 cadence[SHEALTH_CADENCE_LEN];
+
+	s64 start_timestamp;
+	s64 stop_timestamp;
+	s64 interrupt_timestamp;
+	u16 interrupt_mask;
+	u16 interrupt_counter;
+	u64 step_count;
+
+	u16 tick_count;
+
+	s64 start_time_timeofday;
+	s64 interrupt_time_timeofday;
+	s64 stop_time_timeofday;
+
+	u16 state;
+
+	s16 interrupt_duration;
+	u16 valid_count;
+
+	struct work_struct work;
+	struct completion wait;
+	struct timer_list timer;
+	struct wake_lock wake_lock;
+	bool enabled;
 };
 
 /**
@@ -681,6 +740,9 @@ struct inv_mpu_slave;
  *  @smd:               SMD data structure.
  *  @ped:               pedometer data structure.
  *  @batch:             batchmode data structure.
+ *  @lcd_pos:           LCD position data structure.
+ *  @qshot:             qshot function data structure.
+ *  @s_health:          s_health data structure.
  *  @reg:		Map of important registers.
  *  @self_test:         self test settings.
  *  @hw:		Other hardware-specific information.
@@ -725,6 +787,7 @@ struct inv_mpu_slave;
  *  @ts_counter:        time stamp counter.
  *  @dmp_interval:      dmp interval. nomial value is 5 ms.
  *  @dmp_interval_accum: dmp interval accumlater.
+ *  @suspend_state:     state indicator suspend.
  *  @diff_accumulater:  accumlator for the difference of nominal and actual.
  *  @last_ts:           last time stamp.
  *  @step_detector_base_ts: base time stamp for step detector calculation.
@@ -736,16 +799,18 @@ struct inv_mpu_slave;
  *  @secondary_name: name for the slave device in the secondary I2C.
  */
 struct inv_mpu_state {
-#define TIMESTAMP_FIFO_SIZE 64
+#define TIMESTAMP_FIFO_SIZE 16
 	struct inv_chip_config_s chip_config;
 	struct inv_chip_info_s chip_info;
 	struct iio_trigger  *trig;
-	struct iio_dev *indio_dev;
+        struct iio_dev *indio_dev;
 	struct inv_tap tap;
 	struct inv_smd smd;
 	struct inv_ped ped;
+	struct inv_shealth shealth;
 	struct inv_batch batch;
 	struct inv_lcd_pos lcd_pos;
+	struct inv_qshot qshot;
 	struct inv_reg_map_s reg;
 	struct self_test_setting self_test;
 	const struct inv_hw_s *hw;
@@ -792,6 +857,7 @@ struct inv_mpu_state {
 	u32 ts_counter;
 	u32 dmp_interval;
 	s32 dmp_interval_accum;
+	bool suspend_state;
 	s64 diff_accumulater;
 	u64 last_ts;
 	u64 step_detector_base_ts;
@@ -933,6 +999,13 @@ enum MPU_IIO_ATTR_ADDR {
 	ATTR_DMP_PEDOMETER_STEPS,
 	ATTR_DMP_PEDOMETER_TIME,
 	ATTR_DMP_PEDOMETER_COUNTER,
+	ATTR_DMP_SHEALTH_CADENCE,
+	ATTR_DMP_SHEALTH_ENABLE,
+	ATTR_DMP_SHEALTH_INTERRUPT_PERIOD,
+	ATTR_DMP_SHEALTH_INSTANT_CADENCE,
+	ATTR_DMP_SHEALTH_FLUSH_CADENCE,
+	ATTR_DMP_SHEALTH_FREQ_THRESHOLD,
+	ATTR_DMP_SHEALTH_TIMER,
 	ATTR_DMP_TAP_ON,
 	ATTR_DMP_TAP_THRESHOLD,
 	ATTR_DMP_TAP_MIN_COUNT,
@@ -946,6 +1019,10 @@ enum MPU_IIO_ATTR_ADDR {
 	ATTR_DMP_LCD_POS_DOWN_Y_THRESH,
 	ATTR_DMP_LCD_POS_DOWN_Z_THRESH,
 	ATTR_DMP_DISPLAY_ORIENTATION_ON,
+	ATTR_DMP_QSHOT_START_ANGLE,
+	ATTR_DMP_QSHOT_FINISH_ANGLE,
+	ATTR_DMP_QSHOT_START_INT_ENABLE,
+	ATTR_DMP_QSHOT_FINISH_INT_ENABLE,
 /* *****above this line, are DMP features, power needs on/off */
 /* *****below this line, are DMP features, no power needed */
 	ATTR_DMP_ON,
@@ -1073,19 +1150,17 @@ int inv_set_interrupt_on_gesture_event(struct inv_mpu_state *st, bool on);
 int inv_set_display_orient_interrupt_dmp(struct inv_mpu_state *st, bool on);
 u16 inv_dmp_get_address(u16 key);
 int inv_q30_mult(int a, int b);
-int inv_set_tap_threshold_dmp(struct inv_mpu_state *st, u16 threshold);
 int inv_write_2bytes(struct inv_mpu_state *st, int k, int data);
-int inv_set_min_taps_dmp(struct inv_mpu_state *st, u16 min_taps);
-int  inv_set_tap_time_dmp(struct inv_mpu_state *st, u16 time);
-int inv_enable_tap_dmp(struct inv_mpu_state *st, bool on);
 int inv_i2c_read_base(struct inv_mpu_state *st, u16 i2c_addr,
 	u8 reg, u16 length, u8 *data);
 int inv_i2c_single_write_base(struct inv_mpu_state *st,
 	u16 i2c_addr, u8 reg, u8 data);
 int inv_hw_self_test(struct inv_mpu_state *st);
 s64 get_time_ns(void);
-int write_be32_key_to_mem(struct inv_mpu_state *st,
-					u32 data, int key);
+s64 get_time_timeofday(void);
+
+int write_be32_key_to_mem(struct inv_mpu_state *st, u32 data, int key);
+
 int inv_set_accel_bias_dmp(struct inv_mpu_state *st);
 int inv_mpu_setup_compass_slave(struct inv_mpu_state *st);
 int inv_mpu_setup_pressure_slave(struct inv_mpu_state *st);
@@ -1100,8 +1175,31 @@ int inv_quaternion_on(struct inv_mpu_state *st,
 int inv_enable_pedometer_interrupt(struct inv_mpu_state *st, bool en);
 int inv_read_pedometer_counter(struct inv_mpu_state *st);
 int inv_enable_pedometer(struct inv_mpu_state *st, bool en);
+int inv_reset_pedometer_internal_timer(struct inv_mpu_state *st);
+
 int inv_get_pedometer_steps(struct inv_mpu_state *st, u32 *steps);
 int inv_get_pedometer_time(struct inv_mpu_state *st, u32 *time);
+
+int inv_get_shealth_cadence(struct inv_mpu_state *st, u8 start, u8 end, s32 cadence[]);
+int inv_clear_shealth_cadence(struct inv_mpu_state *st);
+int inv_enable_shealth(struct inv_mpu_state *st, bool en, bool irq_en);
+int inv_get_shealth_valid_count(struct inv_mpu_state *st);
+int inv_set_shealth_interrupt_period(struct inv_mpu_state *st, s16 period);
+int inv_reset_shealth_update_timer(struct inv_mpu_state *st);
+ssize_t inv_get_shealth_instant_cadence(struct inv_mpu_state *st, char* buf);
+s64 inv_get_shealth_timestamp(struct inv_mpu_state *st, bool start);
+int inv_set_shealth_walk_run_thresh(struct inv_mpu_state *st, u32 freq);
+int inv_get_shealth_walk_run_thresh(struct inv_mpu_state *st, char *buf);
+int inv_set_shealth_update_timer(struct inv_mpu_state *st, u16 timer);
+int inv_get_shealth_update_timer(struct inv_mpu_state *st, char *buf);
+
+
+int inv_set_Qshot_start_angle(struct inv_mpu_state *st, int angle);
+int inv_set_Qshot_finish_angle(struct inv_mpu_state *st, int angle);
+int inv_enable_Qshot_finish_interrupt_klp(struct inv_mpu_state *st, bool on);
+int inv_enable_Qshot_start_interrupt_klp(struct inv_mpu_state *st, bool on);
+
+
 int inv_reset_fifo(struct iio_dev *indio_dev);
 int inv_reset_offset_reg(struct inv_mpu_state *st, bool en);
 int inv_batchmode_setup(struct inv_mpu_state *st);
@@ -1115,6 +1213,8 @@ char *wr_pr_debug_end(char *string);
 
 #define mem_w(a, b, c) \
 	mpu_memory_write(st, st->i2c_addr, a, b, c)
+#define mem_r(a, b, c) \
+	mpu_memory_read(st, st->i2c_addr, a, b, c)
 #define mem_w_key(key, b, c) mpu_memory_write_unaligned(st, key, b, c)
 #define inv_i2c_read(st, reg, len, data) \
 	inv_i2c_read_base(st, st->i2c_addr, reg, len, data)

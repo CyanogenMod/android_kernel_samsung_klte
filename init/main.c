@@ -101,6 +101,11 @@ static inline void mark_rodata_ro(void) { }
 extern void tc_init(void);
 #endif
 
+#ifdef CONFIG_TIMA_RKP_30
+#define PGT_BIT_ARRAY_LENGTH 0x40000
+unsigned long pgt_bit_array[PGT_BIT_ARRAY_LENGTH];
+EXPORT_SYMBOL(pgt_bit_array);
+#endif
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -389,6 +394,43 @@ static void __init setup_command_line(char *command_line)
 	strcpy (static_command_line, command_line);
 }
 
+#ifdef CONFIG_TIMA_RKP
+/* Block of Code for RKP initialization */
+static noinline void rkp_init(void)
+{
+#ifdef CONFIG_TIMA_RKP_COHERENT_TT
+	struct memblock_type *type = (struct memblock_type*)(&memblock.memory);
+#endif /*CONFIG_TIMA_RKP_COHERENT_TT*/
+
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+/* Code for initializing Credential Protection */
+	tima_send_cmd5((unsigned long)__rkp_ro_start, (unsigned long)__rkp_ro_end,
+					sizeof(struct cred), offsetof(struct task_struct, cred),
+					offsetof(struct task_struct, active_mm), 0x40);		
+	tima_send_cmd5(offsetof(struct cred, uid), offsetof(struct cred, euid), 
+					offsetof(struct cred, bp_pgd), offsetof(struct cred, bp_task), 
+					offsetof(struct cred, exec_depth), 0x41);
+	tima_send_cmd4(offsetof(struct cred,security),offsetof(struct task_struct,pid),
+					offsetof(struct task_struct,real_parent),offsetof(struct task_struct,comm),0x42);
+	printk(KERN_ERR"RKP CRED INIT %x\n", sizeof(struct cred));
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
+
+#ifdef CONFIG_TIMA_RKP
+#ifdef CONFIG_TIMA_RKP_30
+#ifdef CONFIG_TIMA_RKP_COHERENT_TT
+	tima_send_cmd2(type->cnt, __pa(type->regions), 0x04);
+#endif /*CONFIG_TIMA_RKP_COHERENT_TT*/
+	tima_send_cmd5((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end,(unsigned long)__pa(pgt_bit_array),0x0c);
+	tima_send_cmd3((unsigned long)__pa((unsigned long)_sdata), ((unsigned long)__pa((unsigned long)_edata)-(unsigned long)__pa((unsigned long)_sdata)), 1, 0x26);
+	tima_send_cmd((unsigned long)__pa((unsigned long)_text),0x28);
+#else
+	tima_send_cmd4((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end, 0x0c);
+#endif /* CONFIG_TIMA_RKP_30 */
+#endif /*CONFIG_TIMA_RKP*/
+
+}
+#endif /*CONFIG_TIMA_RKP*/
+
 /*
  * We need to finalize in a non-__init function or else race conditions
  * between the root thread and the init thread may cause start_kernel to
@@ -405,6 +447,9 @@ static noinline void __init_refok rest_init(void)
 	int pid;
 	const struct sched_param param = { .sched_priority = 1 };
 
+#ifdef CONFIG_TIMA_RKP
+	rkp_init();
+#endif
 	rcu_scheduler_starting();
 	/*
 	 * We need to spawn init first so that it obtains pid 1, however
@@ -524,7 +569,7 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
-#ifdef CONFIG_CRYPTO_FIPS
+#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 /* change@ksingh.sra-dallas - in kernel 3.4 and + 
  * the mmu clears the unused/unreserved memory with default RAM initial sticky 
  * bit data.
@@ -564,7 +609,7 @@ static void __init integrity_mem_reserve(void) {
 	printk(KERN_NOTICE "FIPS integrity_mem_reservoir = %ld\n", integrity_mem_reservoir);
 }
 // change@ksingh.sra-dallas - end
-#endif // CONFIG_CRYPTO_FIPS
+#endif // CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 
 asmlinkage void __init start_kernel(void)
 {
@@ -615,12 +660,12 @@ asmlinkage void __init start_kernel(void)
 
 	jump_label_init();
 
-#ifdef CONFIG_CRYPTO_FIPS	
+#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 	/* change@ksingh.sra-dallas
 	 * marks the zImage copy area as reserve before mmu can clear it
 	 */
  	integrity_mem_reserve();
-#endif // CONFIG_CRYPTO_FIPS
+#endif // CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 	/*
 	 * These use large bootmem allocations and must precede
 	 * kmem_cache_init()
@@ -904,11 +949,6 @@ static void run_init_process(const char *init_filename)
 	kernel_execve(init_filename, argv_init, envp_init);
 }
 
-#ifdef CONFIG_TIMA_RKP_30
-#define PGT_BIT_ARRAY_LENGTH 0x40000
-unsigned long pgt_bit_array[PGT_BIT_ARRAY_LENGTH];
-EXPORT_SYMBOL(pgt_bit_array);
-#endif
 #ifdef CONFIG_DEFERRED_INITCALLS
 extern initcall_t __deferred_initcall_start[], __deferred_initcall_end[];
 
@@ -957,11 +997,6 @@ static noinline int init_post(void)
 	free_initmem();
 #endif
 	mark_rodata_ro();
-#ifdef CONFIG_TIMA_RKP
-#ifndef CONFIG_TIMA_RKP_30
-	tima_send_cmd4((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end, 0x3f80c221);
-#endif
-#endif
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
@@ -995,9 +1030,6 @@ static noinline int init_post(void)
 
 static int __init kernel_init(void * unused)
 {
-#ifdef CONFIG_TIMA_RKP_COHERENT_TT
-	struct memblock_type *type = (struct memblock_type*)(&memblock.memory);
-#endif
 	/*
 	 * Wait until kthreadd is all set-up.
 	 */
@@ -1015,14 +1047,6 @@ static int __init kernel_init(void * unused)
 
 	smp_prepare_cpus(setup_max_cpus);
 
-#ifdef CONFIG_TIMA_RKP
-#ifdef CONFIG_TIMA_RKP_30
-#ifdef CONFIG_TIMA_RKP_COHERENT_TT
-	tima_send_cmd2(type->cnt, __pa(type->regions), 0x3f804221);
-#endif
-	tima_send_cmd5((unsigned long)_stext, (unsigned long)init_mm.pgd, (unsigned long)__init_begin, (unsigned long)__init_end,(unsigned long)__pa(pgt_bit_array),0x3f80c221);
-#endif
-#endif
 	do_pre_smp_initcalls();
 	lockup_detector_init();
 

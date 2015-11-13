@@ -11,6 +11,18 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
+config TOUCHSCREEN_ZINITIX_BT532
+	tristate "ZINITIX BT532 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Zinitix BT532 I2C touchscreen,
+	  such as BT532, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called BT532.
+
 config TOUCHSCREEN_MMS252
 	tristate "MELFAS MMS252 touchscreen driver"
 	depends on I2C
@@ -21,6 +33,18 @@ config TOUCHSCREEN_MMS252
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called melfas-ts.
+	  
+config TOUCHSCREEN_MMS300
+	tristate "MELFAS MMS300 touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here if you have a MELFAS MMS300 touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mms_ts.
+
 
 config TOUCHSCREEN_MMS144
 	tristate "Melfas MMS144 Touchscreen"
@@ -144,6 +168,18 @@ config TOUCHSCREEN_ATMEL_MXT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called atmel_mxt_ts.
+
+config TOUCHSCREEN_ATMEL_MAXTOUCH_TS
+	tristate "Atmel Maxtouch Touchscreen Family"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel MaXTouch Touchscreen
+	  using i2c connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called atmel_maxtouch_ts.
 
 config TOUCHSCREEN_AUO_PIXCIR
 	tristate "AUO in-cell touchscreen using Pixcir ICs"
@@ -549,7 +585,7 @@ config TOUCHSCREEN_ATMEL_MXT1188S
 	  To compile this driver as a module, choose M here: the
 	  module will be called mxt1188s
 
-config TOUCHSCREEN_CYTTSP4
+config TOUCHSCREEN_CYPRESS_CYTTSP4
 	tristate "CYPRESS TMA445 Touchscreen Interface"
 	depends on I2C
 	default n
@@ -1097,13 +1133,29 @@ config TOUCHSCREEN_GT9XX
 
           If unsure, say N.
 
+config TOUCHSCREEN_ZINITIX_BT531
+	tristate "ZINITIX BT531 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Zinitix BT531 I2C touchscreen,
+	  such as BT531, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called BT531.
+
 source "drivers/input/touchscreen/wacom/Kconfig"
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 source "drivers/input/touchscreen/synaptics/Kconfig"
 source "drivers/input/touchscreen/imagis/Kconfig"
 source "drivers/input/touchscreen/synaptics_s5000/Kconfig"
+source "drivers/input/touchscreen/synaptics_patek/Kconfig"
 source "drivers/input/touchscreen/cyttsp5/Kconfig"
+source "drivers/input/touchscreen/cyttsp4/Kconfig"
 source "drivers/input/touchscreen/wacom_hl/Kconfig"
 source "drivers/input/touchscreen/melfas_mms136/Kconfig"
 source "drivers/input/touchscreen/stm_fts/Kconfig"
+source "drivers/input/touchscreen/stm_s/Kconfig"
+source "drivers/input/touchscreen/synaptics_jsglte/Kconfig"
 endif

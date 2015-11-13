@@ -51,7 +51,7 @@ int msm_slim_get_ctrl(struct msm_slim_ctrl *dev)
 	if (ret >= 0) {
 		ref = atomic_read(&dev->dev->power.usage_count);
 		if (ref <= 0) {
-			dev_err(dev->dev, "reference count -ve:%d", ref);
+			SLIM_WARN(dev, "reference count -ve:%d", ref);
 			ret = -ENODEV;
 		}
 	}
@@ -67,9 +67,9 @@ void msm_slim_put_ctrl(struct msm_slim_ctrl *dev)
 	pm_runtime_mark_last_busy(dev->dev);
 	ref = atomic_read(&dev->dev->power.usage_count);
 	if (ref <= 0)
-		dev_err(dev->dev, "reference count mismatch:%d", ref);
+		SLIM_WARN(dev, "reference count mismatch:%d", ref);
 	else
-		pm_runtime_put(dev->dev);
+		pm_runtime_put_sync(dev->dev);
 #endif
 }
 #if defined(CONFIG_SND_SOC_ES705)
@@ -117,7 +117,7 @@ irqreturn_t msm_slim_port_irq_handler(struct msm_slim_ctrl *dev, u32 pstat)
 	/* clear port interrupts */
 	writel_relaxed(pstat, PGD_THIS_EE(PGD_PORT_INT_CL_EEn,
 							dev->ver));
-	pr_info("disabled overflow/underflow for port 0x%x", pstat);
+	SLIM_INFO(dev, "disabled overflow/underflow for port 0x%x", pstat);
 
 	/*
 	 * Guarantee that port interrupt bit(s) clearing writes go
@@ -313,7 +313,7 @@ void msm_dealloc_port(struct slim_controller *ctrl, u8 pn)
 }
 
 enum slim_port_err msm_slim_port_xfer_status(struct slim_controller *ctr,
-				u8 pn, u8 **done_buf, u32 *done_len)
+				u8 pn, phys_addr_t *done_buf, u32 *done_len)
 {
 	struct msm_slim_ctrl *dev = slim_get_ctrldata(ctr);
 	struct sps_iovec sio;
@@ -321,7 +321,7 @@ enum slim_port_err msm_slim_port_xfer_status(struct slim_controller *ctr,
 	if (done_len)
 		*done_len = 0;
 	if (done_buf)
-		*done_buf = NULL;
+		*done_buf = 0;
 	if (!dev->pipes[pn].connected)
 		return SLIM_P_DISCONNECT;
 	ret = sps_get_iovec(dev->pipes[pn].sps, &sio);
@@ -329,7 +329,7 @@ enum slim_port_err msm_slim_port_xfer_status(struct slim_controller *ctr,
 		if (done_len)
 			*done_len = sio.size;
 		if (done_buf)
-			*done_buf = (u8 *)sio.addr;
+			*done_buf = (phys_addr_t)sio.addr;
 	}
 	dev_dbg(dev->dev, "get iovec returned %d\n", ret);
 	return SLIM_P_INPROGRESS;
@@ -354,7 +354,7 @@ static void msm_slim_port_cb(struct sps_event_notify *ev)
 		complete(comp);
 }
 
-int msm_slim_port_xfer(struct slim_controller *ctrl, u8 pn, u8 *iobuf,
+int msm_slim_port_xfer(struct slim_controller *ctrl, u8 pn, phys_addr_t iobuf,
 			u32 len, struct completion *comp)
 {
 	struct sps_register_event sreg;
@@ -374,7 +374,7 @@ int msm_slim_port_xfer(struct slim_controller *ctrl, u8 pn, u8 *iobuf,
 		dev_dbg(dev->dev, "sps register event error:%x\n", ret);
 		return ret;
 	}
-	ret = sps_transfer_one(dev->pipes[pn].sps, (u32)iobuf, len, comp,
+	ret = sps_transfer_one(dev->pipes[pn].sps, iobuf, len, comp,
 				SPS_IOVEC_FLAG_INT);
 	dev_dbg(dev->dev, "sps submit xfer error code:%x\n", ret);
 	if (!ret) {
@@ -400,7 +400,7 @@ static int msm_slim_post_tx_msgq(struct msm_slim_ctrl *dev, u8 *buf, int len)
 	struct sps_pipe *pipe = endpoint->sps;
 	int ix = (buf - (u8 *)mem->base) / SLIM_MSGQ_BUF_LEN;
 
-	u32 phys_addr = mem->phys_base + (SLIM_MSGQ_BUF_LEN * ix);
+	phys_addr_t phys_addr = mem->phys_base + (SLIM_MSGQ_BUF_LEN * ix);
 
 	for (ret = 0; ret < ((len + 3) >> 2); ret++)
 		pr_debug("BAM TX buf[%d]:0x%x", ret, ((u32 *)buf)[ret]);
@@ -433,7 +433,7 @@ static u32 *msm_slim_tx_msgq_return(struct msm_slim_ctrl *dev)
 	}
 
 	/* Calculate buffer index */
-	dev->tx_idx = (iovec.addr - mem->phys_base) / SLIM_MSGQ_BUF_LEN;
+	dev->tx_idx = ((int)(iovec.addr - mem->phys_base)) / SLIM_MSGQ_BUF_LEN;
 
 	return (u32 *)((u8 *)mem->base + (dev->tx_idx * SLIM_MSGQ_BUF_LEN));
 }
@@ -508,9 +508,9 @@ static int msm_slim_post_rx_msgq(struct msm_slim_ctrl *dev, int ix)
 
 	/* Rx message queue buffers are 4 bytes in length */
 	u8 *virt_addr = mem->base + (4 * ix);
-	u32 phys_addr = mem->phys_base + (4 * ix);
+	phys_addr_t phys_addr = mem->phys_base + (4 * ix);
 
-	pr_debug("index:%d, phys:0x%x, virt:0x%p\n", ix, phys_addr, virt_addr);
+	pr_debug("index:%d, virt:0x%p\n", ix, virt_addr);
 
 	ret = sps_transfer_one(pipe, phys_addr, 4, virt_addr, flags);
 	if (ret)
@@ -892,11 +892,14 @@ void msm_slim_sps_exit(struct msm_slim_ctrl *dev, bool dereg)
 #define SLIMBUS_QMI_SELECT_INSTANCE_RESP_V01 0x0020
 #define SLIMBUS_QMI_POWER_REQ_V01 0x0021
 #define SLIMBUS_QMI_POWER_RESP_V01 0x0021
+#define SLIMBUS_QMI_CHECK_FRAMER_STATUS_REQ 0x0022
+#define SLIMBUS_QMI_CHECK_FRAMER_STATUS_RESP 0x0022
 
 #define SLIMBUS_QMI_POWER_REQ_MAX_MSG_LEN 7
 #define SLIMBUS_QMI_POWER_RESP_MAX_MSG_LEN 7
 #define SLIMBUS_QMI_SELECT_INSTANCE_REQ_MAX_MSG_LEN 14
 #define SLIMBUS_QMI_SELECT_INSTANCE_RESP_MAX_MSG_LEN 7
+#define SLIMBUS_QMI_CHECK_FRAMER_STAT_RESP_MAX_MSG_LEN 7
 
 enum slimbus_mode_enum_type_v01 {
 	/* To force a 32 bit signed enum. Do not change or use*/
@@ -943,6 +946,13 @@ struct slimbus_power_resp_msg_v01 {
 	/* Result Code */
 	struct qmi_response_type_v01 resp;
 };
+
+struct slimbus_chkfrm_resp_msg {
+	/* Mandatory */
+	/* Result Code */
+	struct qmi_response_type_v01 resp;
+};
+
 
 static struct elem_info slimbus_select_inst_req_msg_v01_ei[] = {
 	{
@@ -1050,6 +1060,27 @@ static struct elem_info slimbus_power_resp_msg_v01_ei[] = {
 	},
 };
 
+static struct elem_info slimbus_chkfrm_resp_msg_v01_ei[] = {
+	{
+		.data_type = QMI_STRUCT,
+		.elem_len  = 1,
+		.elem_size = sizeof(struct qmi_response_type_v01),
+		.is_array  = NO_ARRAY,
+		.tlv_type  = 0x02,
+		.offset    = offsetof(struct slimbus_chkfrm_resp_msg, resp),
+		.ei_array  = get_qmi_response_type_v01_ei(),
+	},
+	{
+		.data_type = QMI_EOTI,
+		.elem_len  = 0,
+		.elem_size = 0,
+		.is_array  = NO_ARRAY,
+		.tlv_type  = 0x00,
+		.offset    = 0,
+		.ei_array  = NULL,
+	},
+};
+
 static void msm_slim_qmi_recv_msg(struct kthread_work *work)
 {
 	int rc;
@@ -1110,13 +1141,13 @@ static int msm_slim_qmi_send_select_inst_req(struct msm_slim_ctrl *dev,
 	rc = qmi_send_req_wait(dev->qmi.handle, &req_desc, req, sizeof(*req),
 					&resp_desc, &resp, sizeof(resp), 5000);
 	if (rc < 0) {
-		pr_err("%s: QMI send req failed %d\n", __func__, rc);
+		SLIM_ERR(dev, "%s: QMI send req failed %d\n", __func__, rc);
 		return rc;
 	}
 
 	/* Check the response */
 	if (resp.resp.result != QMI_RESULT_SUCCESS_V01) {
-		pr_err("%s: QMI request failed 0x%x (%s)\n", __func__,
+		SLIM_ERR(dev, "%s: QMI request failed 0x%x (%s)\n", __func__,
 				resp.resp.result, get_qmi_error(&resp.resp));
 		return -EREMOTEIO;
 	}
@@ -1142,13 +1173,13 @@ static int msm_slim_qmi_send_power_request(struct msm_slim_ctrl *dev,
 	rc = qmi_send_req_wait(dev->qmi.handle, &req_desc, req, sizeof(*req),
 					&resp_desc, &resp, sizeof(resp), 5000);
 	if (rc < 0) {
-		pr_err("%s: QMI send req failed %d\n", __func__, rc);
+		SLIM_ERR(dev, "%s: QMI send req failed %d\n", __func__, rc);
 		return rc;
 	}
 
 	/* Check the response */
 	if (resp.resp.result != QMI_RESULT_SUCCESS_V01) {
-		pr_err("%s: QMI request failed 0x%x (%s)\n", __func__,
+		SLIM_ERR(dev, "%s: QMI request failed 0x%x (%s)\n", __func__,
 				resp.resp.result, get_qmi_error(&resp.resp));
 		return -EREMOTEIO;
 	}
@@ -1182,9 +1213,10 @@ int msm_slim_qmi_init(struct msm_slim_ctrl *dev, bool apps_is_master)
 	}
 
 	rc = qmi_connect_to_service(handle, SLIMBUS_QMI_SVC_ID,
+						SLIMBUS_QMI_SVC_V1,
 						SLIMBUS_QMI_INS_ID);
 	if (rc < 0) {
-		pr_err("%s: QMI server not found\n", __func__);
+		SLIM_ERR(dev, "%s: QMI server not found\n", __func__);
 		goto qmi_connect_to_service_failed;
 	}
 
@@ -1238,4 +1270,33 @@ int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active)
 		req.pm_req = SLIMBUS_PM_INACTIVE_V01;
 
 	return msm_slim_qmi_send_power_request(dev, &req);
+}
+
+int msm_slim_qmi_check_framer_request(struct msm_slim_ctrl *dev)
+{
+	struct slimbus_chkfrm_resp_msg resp = { { 0, 0 } };
+	struct msg_desc req_desc, resp_desc;
+	int rc;
+
+	req_desc.msg_id = SLIMBUS_QMI_CHECK_FRAMER_STATUS_REQ;
+	req_desc.max_msg_len = 0;
+	req_desc.ei_array = NULL;
+
+	resp_desc.msg_id = SLIMBUS_QMI_CHECK_FRAMER_STATUS_RESP;
+	resp_desc.max_msg_len = SLIMBUS_QMI_CHECK_FRAMER_STAT_RESP_MAX_MSG_LEN;
+	resp_desc.ei_array = slimbus_chkfrm_resp_msg_v01_ei;
+
+	rc = qmi_send_req_wait(dev->qmi.handle, &req_desc, NULL, 0,
+					&resp_desc, &resp, sizeof(resp), 5000);
+	if (rc < 0) {
+		SLIM_ERR(dev, "%s: QMI send req failed %d\n", __func__, rc);
+		return rc;
+	}
+	/* Check the response */
+	if (resp.resp.result != QMI_RESULT_SUCCESS_V01) {
+		SLIM_ERR(dev, "%s: QMI request failed 0x%x (%s)\n",
+			__func__, resp.resp.result, get_qmi_error(&resp.resp));
+		return -EREMOTEIO;
+	}
+	return 0;
 }

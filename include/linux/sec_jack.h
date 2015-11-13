@@ -43,6 +43,7 @@ struct sec_jack_platform_data {
 	int	det_gpio;
 	int	send_end_gpio;
 	int	ear_micbias_gpio;
+	const char *ear_micbias_ldo;
 	int	fsa_en_gpio;
 	bool	det_active_high;
 	bool	send_end_active_high;

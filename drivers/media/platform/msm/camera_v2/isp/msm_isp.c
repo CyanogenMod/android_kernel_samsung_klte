@@ -101,6 +101,7 @@ static int __devinit vfe_probe(struct platform_device *pdev)
 	}
 
 	INIT_LIST_HEAD(&vfe_dev->tasklet_q);
+	INIT_LIST_HEAD(&vfe_dev->tasklet_regupdate_q);
 	tasklet_init(&vfe_dev->vfe_tasklet,
 		     msm_isp_do_tasklet, (unsigned long)vfe_dev);
 
@@ -137,6 +138,7 @@ static int __devinit vfe_probe(struct platform_device *pdev)
 					&vfe_vb2_ops, &vfe_layout);
 	if (rc < 0) {
 		pr_err("%s: Unable to create buffer manager\n", __func__);
+		msm_sd_unregister(&vfe_dev->subdev);
 		kfree(vfe_dev);
 		return -EINVAL;
 	}

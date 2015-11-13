@@ -1,3 +1,35 @@
+/*
+ * fs/scfs/kthread.c
+ *
+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
+ *   Authors: Sunghwan Yun <sunghwan.yun@samsung.com>
+ *            Jongmin Kim <jm45.kim@samsung.com>
+ *            Sangwoo Lee <sangwoo2.lee@samsung.com>
+ *            Inbae Lee   <inbae.lee@samsung.com>
+ *
+ * This program has been developed as a stackable file system based on
+ * the WrapFS, which was written by:
+ *
+ * Copyright (C) 1997-2003 Erez Zadok
+ * Copyright (C) 2001-2003 Stony Brook University
+ * Copyright (C) 2004-2006 International Business Machines Corp.
+ *   Author(s): Michael A. Halcrow <mahalcro@us.ibm.com>
+ *              Michael C. Thompson <mcthomps@us.ibm.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
@@ -100,16 +132,16 @@ int scfs_privileged_open(struct file **lower_file,
 {
 	struct scfs_open_req *req;
 	int flags = O_LARGEFILE;
-	int ret = SCFS_SUCCESS;
+	int ret = 0;
 #if SCFS_PROFILE_MEM
 //	struct scfs_sb_info *sbi;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
 	const struct path path = {lower_mnt, lower_dentry};
-#endif
-
+#else
 	dget(lower_dentry);
 	mntget(lower_mnt);
+#endif
 	flags |= IS_RDONLY(lower_dentry->d_inode) ? O_RDONLY : O_RDWR;
 	(*lower_file) = dentry_open(
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
@@ -126,7 +158,7 @@ int scfs_privileged_open(struct file **lower_file,
 	}
 	req = kmem_cache_alloc(scfs_open_req_cache, GFP_KERNEL);
 	if (!req) {
-		ret = SCFS_ERR_OUT_OF_MEMORY;
+		ret = -ENOMEM;
 		goto out;
 	}
 #if SCFS_PROFILE_MEM
@@ -141,7 +173,7 @@ int scfs_privileged_open(struct file **lower_file,
 	req->flags = 0;
 	mutex_lock(&scfs_kthread_ctl.mux);
 	if (scfs_kthread_ctl.flags & SCFS_KTHREAD_ZOMBIE) {
-		ret = SCFS_ERR_IO;
+		ret = -EIO;
 		mutex_unlock(&scfs_kthread_ctl.mux);
 		SCFS_PRINT_ERROR("We are in the middle of shutting down; "
 		       "aborting privileged request to open lower file\n");
@@ -155,7 +187,7 @@ int scfs_privileged_open(struct file **lower_file,
 	BUG_ON(req->flags == 0);
 	if (req->flags & SCFS_REQ_DROPPED
 	    || req->flags & SCFS_REQ_ZOMBIE) {
-		ret = SCFS_ERR_IO;
+		ret = -EIO;
 		SCFS_PRINT_ERROR( "Privileged open request dropped\n");
 		goto out_unlock;
 	}

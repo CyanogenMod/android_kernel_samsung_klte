@@ -43,6 +43,7 @@ struct ISDBT_INIT_INFO_T *hInit;
 #define FC8150_NAME		"isdbt"
 static struct isdbt_platform_data *isdbt_pdata;
 
+u8 static_ringbuffer[RING_BUFFER_SIZE];
 
 enum ISDBT_MODE driver_mode = ISDBT_POWEROFF;
 static DEFINE_MUTEX(ringbuffer_lock);
@@ -191,7 +192,7 @@ ISBT_EN_ERR:
 static void isdbt_gpio_init(void)
 {
 	printk("%s\n",__func__);
-/*	
+#ifdef CONFIG_ISDBT_FC8150_HKDI
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_spi_di, GPIOMUX_FUNC_1,
 					 GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 					 GPIO_CFG_ENABLE);
@@ -207,7 +208,7 @@ static void isdbt_gpio_init(void)
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_spi_clk, GPIOMUX_FUNC_1,
 					 GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 					 GPIO_CFG_ENABLE);
-*/
+#endif
 					 
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_en, GPIOMUX_FUNC_GPIO,
 						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
@@ -428,7 +429,8 @@ int isdbt_open(struct inode *inode, struct file *filp)
 	printk("isdbt_open. \n");
 	hOpen = kmalloc(sizeof(struct ISDBT_OPEN_INFO_T), GFP_KERNEL);
 
-	hOpen->buf = kmalloc(RING_BUFFER_SIZE, GFP_KERNEL);
+//	hOpen->buf = kmalloc(RING_BUFFER_SIZE, GFP_KERNEL); //Fix for PLM P140326-05955
+	hOpen->buf = &static_ringbuffer[0];
 	hOpen->isdbttype = 0;
 
 	list_add(&(hOpen->hList), &(hInit->hHead));
@@ -498,7 +500,7 @@ int isdbt_release(struct inode *inode, struct file *filp)
 	hOpen->isdbttype = 0;
 
 	list_del(&(hOpen->hList));
-	kfree(hOpen->buf);
+	/* kfree(hOpen->buf); */
 	kfree(hOpen);
 
 	return 0;
@@ -1140,7 +1142,12 @@ static int isdbt_resume(struct platform_device *pdev)
 
 
 static const struct of_device_id isdbt_match_table[] = {
-	{   .compatible = "isdb_fc8300_pdata",
+	{
+#ifdef CONFIG_ISDBT_FC8150_HKDI
+	    .compatible = "isdb_pdata",
+#else
+	    .compatible = "isdb_fc8300_pdata",
+#endif
 	},
 	{}
 };

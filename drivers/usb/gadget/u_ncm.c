@@ -19,6 +19,7 @@
  */
 
 #include "f_ncm.c"
+#include <linux/module.h>
 
 /* Support dynamic tethering mode.
  * if ncm_connect is true, device is received vendor specific request
@@ -89,7 +90,9 @@ static int ncm_function_bind_config(struct android_usb_function *f,
 	/* we have to use trick.
 	 * rndis name will be used for ethernet interface name.
 	 */
-	ret = gether_setup_name(c->cdev->gadget, ncm->ethaddr, "rndis");
+
+	ret = gether_setup_name(c->cdev->gadget, ncm->ethaddr, "ncm");
+
 	printk(KERN_DEBUG "usb: %s after MAC:%02X:%02X:%02X:%02X:%02X:%02X\n",
 			__func__, ncm->ethaddr[0], ncm->ethaddr[1],
 			ncm->ethaddr[2], ncm->ethaddr[3], ncm->ethaddr[4],
@@ -149,6 +152,7 @@ void set_ncm_ready(bool ready)
 		terminal_mode_vendor_id = 0;
 	}
 }
+EXPORT_SYMBOL(set_ncm_ready);
 
 static ssize_t terminal_version_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -158,7 +162,9 @@ static ssize_t terminal_version_show(struct device *dev,
 			terminal_mode_version & 0xff,
 			(terminal_mode_version >> 8 & 0xff),
 			terminal_mode_vendor_id);
-	printk(KERN_DEBUG "usb: %s terminal_mode %s\n", __func__, buf);
+	if(terminal_mode_version)
+		printk(KERN_DEBUG "usb: %s terminal_mode %s\n", __func__, buf);
+
 	return ret;
 }
 

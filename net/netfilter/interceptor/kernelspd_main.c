@@ -55,7 +55,12 @@ debug_filter_string_set(
 }
 
 
-module_param_call(debug_filter_string, debug_filter_string_set, param_get_string, &kps, 0644);
+module_param_call(
+        debug_filter_string,
+        debug_filter_string_set,
+        param_get_string,
+        &kps,
+        0644);
 
 MODULE_PARM_DESC(
         debug_filter_string,

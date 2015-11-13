@@ -43,7 +43,7 @@ struct pcal6416a_chip {
 	struct gpio_chip gpio_chip;
 	struct dentry	*dentry;
 	struct mutex lock;
-
+	struct pcal6416a_platform_data *pdata;
 	unsigned gpio_start;
 
 	uint16_t reg_output;
@@ -429,6 +429,12 @@ static int pcal6416a_parse_dt(struct device *dev,
 		pdata->support_init = 0;
 	}
 
+	ret = of_property_read_string(np, "pcal6416a,supply-name", &pdata->supply_name);
+	if (ret < 0) {
+		pr_err("[%s]: Unable to read pcal6416a,supply-name\n", __func__);
+		pdata->supply_name = "8084_s4";
+	}
+
 	if (pdata->support_init) {
 		ret = of_property_read_u32(np, "pcal6416a,config", (u32 *)&pdata->init_config);
 		if (ret < 0) {
@@ -465,7 +471,7 @@ static int pcal6416a_parse_dt(struct device *dev,
 		}
 	} else {
 		pdata->init_config = 0x0000;
-		pdata->init_data_out = 0x0000;
+		pdata->init_data_out = 0x0400;
 		pdata->init_en_pull = 0x0000;
 		pdata->init_sel_pull = 0x0000;
 	}
@@ -477,48 +483,50 @@ static int pcal6416a_parse_dt(struct device *dev,
 	pr_info("[%s]gpio_start=[%d]ngpio=[%d]reset-gpio=[%d]\n",
 			__func__, pdata->gpio_start, pdata->ngpio,
 			pdata->reset_gpio);
+	pr_info("[%s] supply-name=[%s]\n",
+			__func__, pdata->supply_name);
 	return 0;
 }
 #endif
 
-static void pcal6416a_power_ctrl(char enable)
+static void pcal6416a_power_ctrl(struct pcal6416a_platform_data *pdata, char enable)
 {
 	int ret = 0;
-	static struct regulator *reg_s4;
+	static struct regulator *reg_power;
 
-	if (!reg_s4) {
-		reg_s4 = regulator_get(NULL, "8084_s4");
-		if (IS_ERR(reg_s4)) {
-			pr_err("%s: could not get 8084_s4, rc = %ld\n",
-					__func__, PTR_ERR(reg_s4));
+	if (!reg_power) {
+		reg_power = regulator_get(NULL, pdata->supply_name);
+		if (IS_ERR(reg_power)) {
+			pr_err("%s: could not get %s, rc = %ld\n",
+					__func__, pdata->supply_name, PTR_ERR(reg_power));
 			return;
 		}
-		ret = regulator_set_voltage(reg_s4, 1800000, 1800000);
+		ret = regulator_set_voltage(reg_power, 1800000, 1800000);
 		if (ret) {
-			pr_err("%s: unable to set s4 voltage to 1.8V\n",
+			pr_err("%s: unable to set power regulator voltage to 1.8V\n",
 					__func__);
 			return;
 		}
 	}
 
 	if (enable) {
-		if (regulator_is_enabled(reg_s4))
-			pr_err("%s: S4(1.8V) is enabled\n", __func__);
+		if (regulator_is_enabled(reg_power))
+			pr_err("%s: power regulator(1.8V) is enabled\n", __func__);
 		else
-			ret = regulator_enable(reg_s4);
+			ret = regulator_enable(reg_power);
 		if (ret) {
-			pr_err("%s: enable s4 failed, rc=%d\n",
+			pr_err("%s: power regulator enable failed, rc=%d\n",
 					__func__, ret);
 			return;
 		}
 		pr_info("%s: gpio expander 1.8V on is finished.\n", __func__);
 	} else {
-		if (regulator_is_enabled(reg_s4))
-			ret = regulator_disable(reg_s4);
+		if (regulator_is_enabled(reg_power))
+			ret = regulator_disable(reg_power);
 		else
-			pr_err("%s: S4(1.8V) is disabled\n", __func__);
+			pr_err("%s: power regulator(1.8V) is disabled\n", __func__);
 		if (ret) {
-			pr_err("%s: disable S4 failed, rc=%d\n",
+			pr_err("%s: disable power regulator failed, rc=%d\n",
 					__func__, ret);
 			return;
 		}
@@ -576,14 +584,26 @@ static ssize_t store_pcal6416a_gpio_inout(struct device *dev,
 	char in_out, msg[13];
 	struct pcal6416a_chip *data = dev_get_drvdata(dev);
 
-	retval = sscanf(buf, "%c %d %d", &in_out, &off, &val);
+	retval = sscanf(buf, "%1c %3d %1d", &in_out, &off, &val);
 	if (retval == 0) {
 		dev_err(&data->client->dev, "[%s] fail to pcal6416a out.\n", __func__);
 		return count;
 	}
+	if (!(in_out == 'i' || in_out == 'o')) {
+		pr_err("[%s] wrong in_out value [%c]\n", __func__,  in_out);
+		return count;
+	}
+	if ((off < 0) || (off > 15)) {
+		pr_err("[%s] wrong offset value [%d]\n", __func__, off);
+		return count;
+	}
+	if (!(val == 0 || val == 1)) {
+		pr_err("[%s] wrong val value [%d]\n", __func__, val);
+		return count;
+	}
 
 	gpio_pcal6416a = data->gpio_start + off;
-	sprintf(msg, "exp-gpio%d\n", off);
+	snprintf(msg, sizeof(msg)/sizeof(char), "exp-gpio%d\n", off);
 	if (gpio_is_valid(gpio_pcal6416a)) {
 		retval = gpio_request(gpio_pcal6416a, msg);
 		if (retval) {
@@ -859,7 +879,7 @@ static int __devinit pcal6416a_gpio_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	pcal6416a_power_ctrl(POWER_ON);
+	pcal6416a_power_ctrl(pdata, POWER_ON);
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL) {
@@ -868,6 +888,7 @@ static int __devinit pcal6416a_gpio_probe(struct i2c_client *client,
 	}
 
 	dev->client = client;
+	dev->pdata = pdata;
 	dev->gpio_start = pdata->gpio_start;
 
 	gc = &dev->gpio_chip;
@@ -968,7 +989,7 @@ err_debug_dir:
 err_destroy:
 	device_destroy(sec_class, 0);
 err:
-	pcal6416a_power_ctrl(POWER_OFF);
+	pcal6416a_power_ctrl(pdata, POWER_OFF);
 	mutex_destroy(&dev->lock);
 	kfree(dev);
 	return ret;
@@ -979,7 +1000,7 @@ static int __devexit pcal6416a_gpio_remove(struct i2c_client *client)
 	struct pcal6416a_chip *dev = i2c_get_clientdata(client);
 	int ret;
 
-	pcal6416a_power_ctrl(POWER_OFF);
+	pcal6416a_power_ctrl(dev->pdata, POWER_OFF);
 	ret = gpiochip_remove(&dev->gpio_chip);
 	if (ret) {
 		dev_err(&client->dev, "gpiochip_remove failed %d\n", ret);

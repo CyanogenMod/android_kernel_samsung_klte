@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -51,7 +51,8 @@ enum mdss_mdp_wb_node_state {
 	REGISTERED,
 	IN_FREE_QUEUE,
 	IN_BUSY_QUEUE,
-	WITH_CLIENT
+	WITH_CLIENT,
+	WB_BUFFER_READY,
 };
 
 struct mdss_mdp_wb_data {
@@ -346,7 +347,6 @@ static int mdss_mdp_wb_register_node(struct mdss_mdp_wb *wb,
 		pr_err("Invalid wb node\n");
 		return -EINVAL;
 	}
-
 	node->state = REGISTERED;
 	list_add_tail(&node->registered_entry, &wb->register_queue);
 
@@ -399,13 +399,22 @@ static struct mdss_mdp_wb_data *get_local_node(struct mdss_mdp_wb *wb,
 static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 						struct msmfb_data *data)
 {
-#if defined(CONFIG_FB_MSM_CMD_MODE)
-	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd); 
-#endif
+
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_wb_data *node;
 	struct mdss_mdp_img_data *buf;
 	int ret;
+
+	if (!list_empty(&wb->register_queue)) {
+		list_for_each_entry(node, &wb->register_queue, registered_entry)
+			if ((node->buf_info.memory_id == data->memory_id) &&
+				    (node->buf_info.offset == data->offset)) {
+				pr_debug("found node fd=%x off=%x addr=%x\n",
+						data->memory_id, data->offset,
+						node->buf_data.p[0].addr);
+				return node;
+			}
+	}
 
 	node = kzalloc(sizeof(struct mdss_mdp_wb_data), GFP_KERNEL);
 	if (node == NULL) {
@@ -419,16 +428,19 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	if (wb->is_secure)
 		buf->flags |= MDP_SECURE_OVERLAY_SESSION;
 
-#if defined(CONFIG_FB_MSM_CMD_MODE)
-	if (!is_mdss_iommu_attached()) 
-		mdss_iommu_attach(ctl->mdata); 
-#endif
-
+	ret = mdss_iommu_ctrl(1);
+	if (IS_ERR_VALUE(ret)) {
+		pr_err("IOMMU attach failed\n");
+		goto register_fail;
+	}
 	ret = mdss_mdp_get_img(data, buf);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("error getting buffer info\n");
+		mdss_iommu_ctrl(0);
 		goto register_fail;
 	}
+	mdss_iommu_ctrl(0);
+
 	memcpy(&node->buf_info, data, sizeof(*data));
 
 	ret = mdss_mdp_wb_register_node(wb, node);
@@ -483,13 +495,37 @@ static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
 	if (node == NULL)
 		node = get_user_node(mfd, data);
 
-	if (!node || node->state == IN_BUSY_QUEUE ||
-	    node->state == IN_FREE_QUEUE) {
-		pr_err("memory not registered or Buffer already with us\n");
-		ret = -EINVAL;
+	if (!node) {
+		pr_err("memory not registered\n");
+		ret = -ENOENT;
 	} else {
-		list_add_tail(&node->active_entry, &wb->free_queue);
-		node->state = IN_FREE_QUEUE;
+		struct mdss_mdp_img_data *buf = &node->buf_data.p[0];
+
+		switch (node->state) {
+		case IN_FREE_QUEUE:
+			pr_err("node 0x%pa was already queueued before\n",
+					&buf->addr);
+			ret = -EINVAL;
+			break;
+		case IN_BUSY_QUEUE:
+			pr_err("node 0x%pa still in busy state\n", &buf->addr);
+			ret = -EBUSY;
+			break;
+		case WB_BUFFER_READY:
+			pr_debug("node 0x%pa re-queueded without dequeue\n",
+				&buf->addr);
+			list_del(&node->active_entry);
+		case WITH_CLIENT:
+		case REGISTERED:
+			list_add_tail(&node->active_entry, &wb->free_queue);
+			node->state = IN_FREE_QUEUE;
+			break;
+		default:
+			pr_err("Invalid node 0x%pa state %d\n",
+				&buf->addr, node->state);
+			ret = -EINVAL;
+			break;
+		}
 	}
 	mutex_unlock(&wb->lock);
 
@@ -561,6 +597,8 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	if (!ctl->power_on)
 		return 0;
 
+	memset(&wb_args, 0, sizeof(wb_args));
+
 	mutex_lock(&mdss_mdp_wb_buf_lock);
 	if (wb) {
 		mutex_lock(&wb->lock);
@@ -601,6 +639,7 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	if (wb && node) {
 		mutex_lock(&wb->lock);
 		list_add_tail(&node->active_entry, &wb->busy_queue);
+		node->state = WB_BUFFER_READY;
 		mutex_unlock(&wb->lock);
 		wake_up(&wb->wait_q);
 	}
@@ -646,7 +685,7 @@ int mdss_mdp_wb_get_format(struct msm_fb_data_type *mfd,
 		return -EINVAL;
 	} else {
 		mixer_cfg->writeback_format = ctl->dst_format;
- 	}
+	}
 
 	return 0;
 }
@@ -663,7 +702,7 @@ int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, u32 dst_format)
 		return -EINVAL;
 	} else {
 		ctl->dst_format = dst_format;
- 	}
+	}
 
 	pr_debug("wfd format %d\n", ctl->dst_format);
 	return 0;
@@ -704,7 +743,13 @@ int mdss_mdp_wb_ioctl_handler(struct msm_fb_data_type *mfd, u32 cmd,
 		}
 		break;
 	case MSMFB_WRITEBACK_TERMINATE:
+		ret = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("IOMMU attach failed\n");
+			return ret;
+		}
 		ret = mdss_mdp_wb_terminate(mfd);
+		mdss_iommu_ctrl(0);
 		break;
 	case MSMFB_WRITEBACK_SET_MIRRORING_HINT:
 		if (!copy_from_user(&hint, arg, sizeof(hint))) {
@@ -815,3 +860,28 @@ int msm_fb_writeback_set_secure(struct fb_info *info, int enable)
 	return mdss_mdp_wb_set_secure(mfd, enable);
 }
 EXPORT_SYMBOL(msm_fb_writeback_set_secure);
+
+/**
+ * msm_fb_writeback_iommu_ref() - Add/Remove vote on MDSS IOMMU being attached.
+ * @enable - true adds vote on MDSS IOMMU, false removes the vote.
+ *
+ * Call to vote on MDSS IOMMU being enabled. To ensure buffers are properly
+ * mapped to IOMMU context bank.
+ */
+int msm_fb_writeback_iommu_ref(struct fb_info *info, int enable)
+{
+	int ret;
+
+	if (enable) {
+		ret = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("IOMMU attach failed\n");
+			return ret;
+		}
+	} else {
+		mdss_iommu_ctrl(0);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_fb_writeback_iommu_ref);

@@ -32,12 +32,11 @@
 #define ABSMIN				-128
 #define ABSMAX				128
 
-#define BMA2X2_MODE_NORMAL             0
-#define BMA2X2_MODE_LOWPOWER1          1
-#define BMA2X2_MODE_SUSPEND            2
-#define BMA2X2_MODE_DEEP_SUSPEND       3
-#define BMA2X2_MODE_LOWPOWER2          4
-#define BMA2X2_MODE_STANDBY            5
+/*Mode for BMA254 only*/
+#define BMA254_MODE_NORMAL			0x00
+#define BMA254_MODE_LOWPOWER1		0x40
+#define BMA254_MODE_SUSPEND			0x80
+#define BMA254_MODE_DEEP_SUSPEND	0x20
 
 /* Bandwidth */
 #define BANDWIDTH_07_81		0x08

@@ -53,7 +53,9 @@ MODULE_DESCRIPTION("Driver for 1-wire Dallas network protocol.");
 static int w1_timeout = 2;
 int w1_max_slave_count = 1;
 int w1_max_slave_ttl = 2;
-
+#if defined(CONFIG_W1_FAST_CHECK)
+extern bool w1_is_resumed;
+#endif
 static struct w1_master *master_dev = NULL;
 
 extern int w1_ds28el15_verifymac(struct w1_slave *sl);
@@ -458,12 +460,26 @@ static struct w1_slave *w1_slave_search_device(struct w1_master *dev,
 {
 	struct w1_slave *sl = NULL;
 	list_for_each_entry(sl, &dev->slist, w1_slave_entry) {
-#if !defined(CONFIG_W1_FAST_CHECK)
-		if (sl->reg_num.family == rn->family &&
-				sl->reg_num.id == rn->id &&
-				sl->reg_num.crc == rn->crc)
-#endif
+#if defined(CONFIG_W1_FAST_CHECK)
+		if (w1_is_resumed == true) {
+			w1_is_resumed = false;
+			if (sl->reg_num.family == rn->family &&
+					sl->reg_num.id == rn->id &&
+					sl->reg_num.crc == rn->crc) {
+				return sl;
+			} else {
+				w1_slave_detach(sl);
+				return NULL;
+			}
+		} else {
 			return sl;
+		}
+#else
+		if (sl->reg_num.family == rn->family &&
+					sl->reg_num.id == rn->id &&
+					sl->reg_num.crc == rn->crc)
+				return sl;
+#endif
 	}
 	return NULL;
 }
@@ -535,6 +551,9 @@ static ssize_t w1_master_attribute_store_remove(struct device *dev,
 static ssize_t w1_master_attribute_show_verify_mac(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int result = -1;
+#ifdef CONFIG_SEC_H_PROJECT
+	result = verified;
+#else
 #ifdef CONFIG_W1_WORKQUEUE
 	cancel_delayed_work_sync(&w1_gdev->w1_dwork);
 	schedule_delayed_work(&w1_gdev->w1_dwork, 0);
@@ -542,7 +561,8 @@ static ssize_t w1_master_attribute_show_verify_mac(struct device *dev, struct de
 	msleep(10);
 #endif
 	result = verification;
-
+#endif
+	printk("Inside w1_master_attribute_show_verify_mac() result = %d \n", result);
 	return sprintf(buf, "%d\n", result);
 }
 
@@ -556,6 +576,7 @@ static ssize_t w1_master_attribute_show_cf(struct device *dev, struct device_att
 
 static ssize_t w1_master_attribute_show_check_id(struct device *dev, struct device_attribute *attr, char *buf)
 {
+	printk("Inside w1_master_attribute_show_check_id id  = %d \n",id);
 	return sprintf(buf, "%d\n", id);
 }
 

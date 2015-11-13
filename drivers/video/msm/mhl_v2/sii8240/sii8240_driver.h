@@ -1009,6 +1009,7 @@ struct sii8240_data {
 	struct work_struct				redetect_work;
 #ifdef SII8240_CHECK_MONITOR
 	struct work_struct				mhl_link_monitor_work;
+	bool ckdt_stable;
 #endif
 #ifdef SFEATURE_UNSTABLE_SOURCE_WA
 	struct work_struct				avi_check_work;

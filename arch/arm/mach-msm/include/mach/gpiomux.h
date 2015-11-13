@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011,2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2011,2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -118,8 +118,6 @@ enum msm_tlmm_misc_reg {
 	TLMM_CDC_HDRV_PULL_CTL = 0x2058,
 };
 
-void msm_tlmm_misc_reg_write(enum msm_tlmm_misc_reg misc_reg, int val);
-
 #ifdef CONFIG_MSM_GPIOMUX
 
 /* Before using gpiomux, initialize the subsystem by telling it how many
@@ -173,6 +171,14 @@ void msm_gpio_print_enabled(void);
  * should use msm_gpiomux_write.
  */
 void __msm_gpiomux_write(unsigned gpio, struct gpiomux_setting val);
+
+/* Functions that provide an API for drivers to read from and write to
+ * miscellaneous TLMM registers.
+ */
+int msm_tlmm_misc_reg_read(enum msm_tlmm_misc_reg misc_reg);
+
+void msm_tlmm_misc_reg_write(enum msm_tlmm_misc_reg misc_reg, int val);
+
 #if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8226) || defined(CONFIG_ARCH_MSM8610)
 void __msm_gpiomux_read(unsigned gpio, struct gpiomux_setting *val);
 #endif
@@ -201,5 +207,16 @@ static inline int msm_gpiomux_write(unsigned gpio,
 {
 	return -ENOSYS;
 }
+
+static inline int msm_tlmm_misc_reg_read(enum msm_tlmm_misc_reg misc_reg)
+{
+	return -ENOSYS;
+}
+
+static inline void msm_tlmm_misc_reg_write(enum msm_tlmm_misc_reg misc_reg,
+						int val)
+{
+}
+
 #endif
 #endif

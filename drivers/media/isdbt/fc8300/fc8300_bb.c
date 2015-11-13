@@ -33,6 +33,8 @@
 
 static enum BROADCAST_TYPE broadcast_type;
 
+extern unsigned int bbm_xtal_freq;
+
 static u32 fc8300_get_current_clk(HANDLE handle, DEVICEID devid)
 {
 	u32 pre_sel, post_sel, multi;
@@ -44,7 +46,7 @@ static u32 fc8300_get_current_clk(HANDLE handle, DEVICEID devid)
 	pre_sel = pll_set & 0x000f;
 	post_sel = (pll_set & 0x00f0) >> 4;
 
-	return ((BBM_XTAL_FREQ >> pre_sel) * multi) >> post_sel;
+	return ((bbm_xtal_freq >> pre_sel) * multi) >> post_sel;
 }
 
 static u32 fc8300_get_core_clk(HANDLE handle, DEVICEID devid,
@@ -53,322 +55,333 @@ static u32 fc8300_get_core_clk(HANDLE handle, DEVICEID devid,
 	u32 clk;
 
 #if (BBM_BAND_WIDTH == 6)
-#if (BBM_XTAL_FREQ == 16000)
-	clk = 100000;
-#elif (BBM_XTAL_FREQ == 16384)
-	clk = 98304;
-#elif (BBM_XTAL_FREQ == 18000)
-	clk = 99000;
-#elif (BBM_XTAL_FREQ == 19200)
-	clk = 100800;
-
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 503143:
-		case 605143:
-		case 707143:
-			clk = 110400;
-		}
-		break;
-	case ISDBTMM_1SEG:
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 503143:
-		case 605143:
-		case 707143:
-			clk = 110400;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
+	if (bbm_xtal_freq == 16000) {
+		clk = 100000;
 	}
-#elif (BBM_XTAL_FREQ == 24000)
-	clk = 99000;
-
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBTMM_1SEG:
-	case ISDBTSB_1SEG:
-	case ISDBT_CATV_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 497143:
-		case 593143:
-		case 695143:
-			clk = 120000;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
+	else if (bbm_xtal_freq == 16384) {
+		clk = 98304;
 	}
-#elif (BBM_XTAL_FREQ == 24576)
-	clk = 98304;
-#elif (BBM_XTAL_FREQ == 26000)
-	clk = 100750;
-
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 479143:
-		case 503143:
-		case 521143:
-		case 569143:
-		case 605143:
-		case 653143:
-		case 707143:
-		case 731143:
-		case 755143:
-		case 773143:
-		case 809143:
-			clk = 107250;
-		}
-		break;
-	case ISDBTMM_1SEG:
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 479143:
-		case 503143:
-		case 521143:
-		case 569143:
-		case 605143:
-		case 653143:
-		case 707143:
-		case 731143:
-		case 755143:
-		case 773143:
-		case 803143:
-		case 809143:
-			clk = 107250;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
+	else if (bbm_xtal_freq == 18000) {
+		clk = 99000;
 	}
-#elif (BBM_XTAL_FREQ == 27000)
-	clk = 97875;
-#elif (BBM_XTAL_FREQ == 27120)
-	clk = 98310;
+	else if (bbm_xtal_freq == 19200) {
+		clk = 100800;
 
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 491143:
-		case 587143:
-		case 689143:
-			clk = 101700;
-		}
-		break;
-	case ISDBTMM_1SEG:
-		switch (freq) {
-		case 221142:
-		case 221143:
-		case 221144:
-			clk = 101700;
-		}
-		break;
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 491143:
-		case 587143:
-		case 689143:
-			clk = 101700;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
-	}
-#elif (BBM_XTAL_FREQ == 32000)
-	clk = 100000;
-
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 683143:
-			clk = 104000;
-		}
-		break;
-	case ISDBTMM_1SEG:
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-		switch (freq) {
-		case 599143:
-		case 701143:
-			clk = 116000;
-		}
-		break;
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 99143:
-		case 153143:
-		case 201143:
-		case 231143:
-		case 249143:
-		case 297143:
-		case 303143:
-		case 351143:
-		case 399143:
-		case 497143:
-		case 503143:
-		case 533143:
-		case 551143:
-		case 599143:
-		case 635143:
-		case 653143:
-		case 749143:
-		case 767143:
-			clk = 108000;
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 503143:
+			case 605143:
+			case 707143:
+				clk = 110400;
+			}
 			break;
-		case 647143:
-		case 665143:
-		case 683143:
-			clk = 112000;
+		case ISDBTMM_1SEG:
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 503143:
+			case 605143:
+			case 707143:
+				clk = 110400;
+			}
+			break;
+		case ISDBTMM_13SEG:
 			break;
 		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
 	}
-#elif (BBM_XTAL_FREQ == 37200)
-	clk = 97650;
+	else if (bbm_xtal_freq == 24000) {
+		clk = 99000;
 
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 659143:
-			clk = 111600;
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBTMM_1SEG:
+		case ISDBTSB_1SEG:
+		case ISDBT_CATV_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 497143:
+			case 593143:
+			case 695143:
+				clk = 120000;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
 		}
-		break;
-	case ISDBTMM_1SEG:
-		switch (freq) {
-		case 219856:
-		case 219857:
-		case 219858:
-			clk = 111600;
-		}
-		break;
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 587143:
-		case 683143:
-			clk = 111600;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
 	}
-#elif (BBM_XTAL_FREQ == 37400)
-	clk = 98175;
+	else if (bbm_xtal_freq == 24576) {
+		clk = 98304;
+	}
+	else if (bbm_xtal_freq == 26000) {
+		clk = 100750;
 
-	switch (broadcast) {
-	case ISDBT_1SEG:
-	case ISDBT_CATV_1SEG:
-		switch (freq) {
-		case 491143:
-			clk = 102850;
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 479143:
+			case 503143:
+			case 521143:
+			case 569143:
+			case 605143:
+			case 653143:
+			case 707143:
+			case 731143:
+			case 755143:
+			case 773143:
+			case 809143:
+				clk = 107250;
+			}
+			break;
+		case ISDBTMM_1SEG:
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 479143:
+			case 503143:
+			case 521143:
+			case 569143:
+			case 605143:
+			case 653143:
+			case 707143:
+			case 731143:
+			case 755143:
+			case 773143:
+			case 803143:
+			case 809143:
+				clk = 107250;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
 		}
-		break;
-	case ISDBTMM_1SEG:
-	case ISDBTSB_1SEG:
-	case ISDBTSB_3SEG:
-		break;
-	case ISDBT_13SEG:
-	case ISDBT_CATV_13SEG:
-		switch (freq) {
-		case 491143:
-		case 587143:
-		case 683143:
-			clk = 102850;
-		}
-		break;
-	case ISDBTMM_13SEG:
-		break;
 	}
-#else /* (BBM_XTAL_FREQ == 38400) */
-	clk = 100800;
-#endif /* BBM_XTAL_FREQ */
+	else if (bbm_xtal_freq == 27000) {
+		clk = 97875;
+	}
+	else if (bbm_xtal_freq == 27120) {
+		clk = 98310;
+
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 491143:
+			case 587143:
+			case 689143:
+				clk = 101700;
+			}
+			break;
+		case ISDBTMM_1SEG:
+			switch (freq) {
+			case 221142:
+			case 221143:
+			case 221144:
+				clk = 101700;
+			}
+			break;
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 491143:
+			case 587143:
+			case 689143:
+				clk = 101700;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
+		}
+	}
+	else if (bbm_xtal_freq == 32000) {
+		clk = 100000;
+
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 683143:
+				clk = 104000;
+			}
+			break;
+		case ISDBTMM_1SEG:
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+			switch (freq) {
+			case 599143:
+			case 701143:
+				clk = 116000;
+			}
+			break;
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 99143:
+			case 153143:
+			case 201143:
+			case 231143:
+			case 249143:
+			case 297143:
+			case 303143:
+			case 351143:
+			case 399143:
+			case 497143:
+			case 503143:
+			case 533143:
+			case 551143:
+			case 599143:
+			case 635143:
+			case 653143:
+			case 749143:
+			case 767143:
+				clk = 108000;
+				break;
+			case 647143:
+			case 665143:
+			case 683143:
+				clk = 112000;
+				break;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
+		}
+	}
+	else if (bbm_xtal_freq == 37200) {
+		clk = 97650;
+
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 659143:
+				clk = 111600;
+			}
+			break;
+		case ISDBTMM_1SEG:
+			switch (freq) {
+			case 219856:
+			case 219857:
+			case 219858:
+				clk = 111600;
+			}
+			break;
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 587143:
+			case 683143:
+				clk = 111600;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
+		}
+	}
+	else if (bbm_xtal_freq == 37400) {
+		clk = 98175;
+
+		switch (broadcast) {
+		case ISDBT_1SEG:
+		case ISDBT_CATV_1SEG:
+			switch (freq) {
+			case 491143:
+				clk = 102850;
+			}
+			break;
+		case ISDBTMM_1SEG:
+		case ISDBTSB_1SEG:
+		case ISDBTSB_3SEG:
+			break;
+		case ISDBT_13SEG:
+		case ISDBT_CATV_13SEG:
+			switch (freq) {
+			case 491143:
+			case 587143:
+			case 683143:
+				clk = 102850;
+			}
+			break;
+		case ISDBTMM_13SEG:
+			break;
+		}
+	}
+	else { /* (bbm_xtal_freq == 38400) */
+		clk = 100800;
+	}
 #elif (BBM_BAND_WIDTH == 7)
-#if (BBM_XTAL_FREQ == 16000)
-	clk = 116000;
-#elif (BBM_XTAL_FREQ == 16384)
-	clk = 114688;
-#elif (BBM_XTAL_FREQ == 18000)
-	clk = 117000;
-#elif (BBM_XTAL_FREQ == 19200)
-	clk = 115200;
-#elif (BBM_XTAL_FREQ == 24000)
-	clk = 114000;
-#elif (BBM_XTAL_FREQ == 24576)
-	clk = 116736;
-#elif (BBM_XTAL_FREQ == 26000)
-	clk = 117000;
-#elif (BBM_XTAL_FREQ == 27000)
-	clk = 114750;
-#elif (BBM_XTAL_FREQ == 27120)
-	clk = 115260;
-#elif (BBM_XTAL_FREQ == 32000)
-	clk = 116000;
-#elif (BBM_XTAL_FREQ == 37200)
-	clk = 116250;
-#elif (BBM_XTAL_FREQ == 37400)
-	clk = 116875;
-#else /* (BBM_XTAL_FREQ == 38400) */
-	clk = 115200;
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		clk = 116000;
+	else if (bbm_xtal_freq == 16384)
+		clk = 114688;
+	else if (bbm_xtal_freq == 18000)
+		clk = 117000;
+	else if (bbm_xtal_freq == 19200)
+		clk = 115200;
+	else if (bbm_xtal_freq == 24000)
+		clk = 114000;
+	else if (bbm_xtal_freq == 24576)
+		clk = 116736;
+	else if (bbm_xtal_freq == 26000)
+		clk = 117000;
+	else if (bbm_xtal_freq == 27000)
+		clk = 114750;
+	else if (bbm_xtal_freq == 27120)
+		clk = 115260;
+	else if (bbm_xtal_freq == 32000)
+		clk = 116000;
+	else if (bbm_xtal_freq == 37200)
+		clk = 116250;
+	else if (bbm_xtal_freq == 37400)
+		clk = 116875;
+	else /* (bbm_xtal_freq == 38400) */
+		clk = 115200;
+
 #else /* (BBM_BAND_WIDTH == 8) */
-#if (BBM_XTAL_FREQ == 16000)
-	clk = 132000;
-#elif (BBM_XTAL_FREQ == 16384)
-	clk = 131072;
-#elif (BBM_XTAL_FREQ == 18000)
-	clk = 130500;
-#elif (BBM_XTAL_FREQ == 19200)
-	clk = 134400;
-#elif (BBM_XTAL_FREQ == 24000)
-	clk = 132000;
-#elif (BBM_XTAL_FREQ == 24576)
-	clk = 135168;
-#elif (BBM_XTAL_FREQ == 26000)
-	clk = 136500;
-#elif (BBM_XTAL_FREQ == 27000)
-	clk = 131625;
-#elif (BBM_XTAL_FREQ == 27120)
-	clk = 132210;
-#elif (BBM_XTAL_FREQ == 32000)
-	clk = 132000;
-#elif (BBM_XTAL_FREQ == 37200)
-	clk = 130200;
-#elif (BBM_XTAL_FREQ == 37400)
-	clk = 130900;
-#else /* (BBM_XTAL_FREQ == 38400) */
-	clk = 134400;
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		clk = 132000;
+	else if (bbm_xtal_freq == 16384)
+		clk = 131072;
+	else if (bbm_xtal_freq == 18000)
+		clk = 130500;
+	else if (bbm_xtal_freq == 19200)
+		clk = 134400;
+	else if (bbm_xtal_freq == 24000)
+		clk = 132000;
+	else if (bbm_xtal_freq == 24576)
+		clk = 135168;
+	else if (bbm_xtal_freq == 26000)
+		clk = 136500;
+	else if (bbm_xtal_freq == 27000)
+		clk = 131625;
+	else if (bbm_xtal_freq == 27120)
+		clk = 132210;
+	else if (bbm_xtal_freq == 32000)
+		clk = 132000;
+	else if (bbm_xtal_freq == 37200)
+		clk = 130200;
+	else if (bbm_xtal_freq == 37400)
+		clk = 130900;
+	else /* (bbm_xtal_freq == 38400) */
+		clk = 134400;
 
 #endif /* #if (BBM_BAND_WIDTH == 6) */
 
@@ -3505,92 +3518,90 @@ static s32 fc8300_set_cal_front_13seg(HANDLE handle, DEVICEID devid, u32 clk)
 
 static s32 fc8300_set_default_core_clk(HANDLE handle, DEVICEID devid)
 {
-	u16 pll_set;
+	u16 pll_set = 0x1a11;
 
 #if (BBM_BAND_WIDTH == 6)
-#if (BBM_XTAL_FREQ == 16000)
-	pll_set = 0x1711;
-#elif (BBM_XTAL_FREQ == 16384)
-	pll_set = 0x1611;
-#elif (BBM_XTAL_FREQ == 18000)
-	pll_set = 0x1411;
-#elif (BBM_XTAL_FREQ == 19200)
-	pll_set = 0x1311;
-#elif (BBM_XTAL_FREQ == 24000)
-	pll_set = 0x1f12;
-#elif (BBM_XTAL_FREQ == 24576)
-	pll_set = 0x1e12;
-#elif (BBM_XTAL_FREQ == 26000)
-	pll_set = 0x1d12;
-#elif (BBM_XTAL_FREQ == 27000)
-	pll_set = 0x1b12;
-#elif (BBM_XTAL_FREQ == 27120)
-	pll_set = 0x1b12;
-#elif (BBM_XTAL_FREQ == 32000)
-	pll_set = 0x1712;
-#elif (BBM_XTAL_FREQ == 37200)
-	pll_set = 0x1312;
-#elif (BBM_XTAL_FREQ == 37400)
-	pll_set = 0x1312;
-#elif (BBM_XTAL_FREQ == 38400)
-	pll_set = 0x1312;
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		pll_set = 0x1711;
+	else if (bbm_xtal_freq == 16384)
+		pll_set = 0x1611;
+	else if (bbm_xtal_freq == 18000)
+		pll_set = 0x1411;
+	else if (bbm_xtal_freq == 19200)
+		pll_set = 0x1311;
+	else if (bbm_xtal_freq == 24000)
+		pll_set = 0x1f12;
+	else if (bbm_xtal_freq == 24576)
+		pll_set = 0x1e12;
+	else if (bbm_xtal_freq == 26000)
+		pll_set = 0x1d12;
+	else if(bbm_xtal_freq == 27000)
+		pll_set = 0x1b12;
+	else if (bbm_xtal_freq == 27120)
+		pll_set = 0x1b12;
+	else if (bbm_xtal_freq == 32000)
+		pll_set = 0x1712;
+	else if (bbm_xtal_freq == 37200)
+		pll_set = 0x1312;
+	else if (bbm_xtal_freq == 37400)
+		pll_set = 0x1312;
+	else if (bbm_xtal_freq == 38400)
+		pll_set = 0x1312;
 #elif (BBM_BAND_WIDTH == 7)
-#if (BBM_XTAL_FREQ == 16000)
-	pll_set = 0x1b11;
-#elif (BBM_XTAL_FREQ == 16384)
-	pll_set = 0x1a11;
-#elif (BBM_XTAL_FREQ == 18000)
-	pll_set = 0x1811;
-#elif (BBM_XTAL_FREQ == 19200)
-	pll_set = 0x1611;
-#elif (BBM_XTAL_FREQ == 24000)
-	pll_set = 0x2412;
-#elif (BBM_XTAL_FREQ == 24576)
-	pll_set = 0x2412;
-#elif (BBM_XTAL_FREQ == 26000)
-	pll_set = 0x2212;
-#elif (BBM_XTAL_FREQ == 27000)
-	pll_set = 0x2012;
-#elif (BBM_XTAL_FREQ == 27120)
-	pll_set = 0x2012;
-#elif (BBM_XTAL_FREQ == 32000)
-	pll_set = 0x1b12;
-#elif (BBM_XTAL_FREQ == 37200)
-	pll_set = 0x1712;
-#elif (BBM_XTAL_FREQ == 37400)
-	pll_set = 0x1712;
-#elif (BBM_XTAL_FREQ == 38400)
-	pll_set = 0x1612;
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		pll_set = 0x1b11;
+	else if(bbm_xtal_freq == 16384)
+		pll_set = 0x1a11;
+	else if (bbm_xtal_freq == 18000)
+		pll_set = 0x1811;
+	else if (bbm_xtal_freq == 19200)
+		pll_set = 0x1611;
+	else if (bbm_xtal_freq == 24000)
+		pll_set = 0x2412;
+	else if (bbm_xtal_freq == 24576)
+		pll_set = 0x2412;
+	else if (bbm_xtal_freq == 26000)
+		pll_set = 0x2212;
+	else if (bbm_xtal_freq == 27000)
+		pll_set = 0x2012;
+	else if (bbm_xtal_freq == 27120)
+		pll_set = 0x2012;
+	else if (bbm_xtal_freq == 32000)
+		pll_set = 0x1b12;
+	else if (bbm_xtal_freq == 37200)
+		pll_set = 0x1712;
+	else if (bbm_xtal_freq == 37400)
+		pll_set = 0x1712;
+	else if (bbm_xtal_freq == 38400)
+		pll_set = 0x1612;
 #else /* BBM_BAND_WIDTH == 8 */
-#if (BBM_XTAL_FREQ == 16000)
-	pll_set = 0x1f11;
-#elif (BBM_XTAL_FREQ == 16384)
-	pll_set = 0x1e11;
-#elif (BBM_XTAL_FREQ == 18000)
-	pll_set = 0x1b11;
-#elif (BBM_XTAL_FREQ == 19200)
-	pll_set = 0x1a11;
-#elif (BBM_XTAL_FREQ == 24000)
-	pll_set = 0x1402;
-#elif (BBM_XTAL_FREQ == 24576)
-	pll_set = 0x1402;
-#elif (BBM_XTAL_FREQ == 26000)
-	pll_set = 0x1302;
-#elif (BBM_XTAL_FREQ == 27000)
-	pll_set = 0x2512;
-#elif (BBM_XTAL_FREQ == 27120)
-	pll_set = 0x2512;
-#elif (BBM_XTAL_FREQ == 32000)
-	pll_set = 0x1f12;
-#elif (BBM_XTAL_FREQ == 37200)
-	pll_set = 0x1a12;
-#elif (BBM_XTAL_FREQ == 37400)
-	pll_set = 0x1a12;
-#elif (BBM_XTAL_FREQ == 38400)
-	pll_set = 0x1a12;
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		pll_set = 0x1f11;
+	else if (bbm_xtal_freq == 16384)
+		pll_set = 0x1e11;
+	else if (bbm_xtal_freq == 18000)
+		pll_set = 0x1b11;
+	else if(bbm_xtal_freq == 19200)
+		pll_set = 0x1a11;
+	else if (bbm_xtal_freq == 24000)
+		pll_set = 0x1402;
+	else if (bbm_xtal_freq == 24576)
+		pll_set = 0x1402;
+	else if (bbm_xtal_freq == 26000)
+		pll_set = 0x1302;
+	else if (bbm_xtal_freq == 27000)
+		pll_set = 0x2512;
+	else if (bbm_xtal_freq == 27120)
+		pll_set = 0x2512;
+	else if (bbm_xtal_freq == 32000)
+		pll_set = 0x1f12;
+	else if(bbm_xtal_freq == 37200)
+		pll_set = 0x1a12;
+	else if (bbm_xtal_freq == 37400)
+		pll_set = 0x1a12;
+	else if (bbm_xtal_freq == 38400)
+		pll_set = 0x1a12;
+
 #endif /* BBM_BAND_WIDTH */
 
 	bbm_byte_write(handle, devid, BBM_PLL_SEL, 0x00);
@@ -3613,16 +3624,16 @@ static s32 fc8300_set_tsif_clk(HANDLE handle, DEVICEID devid)
 	u32 input_freq;
 	u32 multi_3, multi_2, multi_1;
 
-	if (BBM_XTAL_FREQ <= 10000)
+	if (bbm_xtal_freq <= 10000)
 		pre_sel = 0;
-	else if (BBM_XTAL_FREQ <= 20000)
+	else if (bbm_xtal_freq <= 20000)
 		pre_sel = 1;
-	else if (BBM_XTAL_FREQ <= 40000)
+	else if (bbm_xtal_freq <= 40000)
 		pre_sel = 2;
 	else
 		pre_sel = 3;
 
-	input_freq = BBM_XTAL_FREQ >> pre_sel;
+	input_freq = bbm_xtal_freq >> pre_sel;
 
 	multi_3 = (BBM_TSIF_CLK << 3) / input_freq;
 	multi_2 = (BBM_TSIF_CLK << 2) / input_freq;
@@ -3652,89 +3663,86 @@ static s32 fc8300_set_tsif_clk(HANDLE handle, DEVICEID devid)
 	bbm_byte_write(handle, devid, BBM_PLL2_ENABLE, 0x01);
 	bbm_byte_write(handle, devid, BBM_PLL2_PD, 0x00);
 #if (BBM_TSIF_CLK == 48000)
-#if (BBM_XTAL_FREQ == 16000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1621);
-#elif (BBM_XTAL_FREQ == 16384)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1521);
-#elif (BBM_XTAL_FREQ == 18000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1321);
-#elif (BBM_XTAL_FREQ == 19200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1221);
-#elif (BBM_XTAL_FREQ == 24000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1e22);
-#elif (BBM_XTAL_FREQ == 24576)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1d22);
-#elif (BBM_XTAL_FREQ == 26000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1c22);
-#elif (BBM_XTAL_FREQ == 27000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1b22);
-#elif (BBM_XTAL_FREQ == 27120)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1a22);
-#elif (BBM_XTAL_FREQ == 32000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1622);
-#elif (BBM_XTAL_FREQ == 37200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
-#elif (BBM_XTAL_FREQ == 37400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
-#elif (BBM_XTAL_FREQ == 38400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1222);
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1621);
+	else if (bbm_xtal_freq == 16384)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1521);
+	else if (bbm_xtal_freq == 18000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1321);
+	else if (bbm_xtal_freq == 19200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1221);
+	else if (bbm_xtal_freq == 24000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1e22);
+	else if (bbm_xtal_freq == 24576)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1d22);
+	else if (bbm_xtal_freq == 26000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1c22);
+	else if (bbm_xtal_freq == 27000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1b22);
+	else if (bbm_xtal_freq == 27120)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1a22);
+	else if (bbm_xtal_freq == 32000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1622);
+	else if (bbm_xtal_freq == 37200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
+	else if (bbm_xtal_freq == 37400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
+	else if (bbm_xtal_freq == 38400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1222);
 #elif (BBM_TSIF_CLK == 32000)
-#if (BBM_XTAL_FREQ == 16000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e21);
-#elif (BBM_XTAL_FREQ == 16384)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e21);
-#elif (BBM_XTAL_FREQ == 18000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c21);
-#elif (BBM_XTAL_FREQ == 19200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
-#elif (BBM_XTAL_FREQ == 24000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
-#elif (BBM_XTAL_FREQ == 24576)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
-#elif (BBM_XTAL_FREQ == 26000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1222);
-#elif (BBM_XTAL_FREQ == 27000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1122);
-#elif (BBM_XTAL_FREQ == 27120)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1122);
-#elif (BBM_XTAL_FREQ == 32000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e22);
-#elif (BBM_XTAL_FREQ == 37200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c22);
-#elif (BBM_XTAL_FREQ == 37400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c22);
-#elif (BBM_XTAL_FREQ == 38400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b22);
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e21);
+	else if (bbm_xtal_freq == 16384)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e21);
+	else if (bbm_xtal_freq == 18000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c21);
+	else if (bbm_xtal_freq == 19200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
+	else if (bbm_xtal_freq == 24000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
+	else if (bbm_xtal_freq == 24576)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1322);
+	else if (bbm_xtal_freq == 26000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1222);
+	else if (bbm_xtal_freq == 27000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1122);
+	else if (bbm_xtal_freq == 27120)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x1122);
+	else if (bbm_xtal_freq == 32000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e22);
+	else if (bbm_xtal_freq == 37200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c22);
+	else if (bbm_xtal_freq == 37400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0c22);
+	else if (bbm_xtal_freq == 38400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b22);
 #else /* (BBM_TSIF_CLK == 26000) */
-#if (BBM_XTAL_FREQ == 16000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
-#elif (BBM_XTAL_FREQ == 16384)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
-#elif (BBM_XTAL_FREQ == 18000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0921);
-#elif (BBM_XTAL_FREQ == 19200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0921);
-#elif (BBM_XTAL_FREQ == 24000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0f22);
-#elif (BBM_XTAL_FREQ == 24576)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0f22);
-#elif (BBM_XTAL_FREQ == 26000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e22);
-#elif (BBM_XTAL_FREQ == 27000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0d22);
-#elif (BBM_XTAL_FREQ == 27120)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0d22);
-#elif (BBM_XTAL_FREQ == 32000)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b22);
-#elif (BBM_XTAL_FREQ == 37200)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
-#elif (BBM_XTAL_FREQ == 37400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
-#elif (BBM_XTAL_FREQ == 38400)
-	bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
-#endif /* BBM_XTAL_FREQ */
+	if (bbm_xtal_freq == 16000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
+	else if (bbm_xtal_freq == 16384)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b21);
+	else if (bbm_xtal_freq == 18000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0921);
+	else if (bbm_xtal_freq == 19200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0921);
+	else if (bbm_xtal_freq == 24000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0f22);
+	else if (bbm_xtal_freq == 24576)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0f22);
+	else if (bbm_xtal_freq == 26000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0e22);
+	else if (bbm_xtal_freq == 27000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0d22);
+	else if (bbm_xtal_freq == 27120)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0d22);
+	else if (bbm_xtal_freq == 32000)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0b22);
+	else if (bbm_xtal_freq == 37200)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
+	else if (bbm_xtal_freq == 37400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
+	else if (bbm_xtal_freq == 38400)
+		bbm_word_write(handle, devid, BBM_PLL2_PRE_POST_SELECTION, 0x0922);
 #endif /* #if (BBM_TSIF_CLK == 48000) */
 #endif /* #ifdef BBM_TSIF_CLK_ARBITRARY */
 
@@ -3782,16 +3790,16 @@ s32 fc8300_set_core_clk(HANDLE handle, DEVICEID devid,
 	if (new_clk == current_clk)
 		return BBM_OK;
 
-	if (BBM_XTAL_FREQ <= 10000)
+	if (bbm_xtal_freq <= 10000)
 		pre_sel = 0;
-	else if (BBM_XTAL_FREQ <= 20000)
+	else if (bbm_xtal_freq <= 20000)
 		pre_sel = 1;
-	else if (BBM_XTAL_FREQ <= 40000)
+	else if (bbm_xtal_freq <= 40000)
 		pre_sel = 2;
 	else
 		pre_sel = 3;
 
-	input_freq = BBM_XTAL_FREQ >> pre_sel;
+	input_freq = bbm_xtal_freq >> pre_sel;
 
 	multi_3 = (new_clk << 3) / input_freq;
 	multi_2 = (new_clk << 2) / input_freq;
@@ -3894,11 +3902,11 @@ s32 fc8300_init(HANDLE handle, DEVICEID devid)
 #endif /* #ifdef BBM_2_DIVERSITY */
 #endif
 
-#if (BBM_XTAL_FREQ < 30000)
-	bbm_byte_write(handle, DIV_BROADCAST, BBM_FUSELOAD, 0x03);
-#else
-	bbm_byte_write(handle, DIV_BROADCAST, BBM_FUSELOAD, 0x07);
-#endif
+	if (bbm_xtal_freq < 30000)
+		bbm_byte_write(handle, DIV_BROADCAST, BBM_FUSELOAD, 0x03);
+	else
+		bbm_byte_write(handle, DIV_BROADCAST, BBM_FUSELOAD, 0x07);
+
 	msWait(1);
 	bbm_byte_write(handle, DIV_BROADCAST, BBM_FUSELOAD, 0x00);
 
@@ -4727,4 +4735,5 @@ s32 fc8300_set_broadcast_mode(HANDLE handle, DEVICEID devid,
 
 	return res;
 }
+
 

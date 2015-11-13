@@ -12,7 +12,7 @@ config TDMB
 
 	config TDMB_VENDOR_FCI
 	depends on TDMB
-		bool "FCI"
+	bool "FCI"
 
 choice
 	depends on TDMB && TDMB_VENDOR_FCI
@@ -85,9 +85,12 @@ config TDMB_SPI
 config TDMB_EBI
 	depends on TDMB
 	bool "EBI"
-config TDMB_TSIF
+config TDMB_TSIF_SLSI
 	depends on TDMB
-	bool "TSIF"
+	bool "SLSI TSIF"
+config TDMB_TSIF_QC
+	depends on TDMB
+	bool "Qualcomm TSIF"
 
 config TDMB_I2C
 	depends on TDMB
@@ -104,3 +107,7 @@ config TDMB_DEBUG
 config TDMB_ANT_DET
 	depends on TDMB
 	bool "tdmb antenna detector"
+
+config TDMB_VREG_SUPPORT
+	depends on TDMB
+	bool "tdmb use regulator vdd"

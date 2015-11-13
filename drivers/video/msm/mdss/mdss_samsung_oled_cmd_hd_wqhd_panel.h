@@ -34,8 +34,11 @@
 #define LCD_DEBUG(X, ...) pr_info("[LCD]%s:"X, __func__, ## __VA_ARGS__);
 
 #include "smart_dimming.h"
+#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
+#include "smart_mtp_ea8064.h"
+#else
 #include "smart_mtp_s6e3.h"
-
+#endif
 #define MAX_BL 255
 
 enum mipi_samsung_cmd_list {
@@ -218,6 +221,7 @@ enum {
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
 	PANEL_WVGA_OCTA_S6E88A0,
 #endif
+	PANEL_HD_OCTA_EA8064G_CMD,
 };
 
 enum {

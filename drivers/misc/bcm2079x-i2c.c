@@ -61,6 +61,10 @@
 #define PACKET_TYPE_HCIEV	(4)
 #define MAX_PACKET_SIZE		(PACKET_HEADER_SIZE_NCI + 255)
 
+#ifdef CONFIG_MACH_VICTORLTE_CTC
+extern unsigned int system_rev;
+#endif
+
 struct bcm2079x_dev {
 	wait_queue_head_t read_wq;
 	struct mutex read_mutex;
@@ -411,6 +415,14 @@ static int bcm2079x_probe(struct i2c_client *client,
 	struct bcm2079x_dev *bcm2079x_dev;
 #ifdef DEBUG_BCM2079X_I2C_IRQ
 	char tmp[5] = {0x10, 0x20, 0x00, 0x01, 0x00};
+#endif
+#ifdef CONFIG_MACH_VICTORLTE_CTC
+		pr_info("%s : start  system_rev : %d\n", __func__,system_rev);
+		if (system_rev > 2)
+		{
+			pr_info("%s : probe fail \n", __func__);
+			return -ENODEV;
+		}
 #endif
 	if (client->dev.of_node) {
 		platform_data = devm_kzalloc(&client->dev,

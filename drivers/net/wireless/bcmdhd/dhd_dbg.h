@@ -21,14 +21,14 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_dbg.h 419132 2013-08-19 21:33:05Z $
+ * $Id: dhd_dbg.h 424863 2013-09-19 20:06:14Z $
  */
 
 #ifndef _dhd_dbg_
 #define _dhd_dbg_
 
 #if !defined(CUSTOMER_HW4)
-#define USE_NET_RATELIMIT		net_ratelimit()
+#define USE_NET_RATELIMIT		1
 #else
 #define USE_NET_RATELIMIT		1
 #endif

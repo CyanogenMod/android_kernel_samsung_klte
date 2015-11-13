@@ -49,7 +49,6 @@
 #include "fc8300_es2_tun.h"
 #include "fc8300_cs_tun.h"
 
-#define FC8300_FREQ_XTAL BBM_XTAL_FREQ /* 19200 */
 #define FC8300_TUN_ES1  0xa0
 #define FC8300_TUN_ES2  0xb0
 #define FC8300_TUN_CS   0xc0

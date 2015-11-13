@@ -686,7 +686,7 @@ static DEVICE_ATTR(vendor, S_IRUGO, gyro_vendor_show, NULL);
 static DEVICE_ATTR(power_off, S_IRUGO, gyro_power_off, NULL);
 static DEVICE_ATTR(power_on, S_IRUGO, gyro_power_on, NULL);
 static DEVICE_ATTR(temperature, S_IRUGO, gyro_get_temp, NULL);
-static DEVICE_ATTR(selftest, S_IRUGO, gyro_selftest_show, NULL);
+static DEVICE_ATTR(selftest, S_IRUSR|S_IRGRP, gyro_selftest_show, NULL);
 static DEVICE_ATTR(selftest_dps, S_IRUGO | S_IWUSR | S_IWGRP,
 	gyro_selftest_dps_show, gyro_selftest_dps_store);
 

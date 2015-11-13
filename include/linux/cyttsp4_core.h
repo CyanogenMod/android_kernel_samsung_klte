@@ -22,10 +22,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
  * Contact Cypress Semiconductor at www.cypress.com <ttdrivers@cypress.com>
  *
  */
@@ -33,83 +29,153 @@
 #ifndef _LINUX_CYTTSP4_CORE_H
 #define _LINUX_CYTTSP4_CORE_H
 
-#define CYTTSP4_CORE_NAME "cyttsp4_core"
+#include <linux/stringify.h>
 
-#define CYTTSP4_STR(x) #x
-#define CYTTSP4_STRINGIFY(x) CYTTSP4_STR(x)
+#define CYTTSP4_I2C_NAME "cyttsp4_i2c_adapter"
+#define CYTTSP4_SPI_NAME "cyttsp4_spi_adapter"
+
+#define CYTTSP4_CORE_NAME "cyttsp4_core"
+#define CYTTSP4_MT_NAME "sec_touchscreen"
+#define CYTTSP4_BTN_NAME "cyttsp4_btn"
+#define CYTTSP4_PROXIMITY_NAME "cyttsp4_proximity"
 
 #define CY_DRIVER_NAME TTDA
 #define CY_DRIVER_MAJOR 02
-#define CY_DRIVER_MINOR 02
+#define CY_DRIVER_MINOR 04
 
-#define CY_DRIVER_REVCTRL 409009
+#define CY_DRIVER_REVCTRL 600162
 
-#define CY_DRIVER_VERSION			    \
-CYTTSP4_STRINGIFY(CY_DRIVER_NAME)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_MAJOR)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_MINOR)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_REVCTRL)
+#define CY_DRIVER_VERSION		    \
+__stringify(CY_DRIVER_NAME)		    \
+"." __stringify(CY_DRIVER_MAJOR)	    \
+"." __stringify(CY_DRIVER_MINOR)	    \
+"." __stringify(CY_DRIVER_REVCTRL)
 
-#define CY_DRIVER_DATE "20121127"	/* YYYYMMDD */
+#define CY_DRIVER_DATE "20140218"	/* YYYYMMDD */
 
-/* x-axis resolution of panel in pixels */
-#define CY_PCFG_RESOLUTION_X_MASK 0x7F
+/* abs settings */
+#define CY_IGNORE_VALUE             0xFFFF
 
-/* y-axis resolution of panel in pixels */
-#define CY_PCFG_RESOLUTION_Y_MASK 0x7F
+enum cyttsp4_core_platform_flags {
+	CY_CORE_FLAG_NONE		= 0,
+	CY_CORE_FLAG_WAKE_ON_GESTURE	= (1 << 0),
+	CY_CORE_FLAG_POWEROFF_ON_SLEEP	= (1 << 1),
+	/* choose SCAN_TYPE or TOUCH_MODE RAM ID to alter scan type */
+	CY_CORE_FLAG_SCAN_MODE_USES_RAM_ID_SCAN_TYPE = (1 << 2),
+};
 
-/* x-axis, 0:origin is on left side of panel, 1: right */
-#define CY_PCFG_ORIGIN_X_MASK 0x80
+enum cyttsp4_core_platform_easy_wakeup_gesture {
+	CY_CORE_EWG_NONE,
+	CY_CORE_EWG_TAP_TAP,
+	CY_CORE_EWG_TWO_FINGER_SLIDE,
+	CY_CORE_EWG_RESERVED,
+	CY_CORE_EWG_WAKE_ON_INT_FROM_HOST = 0xFF,
+};
 
-/* y-axis, 0:origin is on top side of panel, 1: bottom */
-#define CY_PCFG_ORIGIN_Y_MASK 0x80
-
-#define CY_TOUCH_SETTINGS_MAX 32
+enum cyttsp4_loader_platform_flags {
+	CY_LOADER_FLAG_NONE,
+	CY_LOADER_FLAG_CALIBRATE_AFTER_FW_UPGRADE,
+	/* Use CONFIG_VER field in TT_CFG to decide TT_CFG update */
+	CY_LOADER_FLAG_CHECK_TTCONFIG_VERSION,
+};
 
 struct touch_settings {
-	const uint8_t   *data;
-	uint32_t         size;
-	uint8_t         tag;
+	const uint8_t *data;
+	uint32_t size;
+	uint8_t tag;
 } __packed;
 
-#ifndef SAMSUNG_SYSINFO_DATA
-#define SAMSUNG_SYSINFO_DATA
-#endif
 struct cyttsp4_touch_firmware {
 	const uint8_t *img;
 	uint32_t size;
-#ifndef SAMSUNG_SYSINFO_DATA
 	const uint8_t *ver;
 	uint8_t vsize;
-#else
+#ifdef SAMSUNG_TSP_INFO	
 	uint8_t hw_version;
-	uint8_t config_version;
 	uint16_t fw_version;
+	uint8_t cfg_version;
 #endif
 } __packed;
+
+struct cyttsp4_touch_config {
+	struct touch_settings *param_regs;
+	struct touch_settings *param_size;
+	const uint8_t *fw_ver;
+	uint8_t fw_vsize;
+};
+
+struct cyttsp4_loader_platform_data {
+	struct cyttsp4_touch_firmware *fw;
+	struct cyttsp4_touch_config *ttconfig;
+	const char *sdcard_path;
+	u32 flags;
+} __packed;
+
+typedef int (*cyttsp4_platform_read) (struct device *dev, u16 addr,
+	void *buf, int size);
+
+#define CY_TOUCH_SETTINGS_MAX 32
 
 struct cyttsp4_core_platform_data {
 	int irq_gpio;
 	int rst_gpio;
 	int level_irq_udelay;
+	int max_xfer_len;
 	int (*xres)(struct cyttsp4_core_platform_data *pdata,
 		struct device *dev);
 	int (*init)(struct cyttsp4_core_platform_data *pdata,
 		int on, struct device *dev);
 	int (*power)(struct cyttsp4_core_platform_data *pdata,
 		int on, struct device *dev, atomic_t *ignore_irq);
+	int (*detect)(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev, cyttsp4_platform_read read);
 	int (*irq_stat)(struct cyttsp4_core_platform_data *pdata,
 		struct device *dev);
-	int (*led_power)(int on);
 	struct touch_settings *sett[CY_TOUCH_SETTINGS_MAX];
-	struct cyttsp4_touch_firmware *fw;
+	struct cyttsp4_loader_platform_data *loader_pdata;
+	u32 flags;
+	u8 easy_wakeup_gesture;
 };
 
-#ifdef VERBOSE_DEBUG
-extern void cyttsp4_pr_buf(struct device *dev, u8 *pr_buf, u8 *dptr, int size,
-			   const char *data_name);
-#else
-#define cyttsp4_pr_buf(a, b, c, d, e) do { } while (0)
-#endif
+struct touch_framework {
+	const uint16_t  *abs;
+	uint8_t         size;
+	uint8_t         enable_vkeys;
+} __packed;
+
+enum cyttsp4_mt_platform_flags {
+	CY_MT_FLAG_NONE = 0x00,
+	CY_MT_FLAG_HOVER = 0x04,
+	CY_MT_FLAG_FLIP = 0x08,
+	CY_MT_FLAG_INV_X = 0x10,
+	CY_MT_FLAG_INV_Y = 0x20,
+	CY_MT_FLAG_VKEYS = 0x40,
+	CY_MT_FLAG_NO_TOUCH_ON_LO = 0x80,
+};
+
+struct cyttsp4_mt_platform_data {
+	struct touch_framework *frmwrk;
+	unsigned short flags;
+	char const *inp_dev_name;
+	int vkeys_x;
+	int vkeys_y;
+};
+
+struct cyttsp4_btn_platform_data {
+	char const *inp_dev_name;
+};
+
+struct cyttsp4_proximity_platform_data {
+	struct touch_framework *frmwrk;
+	char const *inp_dev_name;
+};
+
+struct cyttsp4_platform_data {
+	struct cyttsp4_core_platform_data *core_pdata;
+	struct cyttsp4_mt_platform_data *mt_pdata;
+	struct cyttsp4_btn_platform_data *btn_pdata;
+	struct cyttsp4_proximity_platform_data *prox_pdata;
+	struct cyttsp4_loader_platform_data *loader_pdata;
+};
 
 #endif /* _LINUX_CYTTSP4_CORE_H */

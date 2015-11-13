@@ -9,7 +9,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#define DEBUG
 #include <linux/battery/sec_fuelgauge.h>
 #include <linux/battery/sec_charger.h>
 #include <linux/battery/sec_battery.h>
@@ -33,6 +32,7 @@ static enum power_supply_property sec_fuelgauge_props[] = {
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT,
+	POWER_SUPPLY_PROP_ENERGY_FULL,
 };
 
 /* capacity is  0.1% unit */
@@ -44,9 +44,18 @@ static void sec_fg_get_scaled_capacity(
 		0 : ((val->intval - fuelgauge->pdata->capacity_min) * 1000 /
 		(fuelgauge->capacity_max - fuelgauge->pdata->capacity_min));
 
-	dev_dbg(&fuelgauge->client->dev,
+	dev_info(&fuelgauge->client->dev,
 		"%s: scaled capacity (%d.%d)\n",
 		__func__, val->intval/10, val->intval%10);
+
+#if defined(CONFIG_MACH_KLIMT)|| defined(CONFIG_MACH_CHAGALL)
+	/* Reduce soc jump when battery is full
+	   change capacity_max to initial value */
+	if (fuelgauge->is_charging) {
+		if (fuelgauge->capacity_max > fuelgauge->pdata->capacity_max)
+			fuelgauge->capacity_max--;
+	}
+#endif
 }
 
 /* capacity is integer */
@@ -95,11 +104,20 @@ static int sec_fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CAPACITY:
 	case POWER_SUPPLY_PROP_TEMP:
 	case POWER_SUPPLY_PROP_TEMP_AMBIENT:
+	case POWER_SUPPLY_PROP_ENERGY_FULL:
 		if (!sec_hal_fg_get_property(fuelgauge->client, psp, val))
 			return -EINVAL;
 		if (psp == POWER_SUPPLY_PROP_CAPACITY) {
 			if (soc_type == SEC_FUELGAUGE_CAPACITY_TYPE_RAW)
 				break;
+
+			/* check whether doing the wake_unlock */
+			if ((val->intval > fuelgauge->pdata->fuel_alert_soc) &&
+				fuelgauge->is_fuel_alerted) {
+				wake_unlock(&fuelgauge->fuel_alert_wake_lock);
+				sec_hal_fg_fuelalert_init(fuelgauge->client,
+					fuelgauge->pdata->fuel_alert_soc);
+			}
 
 			if (fuelgauge->pdata->capacity_calculation_type &
 				(SEC_FUELGAUGE_CAPACITY_TYPE_SCALE |
@@ -116,14 +134,6 @@ static int sec_fg_get_property(struct power_supply *psy,
 
 			/* get only integer part */
 			val->intval /= 10;
-
-			/* check whether doing the wake_unlock */
-			if ((val->intval > fuelgauge->pdata->fuel_alert_soc) &&
-				fuelgauge->is_fuel_alerted) {
-				wake_unlock(&fuelgauge->fuel_alert_wake_lock);
-				sec_hal_fg_fuelalert_init(fuelgauge->client,
-					fuelgauge->pdata->fuel_alert_soc);
-			}
 
 			/* (Only for atomic capacity)
 			 * In initial time, capacity_old is 0.
@@ -373,6 +383,9 @@ static int fuelgauge_parse_dt(struct device *dev,
 			struct sec_fuelgauge_info *fuelgauge)
 {
 	struct device_node *np = dev->of_node;
+#if !defined(CONFIG_FUELGAUGE_MAX17050)
+	struct device_node *bnp = of_find_node_by_name(NULL, "battery");
+#endif
 	sec_battery_platform_data_t *pdata = fuelgauge->pdata;
 	int ret;
 #if 0
@@ -425,6 +438,15 @@ static int fuelgauge_parse_dt(struct device *dev,
 				pdata->fuel_alert_soc, pdata->repeated_fuelalert, pdata->jig_irq);
 
 #else
+		pdata->charger_name = "sec-charger";
+		if (bnp == NULL) {
+			pr_err("%s bnp NULL, Forced set to sec-charger\n", __func__);
+		} else {
+			ret = of_property_read_string(bnp,
+				"battery,charger_name", (char const **)&pdata->charger_name);
+			if (ret)
+				pr_info("%s: Vendor is Empty. Forced set to sec-charger\n", __func__);
+		}
 		ret = of_get_named_gpio(np, "fuelgauge,fuel_int", 0);
 		if (ret > 0) {
 			pdata->fg_irq = ret;

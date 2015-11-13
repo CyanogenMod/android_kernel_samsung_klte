@@ -284,8 +284,107 @@ static struct sec_therm_adc_table temper_table_ap[] = {
 	{1626500,	 -200},
 	{1697050,	 -300},
 };
+#elif defined(CONFIG_SEC_BERLUTI_PROJECT)
+static struct sec_therm_adc_table temper_table_ap[] = {
+	{25204, 900},
+	{25624, 850},
+	{26045, 800},
+	{26350, 750},
+	{26656, 700},
+	{27101, 650},
+	{27554, 600},
+	{27650, 590},
+	{27746, 580},
+	{27842, 570},
+	{27938, 560},
+	{28034, 550},
+	{28152, 540},
+	{28270, 530},
+	{28388, 520},
+	{28506, 510},
+	{28625, 500},
+	{28766, 490},
+	{28907, 480},
+	{29048, 470},
+	{29189, 460},
+	{29330, 450},
+	{29485, 440},
+	{29640, 430},
+	{29795, 420},
+	{29950, 410},
+	{30107, 400},
+	{30298, 390},
+	{30489, 380},
+	{30680, 370},
+	{30871, 360},
+	{31064, 350},
+	{31239, 340},
+	{31414, 330},
+	{31589, 320},
+	{31764, 310},
+	{31940, 300},
+	{34068, 200},
+	{36339, 100},
+	{38445, 0},
+	{39784, -100},
+	{41874, -200},
+};
+#elif defined (CONFIG_MACH_VICTORLTE_CTC)
+static struct sec_therm_adc_table temper_table_ap[] = {
+	{26026, 900},
+	{26086, 850},
+	{26146, 800},
+	{26393, 750},
+	{26785, 700},
+	{26865, 690},
+	{26945, 680},
+	{27026, 670},
+	{27106, 660},
+	{27187, 650},
+	{27281, 640},
+	{27375, 630},
+	{27470, 620},
+	{27564, 610},
+	{27659, 600},
+	{27766, 590},
+	{27873, 580},
+	{27980, 570},
+	{28087, 560},
+	{28194, 550},
+	{28314, 540},
+	{28434, 530},
+	{28554, 520},
+	{28674, 510},
+	{28794, 500},
+	{28934, 490},
+	{29074, 480},
+	{29214, 470},
+	{29354, 460},
+	{29494, 450},
+	{29653, 440},
+	{29812, 430},
+	{29972, 420},
+	{30131, 410},
+	{30291, 400},
+	{30473, 390},
+	{30655, 380},
+	{30838, 370},
+	{31020, 360},
+	{31203, 350},
+	{31371, 340},
+	{31539, 330},
+	{31708, 320},
+	{31876, 310},
+	{32045, 300},
+};
 #elif defined (CONFIG_ARCH_MSM8226)
 static struct sec_therm_adc_table temper_table_ap[] = {
+	{23196, 900},
+	{23803, 850},
+	{24437, 800},
+	{25111, 750},
+	{25889, 700},
+	{26669, 650},
 	{27299, 620},
 	{27378, 610},
 	{27514, 600},
@@ -636,18 +735,11 @@ struct sec_therm_platform_data sec_therm_pdata = {
 	.no_polling     = 1,
 };
 
-#if defined(CONFIG_MACH_MS01) || defined(CONFIG_MACH_CRATERVE) || defined(CONFIG_MACH_CT01) || \
-	defined(CONFIG_MACH_S3VE) || defined(CONFIG_MACH_MS01_LTE) || \
-	defined(CONFIG_MACH_CS03_SGLTE) || defined(CONFIG_MACH_CRATERQ) || defined(CONFIG_MACH_MS01_LTE_KOR) || \
-	defined(CONFIG_MACH_MS01_CHN_CMCC_3G) || defined(CONFIG_MACH_MS01_CHN_CTC)|| \
-	defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined(CONFIG_MACH_S3VE3G_EUR) || \
-	defined(CONFIG_SEC_AFYON_PROJECT) || defined(CONFIG_SEC_VICTOR_PROJECT) || defined(CONFIG_SEC_BERLUTI_PROJECT)
 struct platform_device sec_device_thermistor = {
 	.name = "sec-thermistor",
 	.id = -1,
 	.dev.platform_data = &sec_therm_pdata,
 };
-#endif
 
 struct sec_therm_platform_data * fill_therm_pdata(struct platform_device *pdev)
 {

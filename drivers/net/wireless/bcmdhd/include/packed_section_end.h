@@ -38,7 +38,10 @@
  */
 
 
-
+/* Error check - BWL_PACKED_SECTION is defined in packed_section_start.h
+ * and undefined in packed_section_end.h. If it is NOT defined at this
+ * point, then there is a missing include of packed_section_start.h.
+ */
 #ifdef BWL_PACKED_SECTION
 	#undef BWL_PACKED_SECTION
 #else
@@ -48,6 +51,9 @@
 
 
 
-
+/* Compiler-specific directives for structure packing are declared in
+ * packed_section_start.h. This marks the end of the structure packing section,
+ * so, undef them here.
+ */
 #undef	BWL_PRE_PACKED_STRUCT
 #undef	BWL_POST_PACKED_STRUCT

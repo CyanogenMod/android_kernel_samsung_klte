@@ -46,7 +46,7 @@ struct max77804k_led_data {
 	int test_brightness;
 #ifdef CONFIG_LEDS_SEPERATE_MOVIE_FLASH
 	int movie_brightness;
-#endif 
+#endif
 };
 
 static u8 led_en_mask[MAX77804K_LED_MAX] = {
@@ -329,7 +329,7 @@ static int max77804k_led_setup(struct max77804k_led_data *led_data)
 				  MAX77804K_BOOST_VOUT_FLASH_FROM_VOLT(3300));
 	ret |= max77804k_write_reg(led_data->i2c, MAX77804K_CHG_REG_CHG_CNFG_11, 0x2B);
 	ret |= max77804k_write_reg(led_data->i2c,
-				MAX77804K_LED_REG_MAX_FLASH1, 0xBC);
+				MAX77804K_LED_REG_MAX_FLASH1, 0x3C);
 	ret |= max77804k_write_reg(led_data->i2c,
 				MAX77804K_LED_REG_MAX_FLASH2, 0x00);
 
@@ -519,7 +519,7 @@ static int __devexit max77804k_led_remove(struct platform_device *pdev)
 	device_remove_file(flash_dev, &dev_attr_rear_flash);
 #ifdef CONFIG_LEDS_SEPERATE_MOVIE_FLASH
 	device_remove_file(flash_dev, &dev_attr_movie_brightness);
-#endif	
+#endif
 	device_destroy(camera_class, 0);
 	class_destroy(camera_class);
 

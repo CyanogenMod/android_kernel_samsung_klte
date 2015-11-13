@@ -34,9 +34,9 @@
 
 
 typedef struct _IST30XX_RINGBUF {
-	int	RingBufCtr; // Number of characters in the ring buffer
-	u16	RingBufInIdx;
-	u16	RingBufOutIdx;
+	u32	RingBufCtr; // Number of characters in the ring buffer
+	u32	RingBufInIdx;
+	u32	RingBufOutIdx;
 	u8	LogBuf[IST30XX_MAX_LOG_SIZE];        // Ring buffer for status
 } IST30XX_RING_BUF;
 
@@ -48,7 +48,7 @@ int ist30xx_get_track(u32 *track, int cnt);
 int ist30xx_put_track(u32 *track, int cnt);
 int ist30xx_put_track_ms(u32 ms);
 
-int ist30xx_get_track_cnt(void);
+u32 ist30xx_get_track_cnt(void);
 
 int ist30xx_tracking(u32 status);
 

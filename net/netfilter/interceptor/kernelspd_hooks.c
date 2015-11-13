@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2013 - 2014, INSIDE Secure Oy. All rights reserved.
 */
 
 #include <linux/kernel.h>
@@ -10,8 +10,17 @@
 #include <linux/udp.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/version.h>
 
 #include "kernelspd_internal.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+#define HOOK_TYPE unsigned int
+#define HOOK_NUM(__hook) (__hook)
+#else
+#define HOOK_TYPE const struct nf_hook_ops *
+#define HOOK_NUM(__hook) (__hook)->hooknum
+#endif
 
 #define HOOK_NAME(hook)                          \
   (hook == NF_INET_LOCAL_IN ? "IN " :            \
@@ -87,8 +96,24 @@ make_spd_lookup(
     }
 
     {
-      int out_protected = spd_is_protected_interface(out_name);
-      int in_protected = spd_is_protected_interface(in_name);
+      bool out_protected = true;
+      bool in_protected = true;
+
+      if (out_name != NULL)
+        {
+          out_protected =
+              ipsec_boundary_is_protected_interface(
+                      ipsec_boundary,
+                      out_name);
+        }
+
+      if (in_name != NULL)
+        {
+          in_protected =
+              ipsec_boundary_is_protected_interface(
+                      ipsec_boundary,
+                      in_name);
+        }
 
       if (in_protected && !out_protected)
         {
@@ -185,13 +210,14 @@ make_spd_lookup(
 
 static unsigned int
 hook_ipv4(
-        unsigned int hooknum,
+        HOOK_TYPE hook,
         struct sk_buff *skb,
         const struct net_device *in,
         const struct net_device *out,
         int (*okfn)(struct sk_buff *))
 {
   struct IPSelectorFields fields;
+  unsigned int hooknum = HOOK_NUM(hook);
 
   struct iphdr *iph = (struct iphdr *) skb_network_header(skb);
   struct udphdr *udph;
@@ -312,13 +338,14 @@ parse_ip6_headers(
 
 static unsigned int
 hook_ipv6(
-        unsigned int hooknum,
+        HOOK_TYPE hook,
         struct sk_buff *skb,
         const struct net_device *in,
         const struct net_device *out,
         int (*okfn)(struct sk_buff *))
 {
   struct IPSelectorFields fields;
+  unsigned int hooknum = HOOK_NUM(hook);
 
   struct ipv6hdr *iph = (struct ipv6hdr *) skb_network_header(skb);
   struct udphdr *udph;
@@ -412,9 +439,9 @@ spd_hooks_uninit(
 {
   if (initialised != 0)
     {
-      DEBUG_HIGH(hook, "Kernel spd hooks unregistered.");
-
       nf_unregister_hooks(spd_hooks, 6);
       initialised = 0;
+
+      DEBUG_HIGH(hook, "Kernel spd hooks unregistered.");
     }
 }

@@ -70,6 +70,13 @@ struct bio {
 	struct bio_integrity_payload *bi_integrity;  /* data integrity */
 #endif
 
+	/*
+	 * When using dircet-io (O_DIRECT), we can't get the inode from a bio
+	 * by walking bio->bi_io_vec->bv_page->mapping->host
+	 * since the page is anon.
+	 */
+	struct inode		*bi_dio_inode;
+
 	bio_destructor_t	*bi_destructor;	/* destructor */
 
 	/*
@@ -95,6 +102,12 @@ struct bio {
 #define BIO_FS_INTEGRITY 9	/* fs owns integrity data, not block layer */
 #define BIO_QUIET	10	/* Make BIO Quiet */
 #define BIO_MAPPED_INTEGRITY 11/* integrity metadata has been remapped */
+/*
+ * Added for Req based dm which need to perform post processing. This flag
+ * ensures blk_update_request does not free the bios or request, this is done
+ * at the dm level
+ */
+#define BIO_DONTFREE 12
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
@@ -175,6 +188,8 @@ enum rq_flag_bits {
 	 REQ_DISCARD | REQ_NOIDLE | REQ_FLUSH | REQ_FUA | REQ_SECURE | \
 	 REQ_SANITIZE)
 #define REQ_CLONE_MASK		REQ_COMMON_MASK
+
+#define MMC_REQ_NOREINSERT_MASK (REQ_URGENT | REQ_FUA | REQ_FLUSH)
 
 #define REQ_RAHEAD		(1 << __REQ_RAHEAD)
 #define REQ_THROTTLED		(1 << __REQ_THROTTLED)

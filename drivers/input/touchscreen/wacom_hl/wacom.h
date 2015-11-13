@@ -412,14 +412,14 @@ enum BOOST_LEVEL {
 #endif
 
 
-#ifdef CONFIG_SEC_DVFS
+//#ifdef CONFIG_SEC_DVFS
 #include <linux/cpufreq.h>
 #define WACOM_BOOSTER_DVFS
 #define DVFS_STAGE_TRIPLE       3
 #define DVFS_STAGE_DUAL         2
 #define DVFS_STAGE_SINGLE       1
 #define DVFS_STAGE_NONE         0
-#endif
+//#endif
 
 
 /*Parameters for wacom own features*/

@@ -69,7 +69,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #endif
-
+#if defined (CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_ATLANTICLTE_ATT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN)
+#include <asm/hardware/gic.h>
+#endif
 #include <linux/vmalloc.h>
 
 #ifdef CONFIG_SEC_DEBUG_VERBOSE_SUMMARY_HTML
@@ -734,7 +736,11 @@ void *restart_reason;
 #ifdef CONFIG_RESTART_REASON_DDR
 void *restart_reason_ddr_address = NULL;
 /* Using bottom of sec_dbg DDR address range for writting restart reason */
+#ifdef CONFIG_SEC_LPDDR_6G
+#define  RESTART_REASON_DDR_ADDR 0x2FFFE000
+#else
 #define  RESTART_REASON_DDR_ADDR 0x3FFFE000
+#endif
 #endif
 
 DEFINE_PER_CPU(struct sec_debug_core_t, sec_debug_core_reg);
@@ -1456,24 +1462,32 @@ static int sec_debug_normal_reboot_handler(struct notifier_block *nb,
 
 static void sec_debug_set_upload_cause(enum sec_debug_upload_cause_t type)
 {
+#ifdef CONFIG_RESTART_REASON_DDR
+	void *upload_cause_ddr_address = restart_reason_ddr_address + 0x10;
+#endif
 	void * upload_cause = MSM_IMEM_BASE + 0x66C;
 	per_cpu(sec_debug_upload_cause, smp_processor_id()) = type;
 	__raw_writel(type, upload_cause);
 
-	pr_emerg("(%s) %x\n", __func__, type);
+	pr_emerg("(%s) type = 0x%x\n", __func__, type);
 
 #ifdef CONFIG_RESTART_REASON_DDR
-	if(type == UPLOAD_CAUSE_POWER_LONG_PRESS) {
-		if(restart_reason_ddr_address) {
-			void * upload_cause_ddr_address = restart_reason_ddr_address + 0x10;
+	if(restart_reason_ddr_address) {
+		if(type == UPLOAD_CAUSE_POWER_LONG_PRESS) {
 			/* UPLOAD_CAUSE_POWER_LONG_PRESS magic number to DDR restart reason address */
 			__raw_writel(UPLOAD_CAUSE_POWER_LONG_PRESS, upload_cause_ddr_address);
 			pr_info("%s: Write UPLOAD_CAUSE_POWER_LONG_PRESS to DDR : 0x%x \n",
 					__func__,__raw_readl(upload_cause_ddr_address));
 		}
+		/* if power key is released after pressing, clear the DDR */
+		if(type == UPLOAD_CAUSE_INIT &&
+				(UPLOAD_CAUSE_POWER_LONG_PRESS == __raw_readl(upload_cause_ddr_address))) {
+			__raw_writel(0x0, upload_cause_ddr_address);
+			pr_info("%s: Clear UPLOAD_CAUSE_POWER_LONG_PRESS to DDR : 0x%x \n",
+					__func__, __raw_readl(upload_cause_ddr_address));
+		}
 	}
 #endif
-
 }
 
 extern struct uts_namespace init_uts_ns;
@@ -1599,9 +1613,18 @@ EXPORT_SYMBOL(sec_debug_dump_stack);
 extern void dump_tsp_log(void);
 #endif
 
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+extern void tsp_start_read_rawdata(void);
+extern void tsp_stop_read_rawdata(void);
+#endif
+
 void sec_debug_check_crash_key(unsigned int code, int value)
 {
 	static enum { NONE, STEP1, STEP2, STEP3} state = NONE;
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+	static enum { S0, S1, S2, S3 } state_tsp = S0;
+	static bool isCatchRd = true;
+#endif
 #ifdef CONFIG_TOUCHSCREEN_MMS252
         static enum { NO, T1, T2, T3} state_tsp = NO;
 #endif
@@ -1653,6 +1676,41 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 	if (!enable)
 		return;
 
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+	switch(state_tsp) {
+		case S0:
+			if(code == KEY_VOLUMEUP && value)
+				state_tsp = S1;
+			else
+				state_tsp = S0;
+			break;
+		case S1:
+			if (code == KEY_VOLUMEDOWN && value)
+				state_tsp = S2;
+			else
+				state_tsp = S0;
+			break;
+		case S2:
+			if (code == KEY_HOMEPAGE&& value)
+				state_tsp = S3;
+			else
+				state_tsp = S0;
+			break;
+		case S3:
+			if (code == KEY_HOMEPAGE && !value) {
+				if(isCatchRd){
+					isCatchRd = !isCatchRd;
+					tsp_start_read_rawdata();
+				} else {
+					isCatchRd = !isCatchRd;
+					tsp_stop_read_rawdata();
+				}
+			} else {
+				state_tsp = S0;
+			}
+	}
+#endif
+
 	switch (state) {
 	case NONE:
 		if (code == KEY_VOLUMEDOWN && value)
@@ -1677,6 +1735,9 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 			emerg_pet_watchdog();
 			dump_all_task_info();
 			dump_cpu_stat();
+#if defined (CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_ATLANTICLTE_ATT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN)
+			gic_dump_register_set();
+#endif
 			panic("Crash Key");
 		} else {
 			state = NONE;

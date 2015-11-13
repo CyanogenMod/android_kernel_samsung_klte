@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,7 +25,7 @@ static struct snd_soc_dai_ops msm_fe_dai_ops = {};
 /* Conventional and unconventional sample rate supported */
 static unsigned int supported_sample_rates[] = {
 	8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000,
-	96000, 192000
+	88200, 96000, 176400, 192000
 };
 
 static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
@@ -37,11 +37,10 @@ static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
 static int multimedia_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
-	snd_pcm_hw_constraint_list(substream->runtime, 0,
+	return snd_pcm_hw_constraint_list(substream->runtime, 0,
 		SNDRV_PCM_HW_PARAM_RATE,
 		&constraints_sample_rates);
 
-	return 0;
 }
 
 static struct snd_soc_dai_ops msm_fe_Multimedia_dai_ops = {
@@ -689,20 +688,6 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		.name = "DTMF_RX_HOSTLESS",
 	},
 	{
-		.capture = {
-			.stream_name = "Listen Audio Service Capture",
-			.aif_name = "LSM_UL_HL",
-			.rates = SNDRV_PCM_RATE_16000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.channels_min = 1,
-			.channels_max = 1,
-			.rate_min = 16000,
-			.rate_max = 16000,
-		},
-		.ops = &msm_fe_dai_ops,
-		.name = "LSM",
-	},
-	{
 		.playback = {
 			.stream_name = "VoLTE Stub Playback",
 			.aif_name = "VOLTE_STUB_DL",
@@ -829,6 +814,142 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 		},
 		.ops = &msm_fe_dai_ops,
 		.name = "QCHAT",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 1 Audio Service Capture",
+			.aif_name = "LSM1_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM1",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 2 Audio Service Capture",
+			.aif_name = "LSM2_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM2",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 3 Audio Service Capture",
+			.aif_name = "LSM3_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM3",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 4 Audio Service Capture",
+			.aif_name = "LSM4_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM4",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 5 Audio Service Capture",
+			.aif_name = "LSM5_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM5",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 6 Audio Service Capture",
+			.aif_name = "LSM6_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM6",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 7 Audio Service Capture",
+			.aif_name = "LSM7_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM7",
+	},
+	{
+		.capture = {
+			.stream_name = "Listen 8 Audio Service Capture",
+			.aif_name = "LSM8_UL_HL",
+			.rates = SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 1,
+			.rate_min = 16000,
+			.rate_max = 16000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "LSM8",
+	},
+	{
+		.playback = {
+			.stream_name = "VoWLAN Playback",
+			.aif_name = "VoWLAN_DL",
+			.rates = SNDRV_PCM_RATE_8000_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.capture = {
+			.stream_name = "VoWLAN Capture",
+			.aif_name = "VoWLAN_UL",
+			.rates = SNDRV_PCM_RATE_8000_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		.ops = &msm_fe_dai_ops,
+		.name = "VoWLAN",
 	},
 };
 

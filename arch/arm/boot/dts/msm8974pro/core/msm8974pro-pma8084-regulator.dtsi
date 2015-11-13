@@ -385,7 +385,7 @@
 		status = "okay";
 		pma8084_l22: regulator-l22 {
 			regulator-min-microvolt = <3000000>;
-			regulator-max-microvolt = <3000000>;
+			regulator-max-microvolt = <3300000>;
 			qcom,init-voltage = <3000000>;
 			status = "okay";
 		};
@@ -424,7 +424,7 @@
 	rpm-regulator-ldoa26 {
 		status = "okay";
 		pma8084_l26: regulator-l26 {
-			regulator-min-microvolt = <2050000>;
+			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <2050000>;
 			qcom,init-voltage = <2050000>;
 			status = "okay";
@@ -434,7 +434,7 @@
 	rpm-regulator-ldoa27 {
 		status = "okay";
 		pma8084_l27: regulator-l27 {
-			regulator-min-microvolt = <1200000>;
+			regulator-min-microvolt = <1000000>;
 			regulator-max-microvolt = <1225000>;
 			qcom,init-voltage = <1200000>;
 			status = "okay";
@@ -481,6 +481,9 @@
 		ranges;
 		qcom,pfm-threshold = <76>;
 		qcom,use-phase-scaling-factor;
+		qcom,phase-scaling-factor-bits-pos = <16>;
+		qcom,valid-scaling-factor-versions = <0 1 1 0>;
+		qcom,force-auto-mode;
 
 		krait0_vreg: regulator@f9088000 {
 			compatible = "qcom,krait-regulator";

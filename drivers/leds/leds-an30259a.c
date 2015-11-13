@@ -156,6 +156,21 @@ struct device *led_dev;
 /*path : /sys/class/leds/led_b/brightness*/
 #endif
 
+#if defined (CONFIG_SEC_FACTORY)
+#if defined (CONFIG_SEC_S_PROJECT)
+static int f_jig_cable;
+extern int get_lcd_attached(void);
+
+static int __init get_jig_cable_cmdline(char *mode)
+{
+	f_jig_cable = mode[0]-48;
+	return 0;
+}
+
+__setup( "uart_dbg=", get_jig_cable_cmdline);
+#endif
+#endif
+
 static void leds_on(enum an30259a_led_enum led, bool on, bool slopemode,
 					u8 ledcc);
 
@@ -895,6 +910,16 @@ static int __devinit an30259a_probe(struct i2c_client *client,
 		INIT_WORK(&(data->leds[i].brightness_work),
 				 an30259a_led_brightness_work);
 	}
+
+#if defined (CONFIG_SEC_FACTORY)
+#if defined (CONFIG_SEC_S_PROJECT)
+	if ( (f_jig_cable == 0) && (get_lcd_attached() == 0) ) {
+		pr_info("%s:Factory MODE - No OCTA, Battery BOOTING\n", __func__);
+		leds_on(LED_R, true, false, LED_R_CURRENT);
+		leds_i2c_write_all(data->client);
+	}
+#endif
+#endif
 
 #ifdef SEC_LED_SPECIFIC
 	led_dev = device_create(sec_class, NULL, 0, data, "led");

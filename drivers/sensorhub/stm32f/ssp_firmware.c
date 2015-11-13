@@ -18,10 +18,11 @@
 #ifdef CONFIG_SENSORS_SSP_BOUNCE_FIRMWARE
 #define SSP_FIRMWARE_REVISION_STM	14010300 /* Latest, 88922*/
 #else
-#define SSP_FIRMWARE_REVISION_STM	14011400 /* Latest, 88922*/
+#define SSP_FIRMWARE_REVISION_STM	14111800 /* Latest, 88922*/
 #endif
 #define SSP_FIRMWARE_REVISION_STM_88921	13072401 /* 88921 */
 #define SSP_FIRMWARE_REVISION_STM_RVS	13051500
+#define SSP_FIRMWARE_REVISION_JSGLTE	14070300
 
 #define BOOT_SPI_HZ	960000
 #define NORM_SPI_HZ	4800000
@@ -32,6 +33,7 @@
 #else
 #define BL_FW_NAME			"ssp_stm32f.fw"
 #endif
+#define BL_FW_JSGLTE_NAME			"ssp_stm32f_jsglte.fw"
 #define BL_UMS_FW_NAME			"ssp_stm.bin"
 #define BL_CRASHED_FW_NAME		"ssp_crashed.fw"
 
@@ -103,6 +105,8 @@ unsigned int get_module_rev(struct ssp_data *data)
 {
 #if defined (CONFIG_MACH_VIKALCU)
 		return SSP_FIRMWARE_REVISION_STM;
+#elif defined (CONFIG_MACH_JSGLTE_CHN_CMCC)
+		return SSP_FIRMWARE_REVISION_JSGLTE;
 #else
 	if (data->ap_rev > 3)
 		return SSP_FIRMWARE_REVISION_STM;
@@ -745,8 +749,13 @@ static int update_mcu_bin(struct ssp_data *data, int iBinType)
 	switch (iBinType) {
 	case KERNEL_BINARY:
 	 /* HW request: I2C line is reversed */
+#if defined(CONFIG_MACH_JSGLTE_CHN_CMCC)
+	iRet = load_kernel_fw_bootmode(data->spi,
+		BL_FW_JSGLTE_NAME);
+#else
 	iRet = load_kernel_fw_bootmode(data->spi,
 		BL_FW_NAME);
+#endif
 		break;
 	case KERNEL_CRASHED_BINARY:
 		iRet = load_kernel_fw_bootmode(data->spi,
@@ -842,7 +851,9 @@ int check_fwbl(struct ssp_data *data)
 	unsigned int fw_revision;
 
 	pr_info("[SSP] change_rev = %d\n", data->ssp_changes);
-#if defined (CONFIG_MACH_VIKALCU)
+#if defined (CONFIG_MACH_JSGLTE_CHN_CMCC)
+	fw_revision = SSP_FIRMWARE_REVISION_JSGLTE;
+#elif defined (CONFIG_MACH_VIKALCU)
 	fw_revision = SSP_FIRMWARE_REVISION_STM;
 #elif defined (CONFIG_MACH_HLTEVZW) || defined (CONFIG_MACH_HLTESPR) \
 	|| defined (CONFIG_MACH_HLTEUSC)

@@ -115,9 +115,17 @@ enum {
 	NUM_OF_MPU_REGISTERS	/* = 0x76, 118 */
 };
 
+#define	BIT_STBY_XA				0x20
+#define	BIT_STBY_YA				0x10
+#define	BIT_STBY_ZA				0x08
 #define	BIT_STBY_XG				0x04
 #define	BIT_STBY_YG				0x02
 #define	BIT_STBY_ZG				0x01
+
+#define MPU6500_HWST_ACCEL 0x0001
+#define MPU6500_HWST_GYRO  0x0010
+#define MPU6500_HWST_ALL \
+	(MPU6500_HWST_ACCEL | MPU6500_HWST_GYRO)
 
 enum mpu_filter {
 	MPU_FILTER_250HZ_NOLPF2 = 0,
@@ -144,6 +152,7 @@ int mpu6500_selftest_run(struct inv_mpu_state *st,
 			int gyro_bias[3],
 			int gyro_rms[3],
 			int gyro_lsb_bias[3]);
-int mpu6500_gyro_hw_self_check(struct inv_mpu_state *st, int ratio[3]);
+
+int mpu6500_hw_self_check(struct inv_mpu_state *st, int gyro_ratio[3], int accel_ratio[3], int sensors);
 
 #endif

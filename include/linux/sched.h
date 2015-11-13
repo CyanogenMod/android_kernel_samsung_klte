@@ -673,6 +673,9 @@ struct signal_struct {
 	struct mutex cred_guard_mutex;	/* guard against foreign influences on
 					 * credential calculations
 					 * (notably. ptrace) */
+#ifdef CONFIG_SAMP_HOTNESS
+	int hotness_adj;
+#endif
 };
 
 /* Context switch must be unlocked if interrupts are to be enabled */
@@ -1621,6 +1624,9 @@ struct task_struct {
 #endif
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 	atomic_t ptrace_bp_refcnt;
+#endif
+#ifdef CONFIG_SDP
+	unsigned int sensitive;
 #endif
 };
 

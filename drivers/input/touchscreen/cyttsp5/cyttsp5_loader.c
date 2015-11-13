@@ -84,7 +84,6 @@ struct cyttsp5_loader_data {
 #if !defined(UPGRADE_FW_IN_PROBE)
 	struct work_struct fw_and_config_upgrade;
 #endif
-	struct work_struct calibration_work;
 	struct cyttsp5_loader_platform_data *loader_pdata;
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE
 	struct mutex config_lock;
@@ -188,7 +187,6 @@ static int cyttsp5_ldr_enter_(struct device *dev, struct cyttsp5_dev_id *dev_id)
 	dev_id->bl_ver = 0;
 
 	cmd->request_reset(dev);
-	msleep(CY_LDR_SWITCH_TO_APP_MODE_TIMEOUT);
 
 	rc = cmd->request_get_mode(dev, 0, &mode);
 	if (rc < 0)
@@ -197,7 +195,11 @@ static int cyttsp5_ldr_enter_(struct device *dev, struct cyttsp5_dev_id *dev_id)
 	if (mode == CY_MODE_UNKNOWN)
 		return -EINVAL;
 
+	if (mode == CY_MODE_BOOTLOADER)
+		dev_info(dev, "%s: Bootloader mode\n", __func__);
+	else
 	if (mode == CY_MODE_OPERATIONAL) {
+		dev_info(dev, "%s: Operational mode\n", __func__);
 		rc = cmd->cmd->start_bl(dev, 0);
 		if (rc < 0)
 			return rc;
@@ -325,7 +327,7 @@ static int cyttsp5_load_app_(struct device *dev, const u8 *fw, int fw_size)
 			__func__, rc);
 		goto _cyttsp5_load_app_exit;
 	}
-	dev_vdbg(dev, "%s: dev: silicon id=%08X rev=%02X bl=%08X\n",
+	dev_dbg(dev, "%s: dev: silicon id=%08X rev=%02X bl=%08X\n",
 		__func__, dev_id->silicon_id,
 		dev_id->rev_id, dev_id->bl_ver);
 
@@ -413,53 +415,6 @@ _cyttsp5_load_app_error:
 	return rc;
 }
 
-static void cyttsp5_fw_calibrate(struct work_struct *calibration_work)
-{
-	struct cyttsp5_loader_data *ld = container_of(calibration_work,
-			struct cyttsp5_loader_data, calibration_work);
-	struct device *dev = ld->dev;
-	u8 mode;
-	int rc;
-
-	rc = cmd->request_exclusive(dev, CY_LDR_REQUEST_EXCLUSIVE_TIMEOUT);
-	if (rc < 0)
-		return;
-
-	rc = cmd->cmd->suspend_scanning(dev, 0);
-	if (rc < 0)
-		goto release;
-
-	for (mode = 0; mode < 3; mode++) {
-		rc = cmd->cmd->calibrate_idacs(dev, 0, mode);
-		if (rc < 0)
-			goto release;
-	}
-
-	rc = cmd->cmd->resume_scanning(dev, 0);
-	if (rc < 0)
-		goto release;
-
-	dev_dbg(dev, "%s: Calibration Done\n", __func__);
-
-release:
-	cmd->release_exclusive(dev);
-}
-
-static int cyttsp5_fw_calibration_attention(struct device *dev)
-{
-	struct cyttsp5_loader_data *ld = cyttsp5_get_loader_data(dev);
-	int rc = 0;
-
-	dev_dbg(dev, "%s: \n", __func__);
-
-	schedule_work(&ld->calibration_work);
-
-	cmd->unsubscribe_attention(dev, CY_ATTEN_STARTUP, CY_MODULE_LOADER,
-		cyttsp5_fw_calibration_attention, 0);
-
-	return rc;
-}
-
 static int cyttsp5_upgrade_firmware(struct device *dev, const u8 *fw_img,
 		int fw_size)
 {
@@ -469,7 +424,7 @@ static int cyttsp5_upgrade_firmware(struct device *dev, const u8 *fw_img,
 
 	/*pm_runtime_get_sync(dev);*/
 	dev_dbg(dev, "%s: cmd->request_exclusive = %p\n",
-					__func__, cmd->request_exclusive);
+		__func__, cmd->request_exclusive);
 
 	rc = cmd->request_exclusive(dev, CY_LDR_REQUEST_EXCLUSIVE_TIMEOUT);
 	if (rc < 0) {
@@ -489,21 +444,6 @@ static int cyttsp5_upgrade_firmware(struct device *dev, const u8 *fw_img,
 	if (rc < 0) {
 		dev_err(dev, "%s: Firmware update failed with error code %d\n",
 			__func__, rc);
-	} else/* if (ld->loader_pdata &&
-			(ld->loader_pdata->flags
-			 & CY_LOADER_FLAG_CALIBRATE_AFTER_FW_UPGRADE)) */{
-		/* set up call back for startup */
-		dev_vdbg(dev, "%s: Adding callback for calibration\n",
-			__func__);
-		rc = cmd->subscribe_attention(dev, CY_ATTEN_STARTUP,
-			CY_MODULE_LOADER, cyttsp5_fw_calibration_attention, 0);
-		if (rc) {
-			dev_err(dev, "%s: Failed adding callback for calibration\n",
-				__func__);
-			dev_err(dev, "%s: No calibration will be performed\n",
-				__func__);
-			rc = 0;
-		}
 	}
 
 	cmd->release_exclusive(dev);
@@ -555,8 +495,13 @@ static int cyttsp5_check_firmware_version_platform(struct device *dev,
 	dev_info(dev, "%s: phone fw ver=0x%04x, tsp fw ver=0x%04x\n",
 		__func__, fw->fw_version, get_unaligned_be16(&sti->fw_versionh));
 
-	if (fw->hw_version != sti->hw_version)
-		return 1;
+/*#ifdef CONFIG_SEC_ATLANTIC_PROJECT
+	if (fw->hw_version != sti->hw_version){
+		dev_err(dev, "%s: incompatible firmware\n", __func__);
+		return -1;
+	}
+#endif*/
+
 	if (fw->fw_version > get_unaligned_be16(&sti->fw_versionh))
 		return 1;
 
@@ -612,6 +557,12 @@ static int upgrade_firmware_from_platform(struct device *dev, bool forcedUpgrade
 	}
 
 	upgrade = cyttsp5_check_firmware_version_platform(dev, fw);
+
+#ifdef CONFIG_SEC_ATLANTIC_PROJECT
+	if(upgrade < 0)
+		return 0;
+#endif
+
 	if (forcedUpgrade)
 		dev_info(dev, "%s: forced upgrade\n", __func__);
 	if (upgrade || forcedUpgrade)
@@ -754,6 +705,43 @@ static int upgrade_firmware_from_builtin(struct device *dev)
 	return ld->builtin_bin_fw_status;
 }
 #endif /* CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_BINARY_FW_UPGRADE */
+
+#if CYTTSP5_FW_UPGRADE
+int upgrade_firmware_from_sdcard(struct device *dev,
+	const u8 *fw_data, int fw_size)
+{
+	u8 header_size = 0;
+	int rc = 0;
+
+	if (!fw_data || !fw_size) {
+		dev_err(dev, "%s: No firmware received\n", __func__);
+		return -EINVAL;
+	}
+
+	dev_dbg(dev, "%s: bin data[0~3]=0x%02x 0x%02x 0x%02x 0x%02x\n", __func__,
+			fw_data[0], fw_data[1], fw_data[2], fw_data[3]);
+
+	header_size = fw_data[0];
+	dev_dbg(dev, "%s: header_size=0x%02x\n", __func__, header_size);
+	dev_dbg(dev, "%s: fw_size=0x%08x\n", __func__, fw_size);
+	if (header_size >= (fw_size + 1)) {
+		dev_err(dev, "%s: Firmware format is invalid\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = cyttsp5_upgrade_firmware(dev, &(fw_data[header_size + 1]),
+		fw_size - (header_size + 1));
+
+	return rc;
+}
+#else
+int upgrade_firmware_from_sdcard(struct device *dev,
+	const u8 *fw_data, int fw_size)
+{ 
+	dev_err(dev,"%s: Firmware upgrade is not supported.\n",__func__);
+	return -ESRCH; 
+}
+#endif
 
 #if CYTTSP5_TTCONFIG_UPGRADE
 static int cyttsp5_write_config_row_(struct device *dev, u8 ebid,
@@ -1156,6 +1144,7 @@ static DEVICE_ATTR(config_loading, S_IRUSR | S_IWUSR,
 	cyttsp5_config_loading_show, cyttsp5_config_loading_store);
 #endif /* CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE */
 
+#if CYTTSP5_FW_UPGRADE
 #if !defined(UPGRADE_FW_IN_PROBE)
 static void cyttsp5_fw_and_config_upgrade(
 		struct work_struct *fw_and_config_upgrade)
@@ -1171,7 +1160,7 @@ static void cyttsp5_fw_and_config_upgrade(
 	struct device *dev = ld->dev;
 
 	dev_dbg(dev, "%s:\n", __func__);
-	
+
 	ld->si = cmd->request_sysinfo(dev);
 	if (!ld->si)
 		dev_err(dev, "%s: Fail get sysinfo pointer from core\n",
@@ -1219,6 +1208,7 @@ static ssize_t cyttsp5_manual_upgrade_store(struct device *dev,
 static DEVICE_ATTR(manual_upgrade, S_IRUSR | S_IWUSR,
 	NULL, cyttsp5_manual_upgrade_store);
 #endif
+#endif
 
 int cyttsp5_loader_probe(struct device *dev)
 {
@@ -1228,13 +1218,13 @@ int cyttsp5_loader_probe(struct device *dev)
 	int rc;
 
 	dev_dbg(dev, "%s:\n", __func__);
-	
+
 	cmd = cyttsp5_get_commands();
-	if (!cmd)
-	{
+	if (!cmd) {
 		dev_err(dev, "%s: cmd invalid\n", __func__);
 		return -EINVAL;
 	}
+
 	if (!pdata || !pdata->loader_pdata) {
 		dev_err(dev, "%s: Missing platform data\n", __func__);
 		rc = -ENODEV;
@@ -1288,19 +1278,19 @@ int cyttsp5_loader_probe(struct device *dev)
 #endif
 	cmd->subscribe_attention(dev, CY_ATTEN_IRQ, CY_MODULE_LOADER,
 		cyttsp5_loader_attention, CY_MODE_BOOTLOADER);
-
-	INIT_WORK(&ld->calibration_work, cyttsp5_fw_calibrate);
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE
 	mutex_init(&ld->config_lock);
 #endif
 
+#if CYTTSP5_FW_UPGRADE
 #if !defined(UPGRADE_FW_IN_PROBE)
 	INIT_WORK(&ld->fw_and_config_upgrade, cyttsp5_fw_and_config_upgrade);
 	schedule_work(&ld->fw_and_config_upgrade);
 #else
 	cyttsp5_fw_and_config_upgrade(ld);
+#endif
 #endif
 
 	dev_info(dev, "%s: Successful probe %s\n", __func__, dev_name(dev));

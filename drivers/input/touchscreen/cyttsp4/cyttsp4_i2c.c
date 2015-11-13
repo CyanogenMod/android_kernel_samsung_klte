@@ -22,236 +22,203 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
  * Contact Cypress Semiconductor at www.cypress.com <ttdrivers@cypress.com>
  *
  */
 
-#include <linux/cyttsp4_bus.h>
-#include <linux/cyttsp4_core.h>
-#include "cyttsp4_i2c.h"
-
-#include <linux/delay.h>
-#include <linux/hrtimer.h>
+#include "cyttsp4_regs.h"
 #include <linux/i2c.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/mutex.h>
-#include <linux/pm_runtime.h>
-#include <linux/slab.h>
-#include <linux/of_gpio.h>
 
-#define CY_I2C_DATA_SIZE  (3 * 256)
-
-#if defined(CONFIG_MACH_AFYONLTE)
+#ifdef CONFIG_SAMSUNG_LPM_MODE
 extern int poweroff_charging;
 #endif
-struct cyttsp4_i2c {
-	struct i2c_client *client;
-	u8 wr_buf[CY_I2C_DATA_SIZE];
-	struct hrtimer timer;
-	struct mutex lock;
-	atomic_t timeout;
-};
+#define CY_I2C_DATA_SIZE  (2 * 256)
 
-static int cyttsp4_i2c_read_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
-	size_t length, void *values)
+static int cyttsp4_i2c_read_block_data(struct device *dev, u16 addr,
+	int length, void *values, int max_xfer)
 {
-	int rc;
+	struct i2c_client *client = to_i2c_client(dev);
+	int trans_len;
+	u8 client_addr;
+	u8 addr_lo;
+	struct i2c_msg msgs[2];
+	int rc = -EINVAL;
 
-	/* write addr */
-	rc = i2c_master_send(ts_i2c->client, &addr, sizeof(addr));
-	if (rc < 0)
-		return rc;
-	else if (rc != sizeof(addr))
-		return -EIO;
+	while (length > 0) {
+		client_addr = client->addr | ((addr >> 8) & 0x1);
+		addr_lo = addr & 0xFF;
+		trans_len = min(length, max_xfer);
 
-	/* read data */
-	rc = i2c_master_recv(ts_i2c->client, values, length);
+		memset(msgs, 0, sizeof(msgs));
+		msgs[0].addr = client_addr;
+		msgs[0].flags = 0;
+		msgs[0].len = 1;
+		msgs[0].buf = &addr_lo;
 
-	return (rc < 0) ? rc : rc != length ? -EIO : 0;
+		msgs[1].addr = client_addr;
+		msgs[1].flags = I2C_M_RD;
+		msgs[1].len = trans_len;
+		msgs[1].buf = values;
+
+		rc = i2c_transfer(client->adapter, msgs, 2);
+		if (rc != 2)
+			goto exit;
+
+		length -= trans_len;
+		values += trans_len;
+		addr += trans_len;
+	}
+
+exit:
+	return (rc < 0) ? rc : rc != ARRAY_SIZE(msgs) ? -EIO : 0;
 }
 
-static int cyttsp4_i2c_write_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
-	size_t length, const void *values)
+static int cyttsp4_i2c_write_block_data(struct device *dev, u16 addr,
+	u8 *wr_buf, int length, const void *values, int max_xfer)
 {
-	int rc;
+	struct i2c_client *client = to_i2c_client(dev);
+	u8 client_addr;
+	u8 addr_lo;
+	int trans_len;
+	struct i2c_msg msg;
+	int rc = -EINVAL;
 
-	if (sizeof(ts_i2c->wr_buf) < (length + 1))
-		return -ENOMEM;
+	while (length > 0) {
+		client_addr = client->addr | ((addr >> 8) & 0x1);
+		addr_lo = addr & 0xFF;
+		trans_len = min(length, max_xfer);
 
-	ts_i2c->wr_buf[0] = addr;
-	memcpy(&ts_i2c->wr_buf[1], values, length);
-	length += 1;
+		memset(&msg, 0, sizeof(msg));
+		msg.addr = client_addr;
+		msg.flags = 0;
+		msg.len = trans_len + 1;
+		msg.buf = wr_buf;
 
-	/* write data */
-	rc = i2c_master_send(ts_i2c->client, ts_i2c->wr_buf, length);
+		wr_buf[0] = addr_lo;
+		memcpy(&wr_buf[1], values, trans_len);
 
-	return (rc < 0) ? rc : rc != length ? -EIO : 0;
+		/* write data */
+		rc = i2c_transfer(client->adapter, &msg, 1);
+		if (rc != 1)
+			goto exit;
+
+		length -= trans_len;
+		values += trans_len;
+		addr += trans_len;
+	}
+
+exit:
+	return (rc < 0) ? rc : rc != 1 ? -EIO : 0;
 }
 
-static int cyttsp4_i2c_write(struct cyttsp4_adapter *adap, u8 addr,
-	const void *buf, int size)
+static int cyttsp4_i2c_write(struct device *dev, u16 addr, u8 *wr_buf,
+	const void *buf, int size, int max_xfer)
 {
-	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
-	pm_runtime_get_noresume(adap->dev);
-	mutex_lock(&ts->lock);
-	rc = cyttsp4_i2c_write_block_data(ts, addr, size, buf);
-	mutex_unlock(&ts->lock);
-	pm_runtime_put_noidle(adap->dev);
+	pm_runtime_get_noresume(dev);
+	rc = cyttsp4_i2c_write_block_data(dev, addr, wr_buf, size, buf,
+		max_xfer);
+	pm_runtime_put_noidle(dev);
 
 	return rc;
 }
 
-static int cyttsp4_i2c_read(struct cyttsp4_adapter *adap, u8 addr,
-	void *buf, int size)
+static int cyttsp4_i2c_read(struct device *dev, u16 addr, void *buf, int size,
+	int max_xfer)
 {
-	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
-	pm_runtime_get_noresume(adap->dev);
-	mutex_lock(&ts->lock);
-	rc = cyttsp4_i2c_read_block_data(ts, addr, size, buf);
-	mutex_unlock(&ts->lock);
-	pm_runtime_put_noidle(adap->dev);
+	pm_runtime_get_noresume(dev);
+	rc = cyttsp4_i2c_read_block_data(dev, addr, size, buf, max_xfer);
+	pm_runtime_put_noidle(dev);
 
 	return rc;
 }
 
-static struct cyttsp4_ops ops = {
+static struct cyttsp4_bus_ops cyttsp4_i2c_bus_ops = {
 	.write = cyttsp4_i2c_write,
 	.read = cyttsp4_i2c_read,
 };
 
-static int __devinit cyttsp4_i2c_probe(struct i2c_client *client,
+static struct of_device_id cyttsp4_i2c_of_match[] = {
+	{ .compatible = "cy,cyttsp4_i2c_adapter", }, { }
+};
+MODULE_DEVICE_TABLE(of, cyttsp4_i2c_of_match);
+
+static int cyttsp4_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *i2c_id)
 {
-	struct cyttsp4_i2c *ts_i2c;
 	struct device *dev = &client->dev;
-	char const *adap_id = dev_get_platdata(dev);
-	char const *id;
+	const struct of_device_id *match;
 	int rc;
-	printk(KERN_ALERT "Inside cyttsp4_i2c_probe()\n");
 
-	dev_info(dev, "%s: Starting %s probe...\n", __func__, CYTTSP4_I2C_NAME);
-
-	dev_dbg(dev, "%s: debug on\n", __func__);
-	dev_vdbg(dev, "%s: verbose debug on\n", __func__);
-
+	pr_err("%s: \n", __func__);
+		 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		dev_err(dev, "%s: fail check I2C functionality\n", __func__);
-		rc = -EIO;
-		goto error_alloc_data_failed;
+		dev_err(dev, "I2C functionality not Supported\n");
+		return -EIO;
 	}
 
-	ts_i2c = kzalloc(sizeof(struct cyttsp4_i2c), GFP_KERNEL);
-	if (ts_i2c == NULL) {
-		dev_err(dev, "%s: Error, kzalloc.\n", __func__);
-		rc = -ENOMEM;
-		goto error_alloc_data_failed;
-	}
+	match = of_match_device(of_match_ptr(cyttsp4_i2c_of_match), dev);
+	if (match)
+		cyttsp4_devtree_create_and_get_pdata(dev);
 
-	mutex_init(&ts_i2c->lock);
-	ts_i2c->client = client;
-	client->dev.bus = &i2c_bus_type;
-	i2c_set_clientdata(client, ts_i2c);
-	dev_set_drvdata(&client->dev, ts_i2c);
+	rc = cyttsp4_probe(&cyttsp4_i2c_bus_ops, &client->dev, client->irq,
+			CY_I2C_DATA_SIZE);
 
-	if (adap_id)
-		id = adap_id;
-	else
-		id = CYTTSP4_I2C_NAME;
+	if (rc && match)
+		cyttsp4_devtree_clean_pdata(dev);
 
-	dev_dbg(dev, "%s: add adap='%s' (CYTTSP4_I2C_NAME=%s)\n", __func__, id,
-		CYTTSP4_I2C_NAME);
-
-	pm_runtime_enable(&client->dev);
-
-	rc = cyttsp4_add_adapter(id, &ops, dev);
-	if (rc) {
-		dev_err(dev, "%s: Error on probe %s\n", __func__,
-			CYTTSP4_I2C_NAME);
-		goto add_adapter_err;
-	}
-
-	dev_info(dev, "%s: Successful probe %s\n", __func__, CYTTSP4_I2C_NAME);
-
-	return 0;
-
-add_adapter_err:
-	pm_runtime_disable(&client->dev);
-	dev_set_drvdata(&client->dev, NULL);
-	i2c_set_clientdata(client, NULL);
-	kfree(ts_i2c);
-error_alloc_data_failed:
 	return rc;
 }
 
-/* registered in driver struct */
-static int __devexit cyttsp4_i2c_remove(struct i2c_client *client)
+static int cyttsp4_i2c_remove(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
-	struct cyttsp4_i2c *ts_i2c = dev_get_drvdata(dev);
-	char const *adap_id = dev_get_platdata(dev);
-	char const *id;
+	const struct of_device_id *match;
+	struct cyttsp4_core_data *cd = i2c_get_clientdata(client);
 
-	if (adap_id)
-		id = adap_id;
-	else
-		id = CYTTSP4_I2C_NAME;
+	pr_debug("%s: \n", __func__);
+	
+	cyttsp4_release(cd);
 
-	dev_info(dev, "%s\n", __func__);
-	cyttsp4_del_adapter(id);
-	pm_runtime_disable(&client->dev);
-	dev_set_drvdata(&client->dev, NULL);
-	i2c_set_clientdata(client, NULL);
-	kfree(ts_i2c);
+	match = of_match_device(of_match_ptr(cyttsp4_i2c_of_match), dev);
+	if (match)
+		cyttsp4_devtree_clean_pdata(dev);
+
 	return 0;
 }
-static struct of_device_id cyttsp4_i2c_of_match[] = {
-	{ .compatible = "tsp,afyon-ts",},
 
-	{ }
-};
 static const struct i2c_device_id cyttsp4_i2c_id[] = {
 	{ CYTTSP4_I2C_NAME, 0 },  { }
 };
 MODULE_DEVICE_TABLE(i2c, cyttsp4_i2c_id);
 
-
 static struct i2c_driver cyttsp4_i2c_driver = {
 	.driver = {
 		.name = CYTTSP4_I2C_NAME,
 		.owner = THIS_MODULE,
+		.pm = &cyttsp4_pm_ops,
 		.of_match_table = cyttsp4_i2c_of_match,
 	},
 	.probe = cyttsp4_i2c_probe,
-	
-	.remove = __devexit_p(cyttsp4_i2c_remove),
+	.remove = cyttsp4_i2c_remove,
 	.id_table = cyttsp4_i2c_id,
 };
 
 static int __init cyttsp4_i2c_init(void)
 {
 	int rc = 0;
-
-#if defined(CONFIG_MACH_AFYONLTE)
-#if 0 // TODO : disabled the below code because of linker error. by ungsin */
-	if (poweroff_charging) {
-		pr_info("%s: Cypress TTSP I2C Touchscreen Driver Unload poweroff_charging = %d  , rc=%d \n", __func__, poweroff_charging,rc);
-		return 0;
-	}
-#endif
-#endif
-	printk(KERN_ALERT"Inside cyttsp4_i2c_init()\n");
+	#ifdef CONFIG_SAMSUNG_LPM_MODE
+		if (poweroff_charging) {
+			pr_notice("%s : LPM Charging Mode!!\n", __func__);
+			return rc;
+		}
+	#endif
 	rc = i2c_add_driver(&cyttsp4_i2c_driver);
 
-	pr_info("%s: Cypress TTSP I2C Touchscreen Driver (Built %s) rc=%d\n",
+	pr_err("%s: Cypress TTSP v4 I2C Driver (Built %s) rc=%d\n",
 		 __func__, CY_DRIVER_DATE, rc);
 	return rc;
 }
@@ -260,12 +227,9 @@ module_init(cyttsp4_i2c_init);
 static void __exit cyttsp4_i2c_exit(void)
 {
 	i2c_del_driver(&cyttsp4_i2c_driver);
-	pr_info("%s: module exit\n", __func__);
 }
 module_exit(cyttsp4_i2c_exit);
 
-MODULE_ALIAS(CYTTSP4_I2C_NAME);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Cypress TrueTouch(R) Standard Product (TTSP) I2C driver");
-MODULE_AUTHOR("Cypress");
-
+MODULE_DESCRIPTION("Cypress TrueTouch(R) Standard Product I2C driver");
+MODULE_AUTHOR("Cypress Semiconductor <ttdrivers@cypress.com>");

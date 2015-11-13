@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -118,7 +118,8 @@ static ssize_t timeout_suspend_show(struct device *d,
 				    struct device_attribute *attr,
 				    char *buf)
 {
-	return sprintf(buf, "%lu\n", (unsigned long) timeout_suspend_us);
+	return snprintf(buf, PAGE_SIZE, "%lu\n",
+			(unsigned long) timeout_suspend_us);
 }
 
 static DEVICE_ATTR(timeout_suspend, 0664, timeout_suspend_show,
@@ -177,7 +178,7 @@ static ssize_t wakeups_xmit_show(struct device *d,
 				 char *buf)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
-	return sprintf(buf, "%lu\n", p->wakeups_xmit);
+	return snprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_xmit);
 }
 
 DEVICE_ATTR(wakeups_xmit, 0444, wakeups_xmit_show, NULL);
@@ -186,7 +187,7 @@ static ssize_t wakeups_rcv_show(struct device *d, struct device_attribute *attr,
 				char *buf)
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
-	return sprintf(buf, "%lu\n", p->wakeups_rcv);
+	return snprintf(buf, PAGE_SIZE, "%lu\n", p->wakeups_rcv);
 }
 
 DEVICE_ATTR(wakeups_rcv, 0444, wakeups_rcv_show, NULL);
@@ -210,7 +211,7 @@ static ssize_t timeout_show(struct device *d, struct device_attribute *attr,
 {
 	struct rmnet_private *p = netdev_priv(to_net_dev(d));
 	p = netdev_priv(to_net_dev(d));
-	return sprintf(buf, "%lu\n", timeout_us);
+	return snprintf(buf, PAGE_SIZE, "%lu\n", timeout_us);
 }
 
 DEVICE_ATTR(timeout, 0664, timeout_show, timeout_store);
@@ -341,6 +342,8 @@ static int _rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (bam_ret != 0 && bam_ret != -EAGAIN && bam_ret != -EFAULT) {
 		pr_err("[%s] %s: write returned error %d",
 			dev->name, __func__, bam_ret);
+		if (RMNET_IS_MODE_QOS(opmode))
+			skb_pull(skb, sizeof(struct QMI_QOS_HDR_S));
 		return -EPERM;
 	}
 

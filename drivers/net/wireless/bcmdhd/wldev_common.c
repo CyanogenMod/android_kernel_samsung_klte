@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wldev_common.c,v 1.1.4.1.2.14 2011-02-09 01:40:07 $
+ * $Id: wldev_common.c 432642 2013-10-29 04:23:40Z $
  */
 
 #include <osl.h>
@@ -32,12 +32,12 @@
 #include <wldev_common.h>
 #include <bcmutils.h>
 
-#define htod32(i) i
-#define htod16(i) i
-#define dtoh32(i) i
-#define dtoh16(i) i
-#define htodchanspec(i) i
-#define dtohchanspec(i) i
+#define htod32(i) (i)
+#define htod16(i) (i)
+#define dtoh32(i) (i)
+#define dtoh16(i) (i)
+#define htodchanspec(i) (i)
+#define dtohchanspec(i) (i)
 
 #define	WLDEV_ERROR(args)						\
 	do {										\
@@ -369,7 +369,7 @@ int wldev_set_country(
 		cspec.rev = -1;
 		memcpy(cspec.country_abbrev, country_code, WLC_CNTRY_BUF_SZ);
 		memcpy(cspec.ccode, country_code, WLC_CNTRY_BUF_SZ);
-		get_customized_country_code((char *)&cspec.country_abbrev, &cspec);
+		dhd_get_customized_country_code(dev, (char *)&cspec.country_abbrev, &cspec);
 		error = wldev_iovar_setbuf(dev, "country", &cspec, sizeof(cspec),
 			smbuf, sizeof(smbuf), NULL);
 		if (error < 0) {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010,2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010,2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -46,10 +46,17 @@ static unsigned msm_gpiomux_ngpio;
 #if defined(CONFIG_MACH_MILLET3G_EUR) || defined(CONFIG_MACH_MATISSE3G_OPEN) || defined(CONFIG_MACH_MILLETWIFI_OPEN) \
 	|| defined(CONFIG_MACH_MATISSEWIFI_OPEN) || defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_SEC_ATLANTIC3G_COMMON) \
 	|| defined(CONFIG_MACH_MILLETWIFIUS_OPEN) || defined(CONFIG_MACH_MATISSEWIFIUS_OPEN) || defined(CONFIG_MACH_MATISSEWIFIUS_GOOGLE) \
-	|| defined(CONFIG_MACH_MATISSEWIFIUS_AMPLIFY)
+	|| defined(CONFIG_MACH_MATISSEWIFIUS_AMPLIFY) || defined(CONFIG_MACH_BERLUTI3G_COMMON) || defined(CONFIG_MACH_T10_WIFI_OPEN) \
+	|| defined(CONFIG_MACH_T10_3G_OPEN) || defined(CONFIG_MACH_T8_3G_OPEN) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN) || defined(CONFIG_MACH_MS01_EUR_3G) \
+	|| defined(CONFIG_MACH_MEGA23GEUR_OPEN)|| defined(CONFIG_MACH_MEGA2LTE_KTT) || defined(CONFIG_MACH_RUBENSWIFI_OPEN)
 #define AP_GPIO_COUNT   117  //8226
 #elif defined(CONFIG_SEC_MILLETLTE_COMMON) || defined(CONFIG_SEC_MATISSELTE_COMMON) || defined(CONFIG_SEC_ATLANTICLTE_COMMON) \
-	|| defined(CONFIG_SEC_AFYON_PROJECT) || defined(CONFIG_SEC_VICTOR_PROJECT) 
+	|| defined(CONFIG_SEC_AFYON_PROJECT) || defined(CONFIG_SEC_VICTOR_PROJECT) || defined(CONFIG_MACH_BERLUTILTE_COMMON) \
+	|| defined(CONFIG_SEC_DEGASLTE_COMMON) || defined(CONFIG_MACH_RUBENSLTE_OPEN)
+#define AP_GPIO_COUNT   121  //8926
+/* Please use chipset feature from now on,
+	Do not use model feature or project feature */
+#elif defined(CONFIG_ARCH_MSM8926_LTE)
 #define AP_GPIO_COUNT   121  //8926
 #elif defined(CONFIG_SEC_KANAS_PROJECT)
 #define AP_GPIO_COUNT   102
@@ -95,7 +102,7 @@ static void msm8974_check_gpio_status(unsigned char phonestate)
 
 	for (i = 0; i < AP_GPIO_COUNT; i++) {
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
-		if (i >= 23 && i <= 26)
+		if (i >= FP_SPI_FIRST && i <= FP_SPI_LAST)
 			continue;
 #endif
 		__msm_gpiomux_read(i, &val);
@@ -257,6 +264,11 @@ int msm_gpiomux_put(unsigned gpio)
 }
 EXPORT_SYMBOL(msm_gpiomux_put);
 
+int msm_tlmm_misc_reg_read(enum msm_tlmm_misc_reg misc_reg)
+{
+	return readl_relaxed(MSM_TLMM_BASE + misc_reg);
+}
+
 #ifdef CONFIG_SEC_PM_DEBUG
 static const char * const gpiomux_drv_str[] = {
 	"DRV_2mA",
@@ -318,7 +330,7 @@ static void gpiomux_debug_print(struct seq_file *m)
 
 	for (gpio = begin; gpio < msm_gpiomux_ngpio; ++gpio) {
 #ifdef ENABLE_SENSORS_FPRINT_SECURE
-		if (gpio >= 23 && gpio <= 26)
+		if (gpio >= FP_SPI_FIRST && gpio <= FP_SPI_LAST)
 			continue;
 #endif
 		__msm_gpiomux_read(gpio, &set);
@@ -439,7 +451,8 @@ void msm_gpiomux_install(struct msm_gpiomux_config *configs, unsigned nconfigs)
 			rc = msm_gpiomux_write(configs[c].gpio, s,
 				configs[c].settings[s], NULL);
 			if (rc)
-				pr_err("%s: write failure: %d\n", __func__, rc);
+				pr_err("%s: write failure: status[%d] gpio[%d]\n",
+					__func__, rc, configs[c].gpio);
 		}
 	}
 }

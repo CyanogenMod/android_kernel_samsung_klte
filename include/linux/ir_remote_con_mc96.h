@@ -33,6 +33,8 @@ struct mc96_platform_data {
 	u32 irda_scl_flags;
 	int irda_sda_gpio;
 	u32 irda_sda_flags;
+	int irda_poweron;
+	u32 poweron_flags;
 	void (*ir_wake_en)(struct mc96_platform_data *pdata, bool onoff);
 	void (*ir_remote_init) (void);
 	void(*ir_vdd_onoff)(struct device *dev,bool onoff);

@@ -1021,13 +1021,18 @@ static void bmg160_parse_dt(struct bmg160_p *data, struct device *dev)
 
 	data->gyro_int = of_get_named_gpio_flags(dNode,
 		"bmg160-i2c,gyro_int-gpio", 0, &flags);
-	if (data->gyro_int < 0)
-		pr_err("[SENSOR]: %s - get gyro_int error\n", __func__);
-
+	if (data->gyro_int < 0) {
+		pr_err("[SENSOR]: %s - get gyro_int failed\n", __func__);
+		return;
+	}
 	data->gyro_drdy = of_get_named_gpio_flags(dNode,
 		"bmg160-i2c,gyro_drdy-gpio", 0, &flags);
-	if (data->gyro_drdy < 0)
-		pr_err("[SENSOR]: %s - gyro_drdy error\n", __func__);
+	if (data->gyro_drdy < 0) {
+		pr_err("[SENSOR]: %s - gyro_drdy failed\n", __func__);
+		return;
+	}
+
+	bmg160_setup_pin(data);
 }
 
 static int bmg160_probe(struct i2c_client *client,
@@ -1051,13 +1056,11 @@ static int bmg160_probe(struct i2c_client *client,
 	}
 
 	bmg160_parse_dt(data, &client->dev);
-	bmg160_setup_pin(data);
 
 	i2c_set_clientdata(client, data);
 	data->client = client;
 
 	/* read chip id */
-	bmg160_set_mode(data, BMG160_MODE_NORMAL);
 	ret = i2c_smbus_read_word_data(data->client, BMG160_CHIP_ID_REG);
 	if ((ret & 0x00ff) != BMG160_CHIP_ID) {
 		pr_err("[SENSOR]: %s - chip id failed 0x%x\n",

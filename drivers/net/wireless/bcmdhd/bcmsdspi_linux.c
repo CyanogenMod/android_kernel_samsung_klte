@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdspi_linux.c 373331 2012-12-07 04:46:22Z $
+ * $Id: bcmsdspi_linux.c 406045 2013-06-05 22:09:52Z $
  */
 
 #include <typedefs.h>
@@ -150,7 +150,7 @@ static struct spi_driver bcmsdh_spi_driver = {
 /*
  * module init
 */
-int spi_function_init(void)
+int bcmsdh_register_client_driver(void)
 {
 	int error = 0;
 	sd_trace(("bcmsdh_gspi: %s Enter\n", __FUNCTION__));
@@ -163,7 +163,7 @@ int spi_function_init(void)
 /*
  * module cleanup
 */
-void spi_function_cleanup(void)
+void bcmsdh_unregister_client_driver(void)
 {
 	sd_trace(("%s Enter\n", __FUNCTION__));
 	spi_unregister_driver(&bcmsdh_spi_driver);

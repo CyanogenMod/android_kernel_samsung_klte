@@ -43,7 +43,7 @@
 	((current_reg_content & (unsigned int)(~(mask))) \
 	| ((unsigned int)((val) & (mask)))))
 
-static void __iomem *virt_mmss_gp0_base;
+extern void __iomem *virt_mmss_gp0_base;
 #define HWIO_GP0_CMD_RCGR_ADDR ((void __iomem *)(virt_mmss_gp0_base + 0))	//MMSS_CC_GP0_CMD_RCGR
 #define HWIO_GP0_CFG_RCGR_ADDR ((void __iomem *)(virt_mmss_gp0_base + 4))	//MMSS_CC_GP0_CFG_RCGR
 #define HWIO_GP_M_REG_ADDR ((void __iomem *)(virt_mmss_gp0_base + 8))	//MMSS_CC_GP0_M
@@ -73,8 +73,6 @@ static void __iomem *virt_mmss_gp0_base;
 #define HWIO_UPDATE_VAL_SHFT	0
 #define HWIO_ROOT_EN_VAL_BMSK	0x2
 #define HWIO_ROOT_EN_VAL_SHFT	1
-#define MMSS_GP0_BASE 0xFD8C3420
-#define MMSS_GP0_SIZE  0x28
 
 #define HWIO_GP0_CMD_RCGR_IN		\
 		in_dword_masked(HWIO_GP0_CMD_RCGR_ADDR, HWIO_GP_NS_REG_RMSK)
@@ -119,8 +117,6 @@ static void __iomem *virt_mmss_gp0_base;
 
 void mdss_dsi_panel_bklt_pwm( int level)
 {
-	virt_mmss_gp0_base = ioremap(MMSS_GP0_BASE,MMSS_GP0_SIZE);
-
 	/* Put the MND counter in reset mode for programming */
 	HWIO_OUTM(GP0_CFG_RCGR, HWIO_GP_SRC_SEL_VAL_BMSK, 
 				0 << HWIO_GP_SRC_SEL_VAL_SHFT); //SRC_SEL = 000(cxo)

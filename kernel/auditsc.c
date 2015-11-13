@@ -1606,48 +1606,51 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 	context->fsgid = cred->fsgid;
 	context->personality = tsk->personality;
 
-	ab = audit_log_start(context, GFP_KERNEL, AUDIT_SYSCALL);
-	if (!ab)
-		return;		/* audit_panic has been called */
-	audit_log_format(ab, "arch=%x syscall=%d",
-			 context->arch, context->major);
-	if (context->personality != PER_LINUX)
-		audit_log_format(ab, " per=%lx", context->personality);
-	if (context->return_valid)
-		audit_log_format(ab, " success=%s exit=%ld",
-				 (context->return_valid==AUDITSC_SUCCESS)?"yes":"no",
-				 context->return_code);
+	if (context->major != 294) /* __NR_setsockopt */
+	{
+		ab = audit_log_start(context, GFP_KERNEL, AUDIT_SYSCALL);
+		if (!ab)
+			return;		/* audit_panic has been called */
+		audit_log_format(ab, "arch=%x syscall=%d",
+				 context->arch, context->major);
+		if (context->personality != PER_LINUX)
+			audit_log_format(ab, " per=%lx", context->personality);
+		if (context->return_valid)
+			audit_log_format(ab, " success=%s exit=%ld",
+					 (context->return_valid==AUDITSC_SUCCESS)?"yes":"no",
+					 context->return_code);
 
-	spin_lock_irq(&tsk->sighand->siglock);
-	if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
-		tty = tsk->signal->tty->name;
-	else
-		tty = "(none)";
-	spin_unlock_irq(&tsk->sighand->siglock);
+		spin_lock_irq(&tsk->sighand->siglock);
+		if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
+			tty = tsk->signal->tty->name;
+		else
+			tty = "(none)";
+		spin_unlock_irq(&tsk->sighand->siglock);
 
-	audit_log_format(ab,
-		  " a0=%lx a1=%lx a2=%lx a3=%lx items=%d"
-		  " ppid=%d pid=%d auid=%u uid=%u gid=%u"
-		  " euid=%u suid=%u fsuid=%u"
-		  " egid=%u sgid=%u fsgid=%u tty=%s ses=%u",
-		  context->argv[0],
-		  context->argv[1],
-		  context->argv[2],
-		  context->argv[3],
-		  context->name_count,
-		  context->ppid,
-		  context->pid,
-		  tsk->loginuid,
-		  context->uid,
-		  context->gid,
-		  context->euid, context->suid, context->fsuid,
-		  context->egid, context->sgid, context->fsgid, tty,
-		  tsk->sessionid);
+		audit_log_format(ab,
+			  " a0=%lx a1=%lx a2=%lx a3=%lx items=%d"
+			  " ppid=%d pid=%d auid=%u uid=%u gid=%u"
+			  " euid=%u suid=%u fsuid=%u"
+			  " egid=%u sgid=%u fsgid=%u tty=%s ses=%u",
+			  context->argv[0],
+			  context->argv[1],
+			  context->argv[2],
+			  context->argv[3],
+			  context->name_count,
+			  context->ppid,
+			  context->pid,
+			  tsk->loginuid,
+			  context->uid,
+			  context->gid,
+			  context->euid, context->suid, context->fsuid,
+			  context->egid, context->sgid, context->fsgid, tty,
+			  tsk->sessionid);
 
 
-	audit_log_task_info(ab, tsk);
-	audit_log_key(ab, context->filterkey);
-	audit_log_end(ab);
+		audit_log_task_info(ab, tsk);
+		audit_log_key(ab, context->filterkey);
+		audit_log_end(ab);
+	}
 
 	for (aux = context->aux; aux; aux = aux->next) {
 

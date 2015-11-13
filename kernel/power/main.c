@@ -17,6 +17,13 @@
 #include <linux/seq_file.h>
 #include <linux/hrtimer.h>
 
+#define CONFIG_SUSPEND_HELPER //etinum.test
+//#define SUSPEND_WAKEUP_BOOST
+
+#ifdef SUSPEND_WAKEUP_BOOST
+#include <linux/sched.h>
+#endif
+
 #ifdef CONFIG_CPU_FREQ_LIMIT_USERSPACE
 #include <linux/cpufreq.h>
 #include <linux/cpufreq_limit.h>
@@ -391,15 +398,38 @@ static suspend_state_t decode_state(const char *buf, size_t n)
 	return PM_SUSPEND_ON;
 }
 
-static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
-			   const char *buf, size_t n)
+
+
+#ifdef CONFIG_SUSPEND_HELPER
+static struct workqueue_struct *suspend_helper_wq;
+struct state_store_params {
+	const char *buf;
+	size_t n;
+};
+
+struct suspend_helper_data {
+	struct work_struct work;
+	struct completion done;
+	struct state_store_params params;
+	int result;
+};
+struct suspend_helper_data *suspend_helper_data;
+
+static void suspend_helper(struct work_struct *work)
 {
+	struct suspend_helper_data *data = (struct suspend_helper_data *)
+		container_of(work, struct suspend_helper_data, work);
+	const char *buf = data->params.buf;
+	size_t n = data->params.n;
 	suspend_state_t state;
-	int error;
+	int error = 0;
+
+	pr_info("[suspend helper] %s: start!\n", __func__);
 
 	error = pm_autosleep_lock();
-	if (error)
-		return error;
+	if (error) {
+		goto out_nolock;
+	}
 
 	if (pm_autosleep_state() > PM_SUSPEND_ON) {
 		error = -EBUSY;
@@ -414,6 +444,136 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	else
 		error = -EINVAL;
 
+out:
+	pm_autosleep_unlock();
+
+out_nolock:
+	// set result and notify completion
+	data->result = error;
+	complete(&data->done);
+
+	pr_info("[suspend helper] %s: result = %d\n", __func__, error);
+}
+
+static ssize_t state_store_helper(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t n)
+{
+	int error;
+	int freezable = 0;
+
+	// we don't need to freeze. so tell the freezer
+	if (!freezer_should_skip(current)) {
+		freezable = 1;
+		freezer_do_not_count();
+		pr_info("[suspend helper] %s: freezer should skip me (%s:%d)\n",
+				__func__, current->comm, current->pid);
+	}
+
+	suspend_helper_data->params.buf = buf;
+	suspend_helper_data->params.n = n;
+	INIT_COMPLETION(suspend_helper_data->done);
+
+	// use kworker for suspend resume
+	queue_work(suspend_helper_wq, &suspend_helper_data->work);
+
+	// wait for suspend/resume work to be complete
+	wait_for_completion(&suspend_helper_data->done);
+
+	if (freezable) {
+		// set ourself as freezable
+		freezer_count();
+	}
+
+	error = suspend_helper_data->result;
+	pr_info("[suspend helper] %s: suspend_helper returned %d\n", __func__, error);
+
+	return error ? error : n;
+}
+
+static int suspend_helper_init(void)
+{
+	int ret = 0;
+
+	suspend_helper_wq = alloc_ordered_workqueue("suspend_helper", 0);
+	if (!suspend_helper_wq)
+		return -ENOMEM;
+
+	suspend_helper_data = kzalloc(sizeof(struct suspend_helper_data), GFP_KERNEL);
+	if (!suspend_helper_data) {
+		ret = -ENOMEM;
+		goto out_destroy_wq;
+	}
+
+	INIT_WORK(&suspend_helper_data->work, suspend_helper);
+	init_completion(&suspend_helper_data->done);
+
+	pr_info("[suspend helper] %s: init done\n", __func__);
+
+	return 0;
+out_destroy_wq:
+	destroy_workqueue(suspend_helper_wq);
+
+	return ret;
+}
+#endif
+
+#ifdef SUSPEND_WAKEUP_BOOST
+static void pr_sched_state(const char *msg)
+{
+	pr_debug("[sched state] %s: (%s:%d) %pS policy=%d, prio=%d, static_prio=%d, normal_prio=%d, rt_priority=%d\n",
+		msg, current->comm, current->pid,
+		current->sched_class, current->policy,
+		current->prio, current->static_prio, current->normal_prio, current->rt_priority);
+}
+#endif
+
+static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t n)
+{
+	suspend_state_t state;
+	int error;
+#ifdef SUSPEND_WAKEUP_BOOST
+	int orig_policy = current->policy;
+	int orig_nice = task_nice(current);
+	struct sched_param param = { .sched_priority = 1 };
+#endif
+
+#ifdef CONFIG_SUSPEND_HELPER
+	if (suspend_helper_data) {
+		pr_info("[suspend helper] %s: Let our helper do the real work!\n", __func__);
+		return state_store_helper(kobj, attr, buf, n);
+	}
+	pr_info("[suspend helper] %s: helper data not avaialbe.. Fall back to the legacy code..\n", __func__);
+#endif
+
+	error = pm_autosleep_lock();
+	if (error)
+		return error;
+
+	if (pm_autosleep_state() > PM_SUSPEND_ON) {
+		error = -EBUSY;
+		goto out;
+	}
+
+#ifdef SUSPEND_WAKEUP_BOOST
+	pr_sched_state("before boost");
+	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+	pr_sched_state("after boost");
+#endif
+	state = decode_state(buf, n);
+	if (state < PM_SUSPEND_MAX)
+		error = pm_suspend(state);
+	else if (state == PM_SUSPEND_MAX)
+		error = hibernate();
+	else
+		error = -EINVAL;
+#ifdef SUSPEND_WAKEUP_BOOST
+	pr_sched_state("before restore");
+	param.sched_priority = 0;
+	sched_setscheduler_nocheck(current, orig_policy, &param);
+	set_user_nice(current, orig_nice);
+	pr_sched_state("after restore");
+#endif
  out:
 	pm_autosleep_unlock();
 	return error ? error : n;
@@ -702,7 +862,8 @@ power_attr(cpufreq_max_limit);
 power_attr(cpufreq_min_limit);
 
 struct cpufreq_limit_handle *cpufreq_min_touch;
-
+struct cpufreq_limit_handle *cpufreq_min_camera;
+struct cpufreq_limit_handle *cpufreq_min_sensor;
 
 int set_freq_limit(unsigned long id, unsigned int freq)
 {
@@ -713,6 +874,16 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 	if (cpufreq_min_touch) {
 		cpufreq_limit_put(cpufreq_min_touch);
 		cpufreq_min_touch = NULL;
+	}
+
+	if (cpufreq_min_camera) {
+		cpufreq_limit_put(cpufreq_min_camera);
+		cpufreq_min_camera = NULL;
+	}
+
+	if (cpufreq_min_sensor) {
+		cpufreq_limit_put(cpufreq_min_sensor);
+		cpufreq_min_sensor = NULL;
 	}
 
 	pr_debug("%s: id=%d freq=%d\n", __func__, (int)id, freq);
@@ -727,6 +898,27 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 			}
 		}
 	}
+
+	if (id & DVFS_CAMERA_ID) {
+		if (freq != -1) {
+			cpufreq_min_camera = cpufreq_limit_min_freq(freq, "camera min");
+			if (IS_ERR(cpufreq_min_camera)) {
+				pr_err("%s: fail to get the handle\n", __func__);
+				goto out;
+			}
+		}
+	}
+
+	if (id & DVFS_SENSOR_ID) {
+		if (freq != -1) {
+			cpufreq_min_sensor = cpufreq_limit_min_freq(freq, "sensor min");
+			if (IS_ERR(cpufreq_min_sensor)) {
+				pr_err("%s: fail to get the handle\n", __func__);
+				goto out;
+			}
+		}
+	}
+
 	ret = 0;
 out:
 	mutex_unlock(&cpufreq_limit_mutex);
@@ -790,7 +982,7 @@ static unsigned long thermald_max_freq;
 
 static unsigned long touch_min_freq = MIN_TOUCH_LIMIT;
 static unsigned long unicpu_max_freq = MAX_UNICPU_LIMIT;
-
+static unsigned long sensor_min_freq = MIN_SENSOR_LIMIT;
 
 static int verify_cpufreq_target(unsigned int target)
 {
@@ -837,12 +1029,16 @@ int set_freq_limit(unsigned long id, unsigned int freq)
 		thermald_max_freq = freq;
 	else if (id == DVFS_TOUCH_ID)
 		touch_min_freq = freq;
+	else if (id == DVFS_SENSOR_ID)
+		sensor_min_freq = freq;
 
 	/* set min - apps */
 	if (dvfs_id & DVFS_APPS_MIN_ID && min < apps_min_freq)
 		min = apps_min_freq;
 	if (dvfs_id & DVFS_TOUCH_ID && min < touch_min_freq)
 		min = touch_min_freq;
+	if (dvfs_id & DVFS_SENSOR_ID && min < sensor_min_freq)
+		min = sensor_min_freq;
 
 	/* set max */
 	if (dvfs_id & DVFS_APPS_MAX_ID && max > apps_max_freq)
@@ -1063,6 +1259,9 @@ static int __init pm_init(void)
 	error = sysfs_create_group(power_kobj, &attr_group);
 	if (error)
 		return error;
+#ifdef CONFIG_SUSPEND_HELPER
+	suspend_helper_init();
+#endif
 #ifdef CONFIG_SEC_DVFS
 	apps_min_freq = MIN_FREQ_LIMIT;
 	apps_max_freq = MAX_FREQ_LIMIT;

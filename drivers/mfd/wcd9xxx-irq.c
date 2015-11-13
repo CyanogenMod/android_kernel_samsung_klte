@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -316,10 +316,12 @@ static irqreturn_t wcd9xxx_irq_thread(int irq, void *data)
 		}
 
 		memset(status, 0xff, num_irq_regs);
-		wcd9xxx_bulk_write(wcd9xxx_res, WCD9XXX_A_INTR_CLEAR0,
-				   num_irq_regs, status);
+
+		ret = wcd9xxx_res->codec_bulk_write(wcd9xxx_res,
+				WCD9XXX_A_INTR_CLEAR0,
+				num_irq_regs, status);
 		if (wcd9xxx_get_intf_type() == WCD9XXX_INTERFACE_TYPE_I2C)
-			wcd9xxx_reg_write(wcd9xxx_res,
+			wcd9xxx_res->codec_reg_write(wcd9xxx_res,
 					WCD9XXX_A_INTR_MODE, 0x02);
 	}
 	wcd9xxx_unlock_sleep(wcd9xxx_res);
@@ -613,6 +615,10 @@ static int phyirq_to_virq(struct wcd9xxx_core_resource *wcd9xxx_res, int offset)
 static int virq_to_phyirq(struct wcd9xxx_core_resource *wcd9xxx_res, int virq)
 {
 	struct irq_data *irq_data = irq_get_irq_data(virq);
+	if (unlikely(!irq_data)) {
+		pr_err("%s: irq_data is NULL", __func__);
+		return -EINVAL;
+	}
 	return irq_data->hwirq;
 }
 
@@ -662,6 +668,10 @@ static int __devinit wcd9xxx_irq_probe(struct platform_device *pdev)
 	} else {
 		dev_dbg(&pdev->dev, "%s: virq = %d\n", __func__, irq);
 		domain = irq_find_host(pdev->dev.of_node);
+		if (unlikely(!domain)) {
+			pr_err("%s: domain is NULL", __func__);
+			return -EINVAL;
+		}
 		data = (struct wcd9xxx_irq_drv_data *)domain->host_data;
 		data->irq = irq;
 		wmb();
@@ -677,6 +687,10 @@ static int wcd9xxx_irq_remove(struct platform_device *pdev)
 	struct wcd9xxx_irq_drv_data *data;
 
 	domain = irq_find_host(pdev->dev.of_node);
+	if (unlikely(!domain)) {
+		pr_err("%s: domain is NULL", __func__);
+		return -EINVAL;
+	}
 	data = (struct wcd9xxx_irq_drv_data *)domain->host_data;
 	data->irq = 0;
 	wmb();

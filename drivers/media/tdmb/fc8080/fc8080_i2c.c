@@ -78,7 +78,7 @@ static s32 i2c_bulkwrite(HANDLE handle, u8 chip, u16 addr, u8 *data, u16 length)
 	struct i2c_msg wmsg;
 	unsigned char i2c_data[I2C_MAX_SEND_LENGTH];
 
-	if ((length + 1) > I2C_MAX_SEND_LENGTH)
+	if ((length + 2) > I2C_MAX_SEND_LENGTH)
 		return -ENODEV;
 
 	wmsg.addr = CHIP_ADDR;

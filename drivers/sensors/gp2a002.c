@@ -47,8 +47,14 @@
 #define REGS_OPMOD		0x4 /* Write Only */
 #define REGS_CON		0x6 /* Write Only */
 
+#if defined(CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_AFYONLTE_MTR)
+#define PROX_NONDETECT			0x40
+
+#define PROX_DETECT				0x20
+#else
 #define PROX_NONDETECT			0x2F
 #define PROX_DETECT				0x0F
+#endif
 #define PROX_NONDETECT_MODE1	0x43
 #define PROX_DETECT_MODE1		0x28
 #define PROX_NONDETECT_MODE2	0x48
@@ -464,16 +470,20 @@ static ssize_t proximity_enable_store(struct device *dev,
 			} else {
 				gp2a->nondetect = PROX_NONDETECT;
 				gp2a->detect = PROX_DETECT;
-			}#ifdef CONFIG_SENSORS_POWERCONTROL
-			gp2a_regulator_onoff(&gp2a->i2c_client->dev, true);#endif
+			}
+#ifdef CONFIG_SENSORS_POWERCONTROL
+			gp2a_regulator_onoff(&gp2a->i2c_client->dev, true);
+#endif
 			gp2a_power_onoff(gp2a, 1);
 			gp2a->power_state = value;
 
 			gp2a->val_state = value;
 			input_report_abs(gp2a->input, ABS_DISTANCE, gp2a->val_state);
 			input_sync(gp2a->input);
-		} else {#ifdef CONFIG_SENSORS_POWERCONTROL
-			gp2a_regulator_onoff(&gp2a->i2c_client->dev, false);#endif
+		} else {
+#ifdef CONFIG_SENSORS_POWERCONTROL
+			gp2a_regulator_onoff(&gp2a->i2c_client->dev, false);
+#endif
 			gp2a_power_onoff(gp2a, 0);
 			gp2a->power_state = value;
 		}

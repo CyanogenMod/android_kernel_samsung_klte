@@ -321,6 +321,7 @@ struct esxxx_platform_data *es705_populate_dt_pdata(struct device *dev)
 	}
 	dev_dbg(dev, "%s(): reset gpio %d\n", __func__, pdata->reset_gpio);
 
+#if !defined(CONFIG_ARCH_MSM8226)
 	pdata->gpioa_gpio = of_get_named_gpio(dev->of_node,
 					      "es705-gpioa-gpio", 0);
 	if (pdata->gpioa_gpio < 0) {
@@ -328,7 +329,9 @@ struct esxxx_platform_data *es705_populate_dt_pdata(struct device *dev)
 		goto alloc_err;
 	}
 	dev_dbg(dev, "%s(): gpioa gpio %d\n", __func__, pdata->gpioa_gpio);
+#endif
 
+#if !defined(CONFIG_SEC_S_PROJECT) && !defined(CONFIG_ARCH_MSM8226)
 	pdata->gpiob_gpio = of_get_named_gpio(dev->of_node,
 					      "es705-gpiob-gpio", 0);
 	if (pdata->gpiob_gpio < 0) {
@@ -336,6 +339,7 @@ struct esxxx_platform_data *es705_populate_dt_pdata(struct device *dev)
 		goto alloc_err;
 	}
 	dev_dbg(dev, "%s(): gpiob gpio %d\n", __func__, pdata->gpiob_gpio);
+#endif
 
 	pdata->uart_tx_gpio = of_get_named_gpio(dev->of_node,
 					     "es705-uart-tx", 0);
@@ -368,7 +372,9 @@ struct esxxx_platform_data *es705_populate_dt_pdata(struct device *dev)
 		pdata->uart_gpio = -1;
 	}
 	dev_dbg(dev, "%s(): uart gpio %d\n", __func__, pdata->uart_gpio);
+	#if !defined(CONFIG_SEC_S_PROJECT)  && !defined(CONFIG_ARCH_MSM8226)
 	pdata->irq_base = gpio_to_irq(pdata->gpiob_gpio);
+	#endif
 
 	return pdata;
 alloc_err:

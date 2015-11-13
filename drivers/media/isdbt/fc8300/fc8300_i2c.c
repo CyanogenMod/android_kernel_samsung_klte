@@ -109,9 +109,9 @@ static s32 i2c_bulkwrite(HANDLE handle, u8 chip, u16 addr, u8 *data, u16 length)
 {
 	int res;
 	struct i2c_msg wmsg;
-	unsigned char i2c_data[I2C_MAX_SEND_LENGTH];
+	unsigned char i2c_data[I2C_MAX_SEND_LENGTH + 2];
 
-	if ((length + 1) > I2C_MAX_SEND_LENGTH)
+	if ((length) > I2C_MAX_SEND_LENGTH)
 		return -ENODEV;
 
 	wmsg.addr = chip;
@@ -133,7 +133,8 @@ s32 fc8300_i2c_init(HANDLE handle, u16 param1, u16 param2)
 	s32 res;
 	//OAL_CREATE_SEMAPHORE();
 	pr_info("%s \n",__func__);
-	fc8300_i2c = kzalloc(sizeof(struct i2c_ts_driver), GFP_KERNEL);
+
+	fc8300_i2c = kzalloc(sizeof(struct i2c_client), GFP_KERNEL);
 
 	if (fc8300_i2c == NULL)
 		return -ENOMEM;

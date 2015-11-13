@@ -63,7 +63,7 @@ static struct miscdevice sec_misc_device = {
 static ssize_t emmc_checksum_done_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, sizeof(buf), "%d\n", emmc_checksum_done);
+	return snprintf(buf, PAGE_SIZE, "%d\n", emmc_checksum_done);
 }
 
 static ssize_t emmc_checksum_done_store(struct device *dev,
@@ -84,7 +84,7 @@ static DEVICE_ATTR(emmc_checksum_done, S_IRUGO | S_IWUSR ,
 static ssize_t emmc_checksum_pass_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, sizeof(buf), "%d\n", emmc_checksum_pass);
+	return snprintf(buf, PAGE_SIZE, "%d\n", emmc_checksum_pass);
 }
 
 static ssize_t emmc_checksum_pass_store(struct device *dev,
@@ -112,7 +112,7 @@ static ssize_t rory_control_show(struct device *dev,
 
 	sec_get_param(param_rory_control, &rory_control);
 
-	return snprintf(buf, sizeof(buf), "%d\n", rory_control);
+	return snprintf(buf, PAGE_SIZE, "%d\n", rory_control);
 }
 
 static ssize_t rory_control_store(struct device *dev,
@@ -133,6 +133,36 @@ static ssize_t rory_control_store(struct device *dev,
 static DEVICE_ATTR(rory_control, S_IRUGO | S_IWUSR ,
 		rory_control_show, rory_control_store);
 #endif /*RORY_CONTROL*/
+
+#ifdef CONFIG_SGLTE_QSC_MODEM
+static ssize_t qsc_control_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int qsc_control;
+
+	sec_get_param(param_update_cp_bin, &qsc_control);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", qsc_control);
+}
+
+static ssize_t qsc_control_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int qsc_control;
+
+	sscanf(buf, "%i", &qsc_control);
+
+	pr_info("qsc control store ..... %d\n", qsc_control);
+
+	/* write to param */
+	sec_set_param(param_update_cp_bin, &qsc_control);
+
+	return size;
+}
+
+static DEVICE_ATTR(qsc_control, S_IRUGO | S_IWUSR ,
+		qsc_control_show, qsc_control_store);
+#endif /*QSC_CONTROL*/
 
 static unsigned int convert_debug_level_str(const char *str)
 {
@@ -201,7 +231,7 @@ static ssize_t slideCount_show
 
 	sec_get_param(param_slideCount, &slideCount);
 
-	return snprintf(buf, sizeof(buf), "%d\n", slideCount);
+	return snprintf(buf, PAGE_SIZE, "%d\n", slideCount);
 }
 
 static ssize_t slideCount_store
@@ -235,7 +265,7 @@ static ssize_t drop_caches_show
 	(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int ret = 0;
-	return snprintf(buf, sizeof(buf), "%d\n", ret);
+	return snprintf(buf, PAGE_SIZE, "%d\n", ret);
 }
 
 static ssize_t drop_caches_store
@@ -283,7 +313,7 @@ static ssize_t update_cp_bin_show
 
 	sec_get_param(param_update_cp_bin, (void *)&update);
 
-	return snprintf(buf, sizeof(buf), "%d\n", update);
+	return snprintf(buf, PAGE_SIZE, "%d\n", update);
 }
 
 static ssize_t update_cp_bin_store
@@ -301,6 +331,31 @@ static DEVICE_ATTR(update_cp_bin, S_IRUGO | S_IWUSR | S_IWGRP,\
 			update_cp_bin_show, update_cp_bin_store);
 #endif
 
+#if defined(CONFIG_SEC_SLOWPATH)
+extern unsigned int get_and_reset_timeup(void);
+extern unsigned int get_and_reset_slowtime(void);
+static ssize_t timeup_show
+	(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	bool time_up;
+
+	time_up = get_and_reset_timeup();
+	return sprintf(buf, "%d\n", time_up);
+}
+
+static DEVICE_ATTR(timeup, S_IRUGO, timeup_show, NULL);
+
+static ssize_t slowpath_show
+	(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	unsigned int slowtime;
+
+	slowtime = get_and_reset_slowtime();
+	return sprintf(buf, "%u\n", slowtime);
+}
+
+static DEVICE_ATTR(slowpath, S_IRUGO, slowpath_show, NULL);
+#endif
 
 struct device *sec_misc_dev;
 
@@ -315,6 +370,13 @@ static struct device_attribute *sec_misc_attrs[] = {
 	&dev_attr_drop_caches,
 #ifdef CONFIG_GSM_MODEM_SPRD6500
 	&dev_attr_update_cp_bin,
+#endif
+#if defined(CONFIG_SEC_SLOWPATH)
+	&dev_attr_timeup,
+	&dev_attr_slowpath,
+#endif
+#ifdef CONFIG_SGLTE_QSC_MODEM
+	&dev_attr_qsc_control,
 #endif
 };
 

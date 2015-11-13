@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -55,7 +55,12 @@ struct coresight_attr {
 int adreno_coresight_enable(struct coresight_device *csdev)
 {
 	struct kgsl_device *device = dev_get_drvdata(csdev->dev.parent);
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct adreno_device *adreno_dev;
+
+	if (device == NULL)
+		return -ENODEV;
+
+	adreno_dev = ADRENO_DEVICE(device);
 
 	/* Check if coresight compatible device, return error otherwise */
 	if (adreno_dev->gpudev->coresight_enable)
@@ -80,7 +85,12 @@ int adreno_coresight_enable(struct coresight_device *csdev)
 void adreno_coresight_disable(struct coresight_device *csdev)
 {
 	struct kgsl_device *device = dev_get_drvdata(csdev->dev.parent);
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct adreno_device *adreno_dev;
+
+	if (device == NULL)
+		return;
+
+	adreno_dev = ADRENO_DEVICE(device);
 
 	/* Check if coresight compatible device, bail otherwise */
 	if (adreno_dev->gpudev->coresight_disable)
@@ -107,12 +117,12 @@ static ssize_t coresight_read_reg(struct kgsl_device *device,
 {
 	unsigned int regval = 0;
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 	if (!kgsl_active_count_get(device)) {
 		kgsl_regread(device, offset, &regval);
 		kgsl_active_count_put(device);
 	}
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 	return snprintf(buf, PAGE_SIZE, "0x%X", regval);
 }
 
@@ -134,6 +144,10 @@ static ssize_t gfx_show_reg(struct device *dev,
 	struct kgsl_device *device = dev_get_drvdata(dev->parent);
 	struct coresight_attr *csight_attr = container_of(attr,
 			struct coresight_attr, attr);
+
+	if (device == NULL)
+		return -ENODEV;
+
 	return coresight_read_reg(device, csight_attr->regname, buf);
 }
 
@@ -142,10 +156,15 @@ static ssize_t gfx_store_reg(struct device *dev,
 		const char *buf, size_t size)
 {
 	struct kgsl_device *device = dev_get_drvdata(dev->parent);
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct adreno_device *adreno_dev;
 	struct coresight_attr *csight_attr = container_of(attr,
 			struct coresight_attr, attr);
 	unsigned int regval = 0;
+
+	if (device == NULL)
+		return -ENODEV;
+
+	adreno_dev = ADRENO_DEVICE(device);
 
 	regval = coresight_convert_reg(buf);
 

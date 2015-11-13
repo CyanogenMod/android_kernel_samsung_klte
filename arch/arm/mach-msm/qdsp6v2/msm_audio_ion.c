@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,7 +29,7 @@ struct msm_audio_ion_private {
 	bool smmu_enabled;
 	bool audioheap_enabled;
 	struct iommu_group *group;
-	u32 domain_id;
+	int32_t domain_id;
 	struct iommu_domain *domain;
 };
 
@@ -344,7 +344,7 @@ int msm_audio_ion_import_legacy(const char *name, struct ion_client *client,
 		pr_err("%s: ion import dma buffer failed\n",
 			__func__);
 		rc = -EINVAL;
-		goto err_destroy_client;
+		goto err;
 	}
 
 	if (ionflag != NULL) {
@@ -380,10 +380,6 @@ int msm_audio_ion_import_legacy(const char *name, struct ion_client *client,
 
 err_ion_handle:
 	ion_free(client, *handle);
-err_destroy_client:
-	msm_audio_ion_client_destroy(client);
-	client = NULL;
-	*handle = NULL;
 err:
 	return rc;
 }
@@ -391,7 +387,9 @@ err:
 int msm_audio_ion_free_legacy(struct ion_client *client,
 			      struct ion_handle *handle)
 {
-	/* To add condition for SMMU enabled */
+	if (msm_audio_ion_data.smmu_enabled)
+		ion_unmap_iommu(client, handle,
+		msm_audio_ion_data.domain_id, 0);
 	ion_unmap_kernel(client, handle);
 
 	ion_free(client, handle);

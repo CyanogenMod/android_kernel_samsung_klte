@@ -29,6 +29,9 @@
 #include "fci_hal.h"
 #include "fc8080_regs.h"
 #include "fc8080_isr.h"
+#include "tdmb.h"
+
+#define FC8080_OVERRUN_CLEAR
 
 static u8 fic_buffer[512+4] __cacheline_aligned;
 static u8 msc_buffer[8192+4] __cacheline_aligned;
@@ -82,17 +85,29 @@ static void fc8080_data(HANDLE handle, u16 status)
 void fc8080_isr(HANDLE handle)
 {
 	u16 buf_int_status = 0;
+	u16 buf_ovr_status;
 
 	bbm_word_read(handle, BBM_BUF_STATUS, &buf_int_status);
+	bbm_word_read(handle, BBM_BUF_OVERRUN, &buf_ovr_status);
 	if (buf_int_status) {
 		bbm_word_write(handle, BBM_BUF_STATUS, buf_int_status);
 		fc8080_data(handle, buf_int_status);
-	}
 
-	buf_int_status = 0;
-	bbm_word_read(handle, BBM_BUF_STATUS, &buf_int_status);
-	if (buf_int_status) {
-		bbm_word_write(handle, BBM_BUF_STATUS, buf_int_status);
-		fc8080_data(handle, buf_int_status);
+		if(buf_ovr_status) {
+			bbm_word_write(handle, BBM_BUF_OVERRUN, buf_ovr_status);
+			bbm_word_write(handle, BBM_BUF_OVERRUN, 0);
+			DPRINTK("[FC8080] Overrun clear\n");
+		}
 	}
+#ifdef FC8080_OVERRUN_CLEAR
+	else {
+		if (buf_ovr_status) {
+			bbm_word_write(handle, BBM_BUF_OVERRUN, buf_ovr_status);
+			bbm_word_write(handle, BBM_BUF_OVERRUN, 0);
+			DPRINTK("[FC8080] Overrun occurred : 0x%x \n"
+				, buf_ovr_status);
+			fc8080_data(handle, buf_ovr_status);
+		}
+	}
+#endif
 }

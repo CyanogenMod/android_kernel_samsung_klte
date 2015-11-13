@@ -32,6 +32,11 @@ config MOTOR_DRV_MAX77828
 	default n
 	depends on MFD_MAX77828
 
+config MOTOR_DRV_MAX77888
+	tristate "Maxim MAX77888 motor"
+	default n
+	depends on MFD_MAX77888
+
 config MOTOR_DRV_ISA1400
 	tristate "ISA1400 motor"
 	default n
@@ -45,6 +50,16 @@ config MOTOR_DRV_DRV2603
 	help
 	  Say Y to enalbe the DRV2603 IC.
 
+config DRV2604_VIBRATOR
+	tristate "DRV2604_VIBRATOR"
+	default n
+	help
+	Say Y to enable DRV2604_VIBRATOR support.
+
+config MOTOR_ISA1000
+	tristate "ISA1000 motor"
+	default n
+	depends on VIBETONZ
 #
 # Immersion TouchSense Player driver configuration
 #
@@ -63,9 +78,15 @@ menuconfig MSM_VIBRATOR
 	help
 	Say Y to enable MSM_VIBRATOR support.
 
+menuconfig MAX77826_VIBRATOR
+	tristate "MAX77826_VIBRATOR"
+	default n
+	help
+	  Say Y to enable MAX77826_VIBRATOR support.
+
 config CONFIG_HAPTIC_ISA1200
         tristate "ISA1200 motor"
         default n
         depends on I2C
         help
-          Say Y to enable the ISA1200 IC. 
+          Say Y to enable the ISA1200 IC.

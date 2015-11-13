@@ -361,10 +361,48 @@ config SEC_DHA_SOL_MAL
         help
          To add support for Samsung DHA solution
 
+config AUDIO_DUAL_CP
+        tristate "Audio Flag For DUAL CP"
+        default n
+        help
+         To add support for udio Flag For DUAL CP
+
 config SEC_DEVIDE_RINGTONE_GAIN
 	tristate "Samsung ringback tone gain devide"
 	default n
 	help
 	 To add support for Ringback tone gain devide
 
+ config LDO_SUBMIC_BIAS
+	depends on ARCH_MSM8974
+	default n
+	bool "LDO SUB MICBIAS"
+	 ---help---
+         Support for the SAMSUNG MSM8974 audio.
+         Say Y here if you want use LDO bias
+         for Sub mic.
+	 To compile this option, choose M here:
+	 If unsure, say N here.
+
+ config LDO_EARMIC_BIAS
+	depends on ARCH_MSM8974
+	default n
+	bool "LDO EAR MICBIAS"
+	 ---help---
+         Support for the SAMSUNG MSM8974 audio.
+         Say Y here if you want use LDO bias
+         for Ear mic.
+	 To compile this option, choose M here:
+	 If unsure, say N here
+
+config GPIO_MAINMIC_BIAS
+	tristate "Main MicBias using gpio"
+	help
+		To add support if the main-mic bias is
+		supplied using external LDO
+
+config DSDA_VIA_UART
+	tristate "DualStandbyDualActive function via UART"
+	help
+	 To add support dsda via uart
 endmenu

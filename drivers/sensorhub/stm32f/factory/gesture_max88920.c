@@ -103,7 +103,12 @@ static ssize_t ir_current_store(struct device *dev,
 		for(current_index = 0; current_index < 16; current_index++) {
 			if (set_current[0][current_index] == uNewIrCurrent) {
 				data->uIr_Current = set_current[1][current_index];
-			}	
+				break;
+			}
+		}
+		if(current_index == 16) // current setting value wrong.
+		{
+			return ERROR;
 		}
 		set_gesture_current(data, data->uIr_Current);
 		data->uIr_Current= uNewIrCurrent;

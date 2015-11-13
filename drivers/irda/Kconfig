@@ -10,6 +10,12 @@ config IR_REMOCON_MC96FR116
 	help
 	  Say Y here to enable the I2C based IRDA for MC96FR116C chip.
 
+config IRDA_COMMON_LDO
+	bool "Micom MC96FR116 ABOV based IR LED driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable the I2C based IRDA for MC96FR116C chip for Kmini
 endmenu
 
 

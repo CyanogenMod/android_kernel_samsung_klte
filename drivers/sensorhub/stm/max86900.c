@@ -438,11 +438,8 @@ static int max86900_read_data(struct max86900_device_data *device, u16 *data)
 			| ((((u16)recvData[i * 2 + 1])) & 0x00ff);
 	}
 
-	data[2] = device->led;
-
-	if ((device->sample_cnt % 1000) == 1)
-		pr_info("%s - %u, %u, %u, %u\n", __func__,
-			data[0], data[1], data[2], data[3]);
+	if ((device->sample_cnt % 4000) == 1)
+		pr_info("%s - %u, %u\n", __func__, data[0], data[1]);
 
 	if (device->sample_cnt == 20 && device->led == 0) {
 		err = max86900_read_temperature(device);
@@ -484,6 +481,11 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 {
 	int err;
 	if (onoff) {
+		if (atomic_read(&data->is_enable)) {
+			pr_err("%s - already enabled !!!\n", __func__);
+			goto exit;
+		}
+		atomic_set(&data->is_enable, 1);
 		if (data->sub_ldo4 != NULL) {
 			err = max86900_regulator_onoff(data, HRM_LDO_ON);
 			if (err < 0)
@@ -498,9 +500,12 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 		err = max86900_enable(data);
 		if (err != 0)
 			pr_err("max86900_enable err : %d\n", err);
-
-		atomic_set(&data->is_enable, 1);
 	} else {
+		if (!atomic_read(&data->is_enable)) {
+			pr_err("%s - already disabled !!!\n", __func__);
+			goto exit;
+		}
+		atomic_set(&data->is_enable, 0);
 		err = max86900_disable(data);
 		if (err != 0)
 			pr_err("max86900_disable err : %d\n", err);
@@ -510,9 +515,8 @@ void max86900_mode_enable(struct max86900_device_data *data, int onoff)
 				pr_err("%s max86900_regulator_off fail err = %d\n",
 					__func__, err);
 		}
-
-		atomic_set(&data->is_enable, 0);
 	}
+exit:
 	pr_info("%s - part_type = %u, onoff = %d\n", __func__, data->part_type, onoff);
 }
 
@@ -1027,6 +1031,27 @@ static ssize_t max86900_lib_ver_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s\n", data->lib_ver);
 }
 
+static ssize_t max86900_hrm_flush_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct max86900_device_data *data = dev_get_drvdata(dev);
+	u8 handle = 0;
+
+	if (sysfs_streq(buf, "17")) /* ID_SAM_HRM */
+		handle = 17;
+	else if (sysfs_streq(buf, "18")) /* ID_AOSP_HRM */
+		handle = 18;
+	else if (sysfs_streq(buf, "19")) /* ID_HRM_RAW */
+		handle = 19;
+	else {
+		pr_info("%s: invalid value %d\n", __func__, *buf);
+		return -EINVAL;
+	}
+
+	input_report_rel(data->hrm_input_dev, REL_MISC, handle);
+	return size;
+}
+
 static DEVICE_ATTR(name, S_IRUGO, max86900_name_show, NULL);
 static DEVICE_ATTR(vendor, S_IRUGO, max86900_vendor_show, NULL);
 static DEVICE_ATTR(led_current, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -1047,6 +1072,8 @@ static DEVICE_ATTR(eol_test_status, S_IRUGO, eol_test_status_show, NULL);
 static DEVICE_ATTR(int_pin_check, S_IRUGO, int_pin_check, NULL);
 static DEVICE_ATTR(lib_ver, S_IRUGO | S_IWUSR | S_IWGRP,
 	max86900_lib_ver_show, max86900_lib_ver_store);
+static DEVICE_ATTR(hrm_flush, S_IWUSR | S_IWGRP,
+	NULL, max86900_hrm_flush_store);
 
 static struct device_attribute *hrm_sensor_attrs[] = {
 	&dev_attr_name,
@@ -1061,6 +1088,7 @@ static struct device_attribute *hrm_sensor_attrs[] = {
 	&dev_attr_eol_test_status,
 	&dev_attr_int_pin_check,
 	&dev_attr_lib_ver,
+	&dev_attr_hrm_flush,
 	NULL,
 };
 
@@ -1068,7 +1096,7 @@ irqreturn_t max86900_irq_handler(int irq, void *device)
 {
 	int err;
 	struct max86900_device_data *data = device;
-	u16 raw_data[4] = {0x00, };
+	u16 raw_data[2] = {0x00, };
 
 	err = max86900_read_data(data, raw_data);
 	if (err < 0)
@@ -1270,6 +1298,7 @@ int max86900_probe(struct i2c_client *client, const struct i2c_device_id *id )
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_X);
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_Y);
 	input_set_capability(data->hrm_input_dev, EV_REL, REL_Z);
+	input_set_capability(data->hrm_input_dev, EV_REL, REL_MISC);
 
 	err = input_register_device(data->hrm_input_dev);
 	if (err < 0) {

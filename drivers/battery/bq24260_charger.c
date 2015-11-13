@@ -496,6 +496,19 @@ bool bq24260_hal_chg_set_property(struct i2c_client *client,
 			gpio_free(charger->pdata->chg_gpio_en);
 		}
 
+		if (val->intval == POWER_SUPPLY_TYPE_POWER_SHARING) {
+			union power_supply_propval ps_status;
+			psy_do_property("ps", get,
+				POWER_SUPPLY_PROP_STATUS, ps_status);
+			if (ps_status.intval) {
+				charger->cable_type = POWER_SUPPLY_TYPE_OTG;
+				pr_info("%s: ps enable\n", __func__);
+			} else {
+				charger->cable_type = POWER_SUPPLY_TYPE_BATTERY;
+				pr_info("%s: ps disable\n", __func__);
+			}
+		}
+
 		if (charger->charging_current >= 0)
 			bq24260_charger_function_conrol(client);
 
@@ -656,7 +669,9 @@ static int bq24260_chg_set_property(struct power_supply *psy,
 	/* val->intval : type */
 	case POWER_SUPPLY_PROP_ONLINE:
 		charger->cable_type = val->intval;
-		if (val->intval == POWER_SUPPLY_TYPE_BATTERY)
+		if (val->intval == POWER_SUPPLY_TYPE_BATTERY || \
+			val->intval == POWER_SUPPLY_TYPE_OTG || \
+			val->intval == POWER_SUPPLY_TYPE_POWER_SHARING)
 			charger->is_charging = false;
 		else
 			charger->is_charging = true;

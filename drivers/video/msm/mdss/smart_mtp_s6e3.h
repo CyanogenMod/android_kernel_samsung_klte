@@ -40,24 +40,6 @@ Copyright (C) 2012, Samsung Electronics. All rights reserved.
 #include <linux/ctype.h>
 #include <asm/div64.h>
 
-/* octa ldi */
-#define EVT0_K_fhd_REVB 0x00
-#define EVT0_K_fhd_REVF 0x01 
-
-#define EVT0_K_fhd_REVG 0x02 
-#define EVT1_K_fhd_REVH 0x12
-#define EVT1_K_fhd_REVI 0x13
-
-#define EVT0_K_wqhd_REVB 0x00
-#define EVT0_K_wqhd_REVC 0x01
-#define EVT0_K_wqhd_REVD 0x02
-#define EVT0_K_wqhd_REVE 0x03
-#define EVT0_K_wqhd_REVF 0x04
-
-#define EVT2_K_fhd_magna_REVA  0x50
-#define EVT2_K_fhd_magna_REVB  0x61
-#define EVT2_K_fhd_magna_REVC  0x72
-
 /*
 *	From 4.8 inch model use AID function
 *	CASE#1 is used for now.

@@ -7,12 +7,28 @@ config BATTERY_SAMSUNG
 	 To see battery-related functions,
 	 refer to sec_charging_common.h
 
+config BATTERY_SAMSUNG_DATA_FILE
+	depends on BATTERY_SAMSUNG
+	string "samsung battery data file"
+	default ""
+	help
+	 Path to the battery data file.
+
+config BATTERY_SAMSUNG_DATA
+	bool
+	default BATTERY_SAMSUNG_DATA_FILE != ""
+
 config CHARGING_VZWCONCEPT
 	tristate "VZW concept about the charging"
 	default n
 	depends on BATTERY_SAMSUNG
 	help
 	 Say Y to include support for the VZW concepts.
+
+config BATTERY_SWELLING
+	bool "prevent battery swelling"
+	help
+	  Say Y to include support for prevent battery swelling
 
 # Fuel Gauge
 
@@ -270,6 +286,22 @@ config CHARGER_MAX77888
           flash driver.
           You have to define MFD_MAX77888
 
+config CHARGER_SM5414
+	tristate "SM5414 charger driver"
+	default n
+	help
+	 Say Y to include support
+	 for SM5414 charger driver.
+	 This driver source code implemented
+	 all functions for SMB5414 charger.
+
+config AFC_CHARGER_MODE
+	bool "afc charging support in sec battery driver"
+	default n
+	depends on CHARGER_MAX77843
+	help
+	  Say Y to include support for sec afc charging support
+
 config SAMSUNG_LPM_MODE
 	bool "Off charging mode support in sec battery driver"
 	default n
@@ -304,3 +336,9 @@ config SAMSUNG_BATTERY_DISALLOW_DEEP_SLEEP
 	help
 	  Say Y to include support
 	  Disallow deep sleep during charging for stablity.
+
+config EN_OOPS
+	bool "enable oops filter"
+	default n
+	help
+	  Say Y to enable oops filter

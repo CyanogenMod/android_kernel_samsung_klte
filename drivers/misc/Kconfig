@@ -50,6 +50,13 @@ config AD525X_DPOT
 	  This driver can also be built as a module.  If so, the module
 	  will be called ad525x_dpot.
 
+config MUIC_MAX77804K_SUPPORT_DESKDOCK
+	bool "MUIC_MAX77804K_SUPPORT_DESKDOCK"
+	depends on MFD_MAX77804K
+	default n
+	help
+	if you say yes here you will get support for Desk dock detection.
+
 config MUIC_MAX77803_SUPPORT_MHL_CABLE_DETECTION
 	  bool "MUIC_MAX77803_SUPPORT_MHL_CABLE_DETECTION"
 	  depends on MFD_MAX77803
@@ -437,6 +444,14 @@ config SAMSUNG_JACK
 	 To samsung jack is reviewed and supported in all the
 	 samsung devices.
 
+config EARJACK_ADC_SYSFS
+	bool "EarJack & BTN adc sysfs"
+	depends on SAMSUNG_JACK
+	default n
+	help
+	This is sysfs for sec_jack driver jack type and
+	btn type adc values.
+
 config HMC6352
 	tristate "Honeywell HMC6352 compass"
 	depends on I2C
@@ -579,6 +594,36 @@ config SM5502_MUIC
 	help
 	  This option enables SILICON MITUS MUIC.
 
+config TORCH_FIX
+	bool "Torch Fix for Factory Test"
+	depends on SM5502_MUIC && QPNP_SEC_CHARGER && SEC_FACTORY
+	default n
+	help
+	  This option enables SILICON MITUS MUIC.
+
+config MUIC_SM5502_SUPPORT_LANHUB_TA
+	bool "SM5502 Muic Lanhub TA support"
+	depends on SM5502_MUIC && !SEC_FACTORY
+	default n
+	help
+	 This option enable the LANHUB + TA Support for the SM5502 MUIC
+	 Disabling the option for the FACTORY Binaries due to delay issue
+	 in the Factory Test PGM.
+
+config SM5504_MUIC
+	bool "SILICON MITUS MUIC"
+	default n
+	help
+	  This option enables SILICON MITUS MUIC SM5504.
+
+config ATT_CHARGER_SUPPORT
+	bool "ATT 219K Charger Support"
+	depends on SM5502_MUIC
+	default n
+	help
+	 This option will disable the 219K L Company cable support as USB,
+	 the cable will be detected only as TA/Charger cable.
+
 config USB_SWITCH_TSU6721
         tristate "TSU6721 USB Switch"
         depends on I2C
@@ -587,6 +632,23 @@ config USB_SWITCH_TSU6721
           The TSU6721 is fully controlled using I2C and enables USB data,
           stereo and mono audio, video, microphone and UART data to use
           a common connector port.
+
+config MUIC_SUPPORT_CAR_DOCK
+	bool "TSU6721 MUIC CarDock Support"
+	depends on USB_SWITCH_TSU6721 && SEC_FACTORY
+	default n
+	help
+	 This option will enable CARDOCK for FACTORY Binaries in case of
+	 TSU6721 MUIC.
+
+config MUIC_SUPPORT_RUSTPROOF
+	bool "MUIC Disable UART"
+	depends on !SEC_FACTORY
+	default n
+	help
+	 This option will disable the UART to prevent the rusting of the
+	 IF Connector in the case of Kmini Devices.
+
 
 config MAX77803_MUIC
 	tristate "MAX77803 MUIC Support"
@@ -830,6 +892,15 @@ config USB_HSIC_SMSC_HUB
 	  This adds support for connecting devices like mouse in HSIC
 	  Host mode.
 
+config CHECK_SIMSLOT_COUNT
+	bool "Dual/Single sim support"
+
+config CHECK_SIMSLOT_COUNT_GPIO
+	int "Number simslot count gpio"
+	depends on CHECK_SIMSLOT_COUNT
+	help
+	  Provides Number of SS/DS detect GPIO value.
+
 config BCM2079X_NFC_I2C
 	tristate "BCM2079X NFC driver for I2C interface"
 	depends on I2C
@@ -884,6 +955,13 @@ config SEC_NFC_IF_I2C_GPIO
 	bool "I2C-GPIO (S/W-I2C)"
 	select I2C_ALGOBIT
 endchoice
+
+config SEC_NFC_NO_POWER_CONTROL
+	bool "Unused external power control (SIM VDD)"
+	depends on SEC_NFC_PRODUCT_N5
+	default n
+	help
+	  Unnecessary driver controls NFC external power control for SIM power.
 
 config SEC_NFC_CLK_REQ
 	bool "External clock control (RF clock)"
@@ -969,6 +1047,27 @@ config TI_DRV2667
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
+
+config RT8973_JIG_WAKEUP
+        bool "enable JIG wakeup when send Jig command"
+        default n
+        help
+        Use MUIC wakeup system when send Jig command.
+
+config MUIC_DET_JACK
+	bool "Earjack detection driver using MUIC"
+	default n
+	help
+	 This is Earjack detection driver using MUIC.
+	 MUIC can recognize earjack device type and earkey using ADC values.
+	 Some project use muic earjack instead of 3.5phi earjack.
+	 Max77804k muic also support earjack detection.
+
+config SGLTE_QSC_MODEM
+	bool "SGLTE QSC MODEM DOWNLOAD"
+	default n
+	help
+	  This option enables SGLTE QSC Modem download.	  
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

@@ -14,12 +14,20 @@
 #elif defined(CONFIG_ARCH_MSM8974)
 #define DEBUG_LOG_START (0x07300000)
 #elif defined(CONFIG_ARCH_MSM8226_3G_WIFI)
-#define DEBUG_LOG_START (0x0D100000)
+#if !defined CONFIG_TIMA_RKP
+#define DEBUG_LOG_START (0x0D180000)
+#else
+#define DEBUG_LOG_START (0x10400000)
+#endif
 #elif defined(CONFIG_ARCH_MSM8926_LTE)
-#define DEBUG_LOG_START (0x10600000)
+#define DEBUG_LOG_START (0x10A00000)
 #endif
 
+#if !defined CONFIG_TIMA_RKP
+#define	DEBUG_LOG_SIZE	(1<<19)
+#else
 #define	DEBUG_LOG_SIZE	(1<<20)
+#endif
 #define	DEBUG_LOG_MAGIC	(0xaabbccdd)
 #define	DEBUG_LOG_ENTRY_SIZE	128
 typedef struct debug_log_entry_s

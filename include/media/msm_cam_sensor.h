@@ -425,6 +425,7 @@ enum eeprom_cfg_type_t {
 	CFG_EEPROM_ERASE,
 	CFG_EEPROM_POWER_ON,
 	CFG_EEPROM_POWER_OFF,
+	CFG_EEPROM_READ_DATA_FROM_HW,
 };
 struct eeprom_get_t {
 	uint32_t num_bytes;

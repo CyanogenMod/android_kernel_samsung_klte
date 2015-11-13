@@ -1001,6 +1001,7 @@ static void max77823_chgin_isr_work(struct work_struct *work)
 	union power_supply_propval value;
 	int stable_count = 0;
 
+	wake_lock(&charger->chgin_wake_lock);
 	max77823_read_reg(charger->i2c,
 			  MAX77823_CHG_INT_MASK, &reg_data);
 	reg_data |= (1 << 6);
@@ -1081,6 +1082,7 @@ static void max77823_chgin_isr_work(struct work_struct *work)
 	reg_data &= ~(1 << 6);
 	max77823_write_reg(charger->i2c,
 		MAX77823_CHG_INT_MASK, reg_data);
+	wake_unlock(&charger->chgin_wake_lock);
 }
 
 static irqreturn_t max77823_chgin_irq(int irq, void *data)
@@ -1227,6 +1229,8 @@ static int __devinit max77823_charger_probe(struct platform_device *pdev)
 		pr_err("%s: Fail to Create Workqueue\n", __func__);
 		goto err_free;
 	}
+	wake_lock_init(&charger->chgin_wake_lock, WAKE_LOCK_SUSPEND,
+			            "charger-chgin");
 	INIT_WORK(&charger->chgin_work, max77823_chgin_isr_work);
 	INIT_DELAYED_WORK(&charger->chgin_init_work, max77823_chgin_init_work);
 	wake_lock_init(&charger->wpc_wake_lock, WAKE_LOCK_SUSPEND,

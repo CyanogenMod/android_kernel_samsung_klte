@@ -96,8 +96,6 @@
 #define EDGE_SWIPE_DATA_OFFSET	8
 
 #define EDGE_SWIPE_WIDTH_MAX	255
-#define EDGE_SWIPE_ANGLE_MIN	(-90)
-#define EDGE_SWIPE_ANGLE_MAX	90
 #define EDGE_SWIPE_PALM_MAX		1
 #endif
 #define F51_FINGER_TIMEOUT 50 /* ms */
@@ -138,9 +136,36 @@
 #define SYNAPTICS_MAX_Y_SIZE	1919
 #define SYNAPTICS_MAX_WIDTH	SYNAPTICS_MAX_Y_SIZE
 
+#if defined(CONFIG_MACH_JACTIVESKT)
+#define NUM_RX	16
+#define NUM_TX	28
+#else
 #define NUM_RX	28
 #define NUM_TX	16
+#endif
 
+#ifdef TSP_PATTERN_TRACKING_METHOD
+#define MAX_GHOSTCHECK_FINGER 		10
+#define MAX_GHOSTTOUCH_COUNT		5
+#define MAX_COUNT_TOUCHSYSREBOOT	4
+#define MAX_GHOSTTOUCH_BY_PATTERNTRACKING		3
+#define PATTERN_TRACKING_DISTANCE 4
+#define TSP_REBOOT_PENDING_TIME 50
+#define MOVE_COUNT_TH	100
+
+#define MIN_X_EDGE	17
+#define MAX_X_EDGE	1060   //1062
+#define MIN_Y_EDGE	17
+#define MAX_Y_EDGE	1900   // 1902
+
+/* Below is used for clearing ghost touch or for checking to system reboot.  by Xtopher */
+static int tcount_finger[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
+static int touchbx[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
+static int touchby[MAX_GHOSTCHECK_FINGER] = {0,0,0,0,0,0,0,0,0,0};
+static int ghosttouchcount = 0;
+
+static bool tsp_pattern_tracking(int fingerindex, int x, int y);
+#endif
 
 extern void mdss_dsi_panel_touchsensing(int enable);
 void synaptics_power_ctrl(struct synaptics_rmi4_data *rmi4_data, bool enable);
@@ -692,7 +717,7 @@ static void synaptics_change_dvfs_lock(struct work_struct *work)
 				MIN_TOUCH_LIMIT_SECOND);
 		rmi4_data->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
 		}
-	} else if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_SINGLE) {
+	} else if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_SINGLE || rmi4_data->dvfs_boost_mode == DVFS_STAGE_TRIPLE) {
 		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
 		rmi4_data->dvfs_freq = -1;
 	}
@@ -753,10 +778,13 @@ static void synaptics_set_dvfs_lock(struct synaptics_rmi4_data *rmi4_data,
 	} else if (on > 0) {
 		cancel_delayed_work(&rmi4_data->work_dvfs_off);
 
-		if (rmi4_data->dvfs_old_stauts != on) {
+		if ((!rmi4_data->dvfs_lock_status) || (rmi4_data->dvfs_old_stauts < on)) {
 			cancel_delayed_work(&rmi4_data->work_dvfs_chg);
-			if (1/*!rmi4_data->dvfs_lock_status*/) {
 				if (rmi4_data->dvfs_freq != MIN_TOUCH_LIMIT) {
+				if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_TRIPLE) 
+					ret = set_freq_limit(DVFS_TOUCH_ID,
+						MIN_TOUCH_LIMIT_SECOND);
+				else
 					ret = set_freq_limit(DVFS_TOUCH_ID,
 							MIN_TOUCH_LIMIT);
 					rmi4_data->dvfs_freq = MIN_TOUCH_LIMIT;
@@ -771,7 +799,6 @@ static void synaptics_set_dvfs_lock(struct synaptics_rmi4_data *rmi4_data,
 					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
 
 				rmi4_data->dvfs_lock_status = true;
-			}
 		}
 	} else if (on < 0) {
 		if (rmi4_data->dvfs_lock_status) {
@@ -1156,16 +1183,17 @@ exit:
 }
 
 #ifdef TSP_PATTERN_TRACKING_METHOD
-static void clear_tcount(struct synaptics_rmi4_data *rmi4_data)
+static void clear_tcount(void)
 {
-	struct pattern_tracking *pattern_data = &(rmi4_data->pattern_data);
-
-	memset(pattern_data->tcount_finger, 0x00, sizeof(pattern_data->tcount_finger));
-	memset(pattern_data->touchbx, 0x00, sizeof(pattern_data->touchbx));
-	memset(pattern_data->touchby, 0x00, sizeof(pattern_data->touchby));
+	int i;
+	for(i=0;i<MAX_GHOSTCHECK_FINGER;i++){
+		tcount_finger[i] = 0;
+		touchbx[i] = 0;
+		touchby[i] = 0;
+	}		 
 }
  
-static bool diff_two_point(int x, int y, int oldx, int oldy)
+static int diff_two_point(int x, int y, int oldx, int oldy)
 {
 	int diffx,diffy;
 	int distance;
@@ -1174,55 +1202,51 @@ static bool diff_two_point(int x, int y, int oldx, int oldy)
 	diffy = y-oldy;
 	distance = abs(diffx) + abs(diffy);
 
-	if (distance < TSP_PT_PATTERN_TRACKING_DISTANCE)
-		return true;
-
-	return false;
+	if(distance < PATTERN_TRACKING_DISTANCE) return 1;
+	else return 0;
 }
 
 static bool IsEdgeArea(int x, int y)
 {
-	if ((x <= TSP_PT_MIN_X_EDGE) || (x >= TSP_PT_MAX_X_EDGE)
-		|| (y <= TSP_PT_MIN_Y_EDGE) || (y >= TSP_PT_MAX_Y_EDGE))
-		return true;
-
-	return false;
+	bool fEdge = false;
+	if((x <= MIN_X_EDGE)||(x >= MAX_X_EDGE)||(y <= MIN_Y_EDGE)||(y >= MAX_Y_EDGE))fEdge = true;
+	return fEdge;
 }
 
 
 /* To do forced calibration when ghost touch occured at the same point
  for several second.   Xtopher */
-static bool tsp_pattern_tracking(struct synaptics_rmi4_data *rmi4_data,
-	int fingerindex, int x, int y, bool movecheck)
+static bool tsp_pattern_tracking(int fingerindex, int x, int y)
 {
-	int max_ghosttouch_th = TSP_PT_MAX_GHOSTTOUCH_COUNT;
-	struct pattern_tracking *pattern_data = &(rmi4_data->pattern_data);
+	int i;
+	bool ghosttouch  = false;
 
-	#ifdef PATTERN_TRACKING_FOR_FULLSCREEN
-	if(!IsEdgeArea(x,y)){
-		if (movecheck)
-			return false;
-		max_ghosttouch_th = TSP_PT_MAX_GHOSTTOUCH_COUNT * 2;
-	}
-	#else
-	if (!IsEdgeArea(x, y))
-		return false;
-	#endif
+	if(!IsEdgeArea(x,y)) return ghosttouch;
 
-	if (diff_two_point(x, y, pattern_data->touchbx[fingerindex], pattern_data->touchby[fingerindex]))
-		pattern_data->tcount_finger[fingerindex]++;
+	for( i = 0; i< MAX_GHOSTCHECK_FINGER; i++)
+	{
+		if( i == fingerindex){
+			//if((touchbx[i] == x)&&(touchby[i] == y))
+			if(diff_two_point(x,y, touchbx[i], touchby[i]))
+			{
+				tcount_finger[i] = tcount_finger[i]+1;
+			}
 			else
-		pattern_data->tcount_finger[fingerindex] = 0;
-
-	pattern_data->touchbx[fingerindex] = x;
-	pattern_data->touchby[fingerindex] = y;
-
-	if (pattern_data->tcount_finger[fingerindex] >= max_ghosttouch_th) {
-		clear_tcount(rmi4_data);
-		return true;
+			{
+				tcount_finger[i] = 0;
 			}
 
-	return false;
+			touchbx[i] = x;
+			touchby[i] = y;
+
+			if(tcount_finger[i]> MAX_GHOSTTOUCH_COUNT){
+				clear_tcount();
+				ghosttouch = true;
+				return ghosttouch;
+			}
+		}
+	}
+	return ghosttouch;
 }
 #endif
 
@@ -1444,8 +1468,12 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			wy = finger_data->wy;
 #ifdef EDGE_SWIPE
 			if (f51) {
+#if defined(CONFIG_MACH_JACTIVESKT)
+				if (f51->proximity_controls & HAS_EDGE_SWIPE) {
+#else
 				if ((f51->proximity_controls & HAS_EDGE_SWIPE)
 					&& f51->surface_data.palm) {
+#endif
 					wx = f51->surface_data.wx;
 					wy = f51->surface_data.wy;
 				}
@@ -1477,8 +1505,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				input_report_abs(rmi4_data->input_dev,
 						ABS_MT_WIDTH_MAJOR, f51->surface_data.width_major);
 				input_report_abs(rmi4_data->input_dev,
-						ABS_MT_ANGLE, f51->surface_data.angle);
-				input_report_abs(rmi4_data->input_dev,
 						ABS_MT_PALM, f51->surface_data.palm);
 			}
 			}
@@ -1492,18 +1518,20 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			if (!rmi4_data->finger[finger].state) {
 				#ifdef TSP_PATTERN_TRACKING_METHOD
 				/* Check hopping on almost fixed point */
-				if (tsp_pattern_tracking(rmi4_data, finger, x, y, false)) {
-					dev_err(&rmi4_data->i2c_client->dev, "Sunflower-Hopping (Pattern Tracking)\n");
-						cancel_delayed_work(&rmi4_data->reboot_work);
-						schedule_delayed_work(&rmi4_data->reboot_work,
-						msecs_to_jiffies(TSP_PT_REBOOT_PENDING_TIME * 6)); /* 300msec*/
-					return 0;
+				if(tsp_pattern_tracking(finger,x,y)){
+					dev_err(&rmi4_data->i2c_client->dev,
+							"Sunflower-Hopping (Pattern Tracking)\n");
+					cancel_delayed_work(&rmi4_data->reboot_work);
+					schedule_delayed_work(&rmi4_data->reboot_work,
+								msecs_to_jiffies(TSP_REBOOT_PENDING_TIME*6)); /* 300msec*/				
+					touch_count = 0;
+					return touch_count;
 				}
 				#endif
 
 
 				
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if defined(CONFIG_USE_INPUTLOCATION_FOR_ENG)
 				dev_info(&rmi4_data->i2c_client->dev, "[%d][P] 0x%02x, x = %d, y = %d, wx = %d, wy = %d\n",
 					finger, finger_status, x, y, wx, wy);
 #else
@@ -1514,13 +1542,15 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				rmi4_data->finger[finger].mcount++;
 				#ifdef TSP_PATTERN_TRACKING_METHOD
 				/* Check staying finger at one point */
-				if ((rmi4_data->finger[finger].mcount % TSP_PT_MOVE_COUNT_TH) == 0) {
-					if (tsp_pattern_tracking(rmi4_data, finger, x, y, true)) {
-						dev_err(&rmi4_data->i2c_client->dev, "Sunflower-Fixed (Pattern Tracking)\n");
-							cancel_delayed_work(&rmi4_data->reboot_work);
-							schedule_delayed_work(&rmi4_data->reboot_work,
-							msecs_to_jiffies(TSP_PT_REBOOT_PENDING_TIME * 6)); /* 300msec*/
-						return 0;
+				if((rmi4_data->finger[finger].mcount%MOVE_COUNT_TH) == 0){
+					if(tsp_pattern_tracking(finger,x,y)){
+						dev_err(&rmi4_data->i2c_client->dev,
+								"Sunflower-Fixed (Pattern Tracking)\n");
+						cancel_delayed_work(&rmi4_data->reboot_work);
+						schedule_delayed_work(&rmi4_data->reboot_work,
+									msecs_to_jiffies(TSP_REBOOT_PENDING_TIME*6)); /* 300msec*/				
+						touch_count = 0;
+						return touch_count;
 					}
 				}
 				#endif
@@ -1529,7 +1559,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 		}
 
 		if (rmi4_data->finger[finger].state && !finger_status) {
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if defined(CONFIG_USE_INPUTLOCATION_FOR_ENG)
 //#ifndef SEC_PRODUCT_SHIP
 			/* TODO : Remove version information when H/W dose not changed */
 			dev_info(&rmi4_data->i2c_client->dev, "[%d][R] 0x%02x M[%d], Ver[%02X%02X%02X%02X]\n",
@@ -1692,9 +1722,17 @@ static int synaptics_rmi4_f51_edge_swipe(struct synaptics_rmi4_data *rmi4_data,
 		return -ENODEV;
 
 	if (data->edge_swipe_dg >= 90 && data->edge_swipe_dg <= 180)
+#if defined(CONFIG_MACH_JACTIVESKT)
+		f51->surface_data.angle = data->edge_swipe_dg - 90;
+#else
 		f51->surface_data.angle = data->edge_swipe_dg - 180;
+#endif
 	else if (data->edge_swipe_dg < 90)
+#if defined(CONFIG_MACH_JACTIVESKT)
+		f51->surface_data.angle = 90 - data->edge_swipe_dg;
+#else
 		f51->surface_data.angle = data->edge_swipe_dg;
+#endif
 	else
 		dev_err(&rmi4_data->i2c_client->dev, "Skip wrong edge swipe angle [%d]\n",
 				data->edge_swipe_dg);
@@ -3311,9 +3349,6 @@ static int synaptics_rmi4_set_input_device
 			ABS_MT_WIDTH_MAJOR, 0,
 			EDGE_SWIPE_WIDTH_MAX, 0, 0);
 	input_set_abs_params(rmi4_data->input_dev,
-			ABS_MT_ANGLE, 0,
-			EDGE_SWIPE_ANGLE_MAX, 0, 0);
-	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_PALM, 0,
 			EDGE_SWIPE_PALM_MAX, 0, 0);
 #endif
@@ -3574,20 +3609,37 @@ static void synaptics_rmi4_reboot_work(struct work_struct *work)
 			container_of(work, struct synaptics_rmi4_data,
 			reboot_work.work);
 
-	dev_err(&rmi4_data->i2c_client->dev, "%s: Tsp Reboot(%d) by pattern tracking\n",
-			__func__, rmi4_data->pattern_data.ghosttouchcount++);
+	mutex_lock(&(rmi4_data->rmi4_reset_mutex));
+	disable_irq(rmi4_data->i2c_client->irq);
 
-	mutex_lock(&rmi4_data->rmi4_device_mutex);
+	synaptics_rmi4_release_all_finger(rmi4_data);
 
-	rmi4_data->pattern_data.is_working = true;
-	retval = synaptics_rmi4_reset_device(rmi4_data);
+	ghosttouchcount++;
+	dev_err(&rmi4_data->i2c_client->dev,
+			": Tsp Reboot(%d) by pattern tracking\n",ghosttouchcount);
+
+	synaptics_power_ctrl(rmi4_data,false);
+	msleep(50);
+	synaptics_power_ctrl(rmi4_data,true);
+	msleep(SYNAPTICS_HW_RESET_TIME);
+
+	retval = synaptics_rmi4_f54_set_control(rmi4_data);
+	if (retval < 0)
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to set f54 control\n",
+				__func__);
+
+	synaptics_rmi4_release_support_fn(rmi4_data);
+
+	retval = synaptics_rmi4_query_device(rmi4_data);
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev, "%s: Failed to issue reset command, error = %d\n",
-				__func__, retval);
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to query device\n",
+				__func__);
 	}
-	rmi4_data->pattern_data.is_working = false;
 
-	mutex_unlock(&rmi4_data->rmi4_device_mutex);
+	enable_irq(rmi4_data->i2c_client->irq);
+	mutex_unlock(&(rmi4_data->rmi4_reset_mutex));
 }
 #endif
 
@@ -3810,7 +3862,7 @@ int synaptics_rmi4_new_function(enum exp_fn fn_type,
 void synaptics_power_ctrl(struct synaptics_rmi4_data *rmi4_data, bool enable)
 {
 	int ret = 0;
-#if defined(CONFIG_SEC_H_PROJECT)
+#if defined(CONFIG_SEC_H_PROJECT)  || defined(CONFIG_MACH_JS01LTEDCM) 
 	static struct regulator *reg_l10;
 
 	if (!reg_l10) {
@@ -4029,7 +4081,11 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	 * 7,	FPCB 7.x,	FW_IMAGE_NAME_B0_4_3,	FAC_FWIMAGE_NAME_B0
 	 * 8,	FPCB 5.x,	FW_IMAGE_NAME_B0_5_1,	FAC_FWIMAGE_NAME_B0_5_1
 	 */
-
+#if defined(CONFIG_MACH_JACTIVESKT)
+		rmi4_data->panel_revision = OCTA_PANEL_REVISION_40;
+		rmi4_data->board->firmware_name = FW_IMAGE_NAME_B0_HSYNC04;
+		rmi4_data->board->fac_firmware_name = FW_IMAGE_NAME_B0_HSYNC04_FAC;
+#else
 	if(touch_fpcb_version == OCTA_PANEL_REVISION_51){
 		rmi4_data->panel_revision = OCTA_PANEL_REVISION_51;
 		rmi4_data->board->firmware_name = FW_IMAGE_NAME_B0_5_1;
@@ -4040,6 +4096,7 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		rmi4_data->board->firmware_name = FW_IMAGE_NAME_B0_4_3;
 		rmi4_data->board->fac_firmware_name = FAC_FWIMAGE_NAME_B0;
 	}
+#endif
 
 	touch_sleep_time = SYNAPTICS_HW_RESET_TIME;
 

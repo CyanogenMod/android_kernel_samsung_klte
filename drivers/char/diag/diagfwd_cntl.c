@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -349,10 +349,19 @@ void diag_send_diag_mode_update_by_smd(struct diag_smd_info *smd_info,
 	int wr_size = -ENOMEM, retry_count = 0, timer;
 	struct diag_smd_info *data = NULL;
 
-	/* For now only allow the modem to receive the message */
-	if (!smd_info || smd_info->type != SMD_CNTL_TYPE ||
-		(smd_info->peripheral != MODEM_DATA))
+	if (!smd_info || smd_info->type != SMD_CNTL_TYPE) {
+		pr_err("diag: In %s, invalid channel info, smd_info: %p type: %d\n",
+					__func__, smd_info,
+					((smd_info) ? smd_info->type : -1));
 		return;
+	}
+
+	if (smd_info->peripheral < MODEM_DATA ||
+					smd_info->peripheral > WCNSS_DATA) {
+		pr_err("diag: In %s, invalid peripheral %d\n", __func__,
+							smd_info->peripheral);
+		return;
+	}
 
 	data = &driver->smd_data[smd_info->peripheral];
 	if (!data)
@@ -380,7 +389,9 @@ void diag_send_diag_mode_update_by_smd(struct diag_smd_info *smd_info,
 
 	if (smd_info->ch) {
 		while (retry_count < 3) {
+			mutex_lock(&smd_info->smd_ch_mutex);
 			wr_size = smd_write(smd_info->ch, buf, msg_size);
+			mutex_unlock(&smd_info->smd_ch_mutex);
 			if (wr_size == -ENOMEM) {
 				/*
 				 * The smd channel is full. Delay while
@@ -407,7 +418,6 @@ void diag_send_diag_mode_update_by_smd(struct diag_smd_info *smd_info,
 		pr_err("diag: ch invalid, feature update on proc %d\n",
 				smd_info->peripheral);
 	}
-	process_lock_enabling(&data->nrt_lock, real_time);
 
 	mutex_unlock(&driver->diag_cntl_mutex);
 }
@@ -433,7 +443,9 @@ int diag_send_stm_state(struct diag_smd_info *smd_info,
 		stm_msg.version = 1;
 		stm_msg.control_data = stm_control_data;
 		while (retry_count < 3) {
+			mutex_lock(&smd_info->smd_ch_mutex);
 			wr_size = smd_write(smd_info->ch, &stm_msg, msg_size);
+			mutex_unlock(&smd_info->smd_ch_mutex);
 			if (wr_size == -ENOMEM) {
 				/*
 				 * The smd channel is full. Delay while

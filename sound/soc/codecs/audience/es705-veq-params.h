@@ -14,7 +14,7 @@
 #ifndef _ES705_VEQ_PARAMS_H
 #define _ES705_VEQ_PARAMS_H
 
-#if defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KLTE_LRA)
+#if defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_USC) || defined(CONFIG_MACH_KLTE_LRA) || defined(CONFIG_MACH_KLTE_TFNVZW)
 /* index 0 means max. volume level */
 static u32 veq_max_gains_nb[] = {
 	0x90180004,

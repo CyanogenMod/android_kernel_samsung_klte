@@ -258,8 +258,10 @@ static int sdcardfs_open(struct inode *inode, struct file *file)
 	if (err)
 		kfree(SDCARDFS_F(file));
 	else {
-		fsstack_copy_attr_all(inode, sdcardfs_lower_inode(inode));
-		fix_derived_permission(inode); 
+		mutex_lock(&inode->i_mutex);
+		sdcardfs_copy_inode_attr(inode, sdcardfs_lower_inode(inode));
+		fix_derived_permission(inode);
+		mutex_unlock(&inode->i_mutex);
 	}
 
 out_revert_cred:

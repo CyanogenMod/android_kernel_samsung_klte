@@ -51,6 +51,8 @@
 #include <linux/battery/charger/max77888_charger.h>
 #elif defined(CONFIG_CHARGER_MAX77823)
 #include <linux/battery/charger/max77823_charger.h>
+#elif defined(CONFIG_CHARGER_SM5414)
+#include <linux/battery/charger/sm5414_charger.h>
 #endif
 
 #if defined(CONFIG_CHARGER_BQ24260)
@@ -63,6 +65,9 @@
 
 struct sec_charger_info {
 	struct i2c_client		*client;
+	#if defined(CONFIG_QPNP_CHARGER)
+	struct qpnp_chg_chip *chip;
+	#endif
 	sec_battery_platform_data_t *pdata;
 	struct power_supply		psy_chg;
 	struct delayed_work isr_work;
@@ -71,6 +76,13 @@ struct sec_charger_info {
 	int status;
 	int siop_level;
 	bool is_charging;
+
+/* used only by sm5414 for store of charger interrupt */
+/* values for next health/charger status                    */
+#if defined(CONFIG_CHARGER_SM5414)
+	struct sec_chg_info sm5414_chg_inf;
+	bool is_fullcharged;
+#endif
 
 	/* charging current : + charging, - OTG */
 	int charging_current;

@@ -59,10 +59,10 @@ extern void host_notify_dev_unregister(struct host_notify_dev *ndev);
 enum host_notify_event {
 	HNOTIFY_NONE,
 	HNOTIFY_VBUS,
-	HNOTIFY_ID,
+	HNOTIFY_ID,			//#2
 	HNOTIFY_CHARGER,
 	HNOTIFY_ENUMERATED,
-	HNOTIFY_ID_PULL,
+	HNOTIFY_ID_PULL,		//#5
 	HNOTIFY_OVERCURRENT,
 	HNOTIFY_OTG_POWER_ON,
 	HNOTIFY_OTG_POWER_OFF,
@@ -72,8 +72,8 @@ enum host_notify_event {
 	HNOTIFY_AUDIODOCK_OFF,
 	HNOTIFY_LANHUB_ON,
 	HNOTIFY_LANHUB_OFF,
-	HNOTIFY_LANHUBTA_ON,
-	HNOTIFY_LANHUBTA_OFF,
+	HNOTIFY_LANHUBTA_ON,		//#15
+	HNOTIFY_LANHUBTA_OFF,		//#16
 };
 
 enum host_notify_data {

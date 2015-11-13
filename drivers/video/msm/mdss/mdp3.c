@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -47,6 +47,7 @@
 #include <mach/iommu.h>
 #include <mach/iommu_domains.h>
 #include <mach/msm_memtypes.h>
+#include <mach/rpm-regulator-smd.h>
 
 #include "mdp3.h"
 #include "mdss_fb.h"
@@ -189,11 +190,11 @@ static irqreturn_t mdp3_irq_handler(int irq, void *ptr)
 	u32 mdp_status = 0;
 
 	spin_lock(&mdata->irq_lock);
-	if (!mdata->irq_mask)
+	if (!mdata->irq_mask) {
 		pr_err("spurious interrupt\n");
-
-	clk_enable(mdp3_res->clocks[MDP3_CLK_AHB]);
-	clk_enable(mdp3_res->clocks[MDP3_CLK_CORE]);
+		spin_unlock(&mdata->irq_lock);
+		return IRQ_HANDLED;
+	}
 
 	mdp_status = MDP3_REG_READ(MDP3_REG_INTR_STATUS);
 	mdp_interrupt = mdp_status;
@@ -208,9 +209,6 @@ static irqreturn_t mdp3_irq_handler(int irq, void *ptr)
 		i++;
 	}
 	MDP3_REG_WRITE(MDP3_REG_INTR_CLEAR, mdp_status);
-
-	clk_disable(mdp3_res->clocks[MDP3_CLK_AHB]);
-	clk_disable(mdp3_res->clocks[MDP3_CLK_CORE]);
 
 	spin_unlock(&mdata->irq_lock);
 
@@ -279,19 +277,51 @@ void mdp3_irq_register(void)
 
 	pr_debug("mdp3_irq_register\n");
 	spin_lock_irqsave(&mdp3_res->irq_lock, flag);
-	enable_irq(mdp3_res->irq);
+	mdp3_res->irq_ref_cnt++;
+	if (mdp3_res->irq_ref_cnt == 1) {
+		MDP3_REG_WRITE(MDP3_REG_INTR_ENABLE, mdp3_res->irq_mask);
+		enable_irq(mdp3_res->irq);
+	}
 	spin_unlock_irqrestore(&mdp3_res->irq_lock, flag);
 }
 
 void mdp3_irq_deregister(void)
 {
 	unsigned long flag;
+	bool irq_enabled = true;
 
 	pr_debug("mdp3_irq_deregister\n");
 	spin_lock_irqsave(&mdp3_res->irq_lock, flag);
 	memset(mdp3_res->irq_ref_count, 0, sizeof(u32) * MDP3_MAX_INTR);
 	mdp3_res->irq_mask = 0;
-	disable_irq_nosync(mdp3_res->irq);
+	MDP3_REG_WRITE(MDP3_REG_INTR_ENABLE, 0);
+	mdp3_res->irq_ref_cnt--;
+	/* This can happen if suspend is called first */
+	if (mdp3_res->irq_ref_cnt < 0) {
+		irq_enabled = false;
+		mdp3_res->irq_ref_cnt = 0;
+	}
+	if (mdp3_res->irq_ref_cnt == 0 && irq_enabled)
+		disable_irq_nosync(mdp3_res->irq);
+	spin_unlock_irqrestore(&mdp3_res->irq_lock, flag);
+}
+
+void mdp3_irq_suspend(void)
+{
+	unsigned long flag;
+	bool irq_enabled = true;
+
+	pr_debug("%s\n", __func__);
+	spin_lock_irqsave(&mdp3_res->irq_lock, flag);
+	mdp3_res->irq_ref_cnt--;
+	if (mdp3_res->irq_ref_cnt < 0) {
+		irq_enabled = false;
+		mdp3_res->irq_ref_cnt = 0;
+	}
+	if (mdp3_res->irq_ref_cnt == 0 && irq_enabled) {
+		MDP3_REG_WRITE(MDP3_REG_INTR_ENABLE, 0);
+		disable_irq_nosync(mdp3_res->irq);
+	}
 	spin_unlock_irqrestore(&mdp3_res->irq_lock, flag);
 }
 
@@ -401,6 +431,12 @@ int mdp3_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota)
 	}
 	bus_handle->current_bus_idx = bus_idx;
 	rc = msm_bus_scale_client_update_request(bus_handle->handle, bus_idx);
+
+	if (!rc && ab_quota != 0 && ib_quota != 0) {
+		bus_handle->restore_ab = ab_quota;
+		bus_handle->restore_ib = ib_quota;
+	}
+
 	return rc;
 }
 
@@ -423,10 +459,18 @@ static int mdp3_clk_update(u32 clk_idx, u32 enable)
 	count = mdp3_res->clock_ref_count[clk_idx];
 	if (count == 1 && enable) {
 		pr_debug("clk=%d en=%d\n", clk_idx, enable);
+		ret = clk_prepare(clk);
+		if (ret) {
+			pr_err("%s: Failed to prepare clock %d",
+						__func__, clk_idx);
+			mdp3_res->clock_ref_count[clk_idx]--;
+			return ret;
+		}
 		ret = clk_enable(clk);
 	} else if (count == 0) {
 		pr_debug("clk=%d disable\n", clk_idx);
 		clk_disable(clk);
+		clk_unprepare(clk);
 		ret = 0;
 	} else if (count < 0) {
 		pr_err("clk=%d count=%d\n", clk_idx, count);
@@ -497,6 +541,31 @@ unsigned long mdp3_get_clk_rate(u32 clk_idx)
 	}
 	return clk_rate;
 }
+
+#if defined(CONFIG_FB_MSM_MDSS_DSI_DBG)
+static inline struct clk *mdp3_get_clk(u32 clk_idx)
+{
+	if (clk_idx < MDP3_MAX_CLK)
+		return mdp3_res->clocks[clk_idx];
+	return NULL;
+}
+
+void mdp3_dump_clk(void)
+{
+	u8 clk_idx = 0;
+	struct clk *clk = NULL;
+
+	pr_info(" ============ %s + ============\n", __func__);
+
+	for(clk_idx = MDP3_CLK_AHB ; clk_idx < MDP3_MAX_CLK ;clk_idx++)
+	{
+		clk = mdp3_get_clk(clk_idx);
+		clock_debug_print_clock2(clk);
+	}
+
+	pr_info(" ============ %s - ============\n", __func__);
+}
+#endif
 
 static int mdp3_clk_register(char *clk_name, int clk_idx)
 {
@@ -578,54 +647,76 @@ int mdp3_clk_enable(int enable, int dsi_clk)
 	return rc;
 }
 
-int mdp3_clk_prepare(void)
+void mdp3_bus_bw_iommu_enable(int enable, int client)
+{
+	struct mdp3_bus_handle_map *bus_handle;
+	int client_idx;
+	u64 ab, ib;
+	int ref_cnt;
+
+	if (client == MDP3_CLIENT_DMA_P) {
+		client_idx  = MDP3_BUS_HANDLE_DMA;
+	} else if (client == MDP3_CLIENT_PPP) {
+		client_idx  = MDP3_BUS_HANDLE_PPP;
+	} else {
+		pr_err("invalid client %d\n", client);
+		return;
+	}
+
+	bus_handle = &mdp3_res->bus_handle[client_idx];
+	if (bus_handle->handle < 1) {
+		pr_err("invalid bus handle %d\n", bus_handle->handle);
+		return;
+	}
+	mutex_lock(&mdp3_res->res_mutex);
+	if (enable)
+		bus_handle->ref_cnt++;
+	else
+		bus_handle->ref_cnt--;
+	ref_cnt = bus_handle->ref_cnt;
+	mutex_unlock(&mdp3_res->res_mutex);
+
+	if (enable && ref_cnt == 1) {
+		if (mdp3_res->allow_iommu_update)
+			mdp3_iommu_enable(client);
+		ab = bus_handle->restore_ab;
+		ib = bus_handle->restore_ib;
+		mdp3_bus_scale_set_quota(client, ab, ib);
+	} else if (!enable && ref_cnt == 0) {
+		mdp3_bus_scale_set_quota(client, 0, 0);
+		mdp3_iommu_disable(client);
+	} else if (ref_cnt < 0) {
+		pr_err("Ref count < 0, bus client=%d, ref_cnt=%d",
+				client_idx, ref_cnt);
+	}
+}
+
+int mdp3_res_update(int enable, int dsi_clk, int client)
 {
 	int rc = 0;
 
-	mutex_lock(&mdp3_res->res_mutex);
-	mdp3_res->clk_prepare_count++;
-	if (mdp3_res->clk_prepare_count == 1) {
-		rc = clk_prepare(mdp3_res->clocks[MDP3_CLK_AHB]);
-		if (rc < 0)
-			goto error0;
-		rc = clk_prepare(mdp3_res->clocks[MDP3_CLK_CORE]);
-		if (rc < 0)
-			goto error1;
-		rc = clk_prepare(mdp3_res->clocks[MDP3_CLK_VSYNC]);
-		if (rc < 0)
-			goto error2;
-		rc = clk_prepare(mdp3_res->clocks[MDP3_CLK_DSI]);
-		if (rc < 0)
-			goto error3;
+	if (enable) {
+		rc = mdp3_clk_enable(enable, dsi_clk);
+		if (rc < 0) {
+			pr_err("mdp3_clk_enable failed, enable=%d, dsi_clk=%d\n",
+				enable, dsi_clk);
+			goto done;
+		}
+		mdp3_irq_register();
+		mdp3_bus_bw_iommu_enable(enable, client);
+	} else {
+		mdp3_bus_bw_iommu_enable(enable, client);
+		mdp3_irq_suspend();
+		rc = mdp3_clk_enable(enable, dsi_clk);
+		if (rc < 0) {
+			pr_err("mdp3_clk_enable failed, enable=%d, dsi_clk=%d\n",
+				enable, dsi_clk);
+			goto done;
+		}
 	}
-	mutex_unlock(&mdp3_res->res_mutex);
-	return rc;
 
-error3:
-	clk_unprepare(mdp3_res->clocks[MDP3_CLK_VSYNC]);
-error2:
-	clk_unprepare(mdp3_res->clocks[MDP3_CLK_CORE]);
-error1:
-	clk_unprepare(mdp3_res->clocks[MDP3_CLK_AHB]);
-error0:
-	mdp3_res->clk_prepare_count--;
-	mutex_unlock(&mdp3_res->res_mutex);
+done:
 	return rc;
-}
-
-void mdp3_clk_unprepare(void)
-{
-	mutex_lock(&mdp3_res->res_mutex);
-	mdp3_res->clk_prepare_count--;
-	if (mdp3_res->clk_prepare_count == 0) {
-		clk_unprepare(mdp3_res->clocks[MDP3_CLK_AHB]);
-		clk_unprepare(mdp3_res->clocks[MDP3_CLK_CORE]);
-		clk_unprepare(mdp3_res->clocks[MDP3_CLK_VSYNC]);
-		clk_unprepare(mdp3_res->clocks[MDP3_CLK_DSI]);
-	} else if (mdp3_res->clk_prepare_count < 0) {
-		pr_err("mdp3 clk unprepare mismatch\n");
-	}
-	mutex_unlock(&mdp3_res->res_mutex);
 }
 
 int mdp3_get_mdp_dsi_clk(void)
@@ -633,7 +724,6 @@ int mdp3_get_mdp_dsi_clk(void)
 	int rc;
 
 	mutex_lock(&mdp3_res->res_mutex);
-	clk_prepare(mdp3_res->clocks[MDP3_CLK_DSI]);
 	rc = mdp3_clk_update(MDP3_CLK_DSI, 1);
 	mutex_unlock(&mdp3_res->res_mutex);
 	return rc;
@@ -644,7 +734,6 @@ int mdp3_put_mdp_dsi_clk(void)
 	int rc;
 	mutex_lock(&mdp3_res->res_mutex);
 	rc = mdp3_clk_update(MDP3_CLK_DSI, 0);
-	clk_unprepare(mdp3_res->clocks[MDP3_CLK_DSI]);
 	mutex_unlock(&mdp3_res->res_mutex);
 	return rc;
 }
@@ -674,9 +763,11 @@ int mdp3_iommu_attach(int context)
 	if (context >= MDP3_IOMMU_CTX_MAX)
 		return -EINVAL;
 
+	mutex_lock(&mdp3_res->iommu_lock);
 	context_map = mdp3_res->iommu_contexts + context;
 	if (context_map->attached) {
 		pr_warn("mdp iommu already attached\n");
+		mutex_unlock(&mdp3_res->iommu_lock);
 		return 0;
 	}
 
@@ -685,6 +776,7 @@ int mdp3_iommu_attach(int context)
 	iommu_attach_device(domain_map->domain, context_map->ctx);
 
 	context_map->attached = true;
+	mutex_unlock(&mdp3_res->iommu_lock);
 	return 0;
 }
 
@@ -697,9 +789,11 @@ int mdp3_iommu_dettach(int context)
 		context >= MDP3_IOMMU_CTX_MAX)
 		return -EINVAL;
 
+	mutex_lock(&mdp3_res->iommu_lock);
 	context_map = mdp3_res->iommu_contexts + context;
 	if (!context_map->attached) {
 		pr_warn("mdp iommu not attached\n");
+		mutex_unlock(&mdp3_res->iommu_lock);
 		return 0;
 	}
 
@@ -707,6 +801,7 @@ int mdp3_iommu_dettach(int context)
 	iommu_detach_device(domain_map->domain, context_map->ctx);
 	context_map->attached = false;
 
+	mutex_unlock(&mdp3_res->iommu_lock);
 	return 0;
 }
 
@@ -1141,6 +1236,54 @@ static int mdp3_parse_dt(struct platform_device *pdev)
 	return 0;
 }
 
+void msm_mdp3_cx_ctrl(int enable)
+{
+	int rc;
+
+	if (!mdp3_res->vdd_cx) {
+		mdp3_res->vdd_cx = devm_regulator_get(&mdp3_res->pdev->dev,
+								"vdd-cx");
+		if (IS_ERR_OR_NULL(mdp3_res->vdd_cx)) {
+			pr_debug("unable to get CX reg. rc=%d\n",
+				PTR_RET(mdp3_res->vdd_cx));
+			mdp3_res->vdd_cx = NULL;
+			return;
+		}
+	}
+
+	if (enable) {
+		rc = regulator_set_voltage(
+				mdp3_res->vdd_cx,
+				RPM_REGULATOR_CORNER_SVS_SOC,
+				RPM_REGULATOR_CORNER_SUPER_TURBO);
+		if (rc < 0)
+			goto vreg_set_voltage_fail;
+
+		rc = regulator_enable(mdp3_res->vdd_cx);
+		if (rc) {
+			pr_err("Failed to enable regulator vdd_cx.\n");
+			return;
+		}
+	} else {
+		rc = regulator_disable(mdp3_res->vdd_cx);
+		if (rc) {
+			pr_err("Failed to disable regulator vdd_cx.\n");
+			return;
+		}
+		rc = regulator_set_voltage(
+				mdp3_res->vdd_cx,
+				RPM_REGULATOR_CORNER_NONE,
+				RPM_REGULATOR_CORNER_SUPER_TURBO);
+		if (rc < 0)
+			goto vreg_set_voltage_fail;
+	}
+
+	return;
+vreg_set_voltage_fail:
+	pr_err("Set vltg failed\n");
+	return;
+}
+
 void mdp3_batfet_ctrl(int enable)
 {
 	int rc;
@@ -1171,6 +1314,12 @@ void mdp3_batfet_ctrl(int enable)
 
 	if (rc < 0)
 		pr_err("%s: reg enable/disable failed", __func__);
+}
+
+void mdp3_enable_regulator(int enable)
+{
+	msm_mdp3_cx_ctrl(enable);
+	mdp3_batfet_ctrl(enable);
 }
 
 static void mdp3_iommu_heap_unmap_iommu(struct mdp3_iommu_meta *meta)
@@ -1667,69 +1816,79 @@ u32 mdp3_fb_stride(u32 fb_index, u32 xres, int bpp)
 		return xres * bpp;
 }
 
-static int mdp3_alloc(size_t size, void **virt, unsigned long *phys)
+static int mdp3_alloc(struct msm_fb_data_type *mfd)
 {
-	int ret = 0;
+	int ret;
+	int dom;
+	void *virt;
+	unsigned long phys;
+	u32 offsets[2];
+	size_t size;
+	struct platform_device *pdev = mfd->pdev;
 
-	if (mdp3_res->ion_handle) {
-		pr_debug("memory already alloc\n");
-		*virt = mdp3_res->virt;
-		*phys = mdp3_res->phys;
-		return 0;
+	mfd->fbi->screen_base = NULL;
+	mfd->fbi->fix.smem_start = 0;
+	mfd->fbi->fix.smem_len = 0;
+
+	ret = of_property_read_u32_array(pdev->dev.of_node,
+				"qcom,memblock-reserve", offsets, 2);
+
+	if (ret) {
+		pr_err("fail to parse splash memory address\n");
+		return ret;
 	}
 
-	mdp3_res->ion_handle = ion_alloc(mdp3_res->ion_client, size,
-					SZ_1M,
-					ION_HEAP(ION_QSECOM_HEAP_ID), 0);
+	phys = offsets[0];
+	size = PAGE_ALIGN(mfd->fbi->fix.line_length *
+		mfd->fbi->var.yres_virtual);
 
-	if (!IS_ERR_OR_NULL(mdp3_res->ion_handle)) {
-		*virt = ion_map_kernel(mdp3_res->ion_client,
-					mdp3_res->ion_handle);
-		if (IS_ERR(*virt)) {
-			pr_err("map kernel error\n");
-			goto ion_map_kernel_err;
-		}
+	if (size > offsets[1]) {
+		pr_err("reserved splash memory size too small\n");
+		return -EINVAL;
+	}
 
-		ret = ion_phys(mdp3_res->ion_client, mdp3_res->ion_handle,
-				phys, &size);
-		if (ret) {
-			pr_err("%s ion_phys error\n", __func__);
-			goto ion_map_phys_err;
-		}
-
-		mdp3_res->virt = *virt;
-		mdp3_res->phys = *phys;
-		mdp3_res->size = size;
-	} else {
-		pr_err("%s ion alloc fail\n", __func__);
-		mdp3_res->ion_handle = NULL;
+	virt = phys_to_virt(phys);
+	if (unlikely(!virt)) {
+		pr_err("unable to map in splash memory\n");
 		return -ENOMEM;
 	}
 
-	return 0;
+	dom = mdp3_res->domains[MDP3_DMA_IOMMU_DOMAIN].domain_idx;
+	ret = msm_iommu_map_contig_buffer(phys, dom, 0, size, SZ_4K, 0,
+					&mfd->iova);
 
-ion_map_phys_err:
-	ion_unmap_kernel(mdp3_res->ion_client, mdp3_res->ion_handle);
-ion_map_kernel_err:
-	ion_free(mdp3_res->ion_client, mdp3_res->ion_handle);
-	mdp3_res->ion_handle = NULL;
-	mdp3_res->virt = NULL;
-	mdp3_res->phys = 0;
-	mdp3_res->size = 0;
-	return -ENOMEM;
+	if (ret) {
+		pr_err("fail to map to IOMMU %d\n", ret);
+		return ret;
+	}
+	pr_info("allocating %u bytes at %p (%lx phys) for fb %d\n",
+		size, virt, phys, mfd->index);
+
+	mfd->fbi->screen_base = virt;
+	mfd->fbi->fix.smem_start = phys;
+	mfd->fbi->fix.smem_len = size;
+
+	return 0;
 }
 
-void mdp3_free(void)
+void mdp3_free(struct msm_fb_data_type *mfd)
 {
-	pr_debug("mdp3_fbmem_free\n");
-	if (mdp3_res->ion_handle) {
-		ion_unmap_kernel(mdp3_res->ion_client, mdp3_res->ion_handle);
-		ion_free(mdp3_res->ion_client, mdp3_res->ion_handle);
-		mdp3_res->ion_handle = NULL;
-		mdp3_res->virt = NULL;
-		mdp3_res->phys = 0;
-		mdp3_res->size = 0;
+	size_t size = 0;
+	int dom;
+
+	if (!mfd->iova || !mfd->fbi->screen_base) {
+		pr_info("no fbmem allocated\n");
+		return;
 	}
+
+	size = mfd->fbi->fix.smem_len;
+	dom = mdp3_res->domains[MDP3_DMA_IOMMU_DOMAIN].domain_idx;
+	msm_iommu_unmap_contig_buffer(mfd->iova, dom, 0, size);
+
+	mfd->fbi->screen_base = NULL;
+	mfd->fbi->fix.smem_start = 0;
+	mfd->fbi->fix.smem_len = 0;
+	mfd->iova = 0;
 }
 
 int mdp3_parse_dt_splash(struct msm_fb_data_type *mfd)
@@ -1752,16 +1911,17 @@ int mdp3_parse_dt_splash(struct msm_fb_data_type *mfd)
 	mdp3_res->splash_mem_addr = offsets[0];
 	mdp3_res->splash_mem_size = offsets[1];
 
-	pr_debug("memaddr=%x size=%x\n", mdp3_res->splash_mem_addr,
+	pr_debug("memaddr=%lx size=%x\n", mdp3_res->splash_mem_addr,
 		mdp3_res->splash_mem_size);
 
 	return rc;
 }
 
-void mdp3_release_splash_memory(void)
+void mdp3_release_splash_memory(struct msm_fb_data_type *mfd)
 {
 	/* Give back the reserved memory to the system */
 	if (mdp3_res->splash_mem_addr) {
+		mdp3_free(mfd);
 		pr_debug("mdp3_release_splash_memory\n");
 		memblock_free(mdp3_res->splash_mem_addr,
 				mdp3_res->splash_mem_size);
@@ -1811,44 +1971,6 @@ int mdp3_get_cont_spash_en(void)
 	return mdp3_res->cont_splash_en;
 }
 
-int mdp3_continuous_splash_copy(struct mdss_panel_data *pdata)
-{
-	unsigned long splash_phys, phys;
-	void *splash_virt, *virt;
-	u32 height, width, rgb_size, stride;
-	size_t size;
-	int rc;
-
-	if (pdata->panel_info.type != MIPI_VIDEO_PANEL) {
-		pr_debug("cmd mode panel, no need to copy splash image\n");
-		return 0;
-	}
-
-	rgb_size = MDP3_REG_READ(MDP3_REG_DMA_P_SIZE);
-	stride = MDP3_REG_READ(MDP3_REG_DMA_P_IBUF_Y_STRIDE);
-	stride = stride & 0x3FFF;
-	splash_phys = MDP3_REG_READ(MDP3_REG_DMA_P_IBUF_ADDR);
-
-	height = (rgb_size >> 16) & 0xffff;
-	width  = rgb_size & 0xffff;
-	size = PAGE_ALIGN(height * stride);
-	pr_debug("splash_height=%d splash_width=%d Buffer size=%d\n",
-		height, width, size);
-
-	rc = mdp3_alloc(size, &virt, &phys);
-	if (rc) {
-		pr_err("fail to allocate memory for continuous splash image\n");
-		return rc;
-	}
-
-	splash_virt = ioremap(splash_phys, stride * height);
-	memcpy(virt, splash_virt, stride * height);
-	iounmap(splash_virt);
-	MDP3_REG_WRITE(MDP3_REG_DMA_P_IBUF_ADDR, phys);
-
-	return 0;
-}
-
 static int mdp3_is_display_on(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
@@ -1876,33 +1998,35 @@ static int mdp3_is_display_on(struct mdss_panel_data *pdata)
 static int mdp3_continuous_splash_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_panel_info *panel_info = &pdata->panel_info;
-	int ab, ib, rc;
+	struct mdp3_bus_handle_map *bus_handle;
+	u64 ab, ib;
+	int rc;
 
 	pr_debug("mdp3__continuous_splash_on\n");
 
 	mdp3_clk_set_rate(MDP3_CLK_VSYNC, MDP_VSYNC_CLK_RATE,
 			MDP3_CLIENT_DMA_P);
 
-	rc = mdp3_clk_prepare();
-	if (rc) {
-		pr_err("fail to prepare clk\n");
-		return rc;
-	}
+	mdp3_clk_set_rate(MDP3_CLK_CORE, MDP_CORE_CLK_RATE,
+			MDP3_CLIENT_DMA_P);
 
-	rc = mdp3_clk_enable(1, 1);
-	if (rc) {
-		pr_err("fail to enable clk\n");
-		mdp3_clk_unprepare();
-		return rc;
+	bus_handle = &mdp3_res->bus_handle[MDP3_BUS_HANDLE_DMA];
+	if (bus_handle->handle < 1) {
+		pr_err("invalid bus handle %d\n", bus_handle->handle);
+		return -EINVAL;
 	}
 
 	ab = panel_info->xres * panel_info->yres * 4;
 	ab *= panel_info->mipi.frame_rate;
 	ib = (ab * 3) / 2;
 	rc = mdp3_bus_scale_set_quota(MDP3_CLIENT_DMA_P, ab, ib);
+	bus_handle->restore_ab = ab;
+	bus_handle->restore_ib = ib;
+
+	rc = mdp3_res_update(1, 1, MDP3_CLIENT_DMA_P);
 	if (rc) {
-		pr_err("fail to request bus bandwidth\n");
-		goto splash_on_err;
+		pr_err("fail to enable clk\n");
+		return rc;
 	}
 
 	rc = mdp3_ppp_init();
@@ -1910,8 +2034,6 @@ static int mdp3_continuous_splash_on(struct mdss_panel_data *pdata)
 		pr_err("ppp init failed\n");
 		goto splash_on_err;
 	}
-
-	mdp3_irq_register();
 
 	if (pdata->event_handler) {
 		rc = pdata->event_handler(pdata, MDSS_EVENT_CONT_SPLASH_BEGIN,
@@ -1927,15 +2049,14 @@ static int mdp3_continuous_splash_on(struct mdss_panel_data *pdata)
 	else
 		mdp3_res->intf[MDP3_DMA_OUTPUT_SEL_DSI_CMD].active = 1;
 
-	mdp3_batfet_ctrl(true);
+	mdp3_enable_regulator(true);
 	mdp3_res->cont_splash_en = 1;
 	return 0;
 
 splash_on_err:
-	if (mdp3_clk_enable(0, 1))
+	if (mdp3_res_update(0, 1, MDP3_CLIENT_DMA_P))
 		pr_err("%s: Unable to disable mdp3 clocks\n", __func__);
 
-	mdp3_clk_unprepare();
 	return rc;
 }
 
@@ -1955,6 +2076,12 @@ static int mdp3_panel_register_done(struct mdss_panel_data *pdata)
 			rc = mdp3_continuous_splash_on(pdata);
 		}
 	}
+	/*
+	 * We want to prevent iommu from being enabled if there is
+	 * continue splash screen. This would have happened in
+	 * res_update in continuous_splash_on without this flag.
+	 */
+	mdp3_res->allow_iommu_update = true;
 	return rc;
 }
 
@@ -1969,11 +2096,9 @@ static int mdp3_debug_dump_stats(void *data, char *buf, int len)
 static void mdp3_debug_enable_clock(int on)
 {
 	if (on) {
-		mdp3_clk_prepare();
 		mdp3_clk_enable(1, 0);
 	} else {
 		mdp3_clk_enable(0, 0);
-		mdp3_clk_unprepare();
 	}
 }
 
@@ -2171,6 +2296,8 @@ static int mdp3_probe(struct platform_device *pdev)
 	.fb_mem_get_iommu_domain = mdp3_fb_mem_get_iommu_domain,
 	.panel_register_done = mdp3_panel_register_done,
 	.fb_stride = mdp3_fb_stride,
+	.fb_mem_alloc_fnc = mdp3_alloc,
+	.check_dsi_status = mdp3_check_dsi_ctrl_status,
 	};
 
 	struct mdp3_intr_cb underrun_cb = {
@@ -2271,7 +2398,7 @@ int mdp3_panel_get_boot_cfg(void)
 
 	if (!mdp3_res || !mdp3_res->pan_cfg.init_done)
 		rc = -EPROBE_DEFER;
-	if (mdp3_res->pan_cfg.lk_cfg)
+	else if (mdp3_res->pan_cfg.lk_cfg)
 		rc = 1;
 	else
 		rc = 0;
@@ -2280,13 +2407,13 @@ int mdp3_panel_get_boot_cfg(void)
 
 static  int mdp3_suspend_sub(struct mdp3_hw_resource *mdata)
 {
-	mdp3_batfet_ctrl(false);
+	mdp3_enable_regulator(false);
 	return 0;
 }
 
 static  int mdp3_resume_sub(struct mdp3_hw_resource *mdata)
 {
-	mdp3_batfet_ctrl(true);
+	mdp3_enable_regulator(true);
 	return 0;
 }
 

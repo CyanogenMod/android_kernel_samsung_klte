@@ -122,6 +122,9 @@ struct mpu6500_input_data {
 	atomic_t accel_enable;
 	ktime_t accel_delay;
 
+	struct mpu6500_v acc_data;
+	struct mpu6500_v gyro_data;
+
 	atomic_t gyro_enable;
 	ktime_t gyro_delay;
 	atomic_t reactive_state;
@@ -431,7 +434,6 @@ static int mpu6500_input_set_mode(struct mpu6500_input_data *data, u8 mode)
 static void mpu6500_input_report_accel_xyz(struct mpu6500_input_data *data)
 {
 	u8 regs[6];
-	struct mpu6500_v acc;
 	int result;
 
 	result = mpu6500_i2c_read_reg(data->client, MPUREG_ACCEL_XOUT_H, 6, regs);
@@ -440,20 +442,20 @@ static void mpu6500_input_report_accel_xyz(struct mpu6500_input_data *data)
 		return;
 	}
 
-	acc.x = ((s16) ((s16) regs[0] << 8)) | regs[1];
-	acc.y = ((s16) ((s16) regs[2] << 8)) | regs[3];
-	acc.z = ((s16) ((s16) regs[4] << 8)) | regs[5];
+	data->acc_data.x = ((s16) ((s16) regs[0] << 8)) | regs[1];
+	data->acc_data.y = ((s16) ((s16) regs[2] << 8)) | regs[3];
+	data->acc_data.z = ((s16) ((s16) regs[4] << 8)) | regs[5];
 
-	remap_sensor_data(acc.v, data->chip_pos);
+	remap_sensor_data(data->acc_data.v, data->chip_pos);
 
-	input_report_rel(data->accel_input, REL_X, acc.x - data->acc_cal[0]);
-	input_report_rel(data->accel_input, REL_Y, acc.y - data->acc_cal[1]);
-	input_report_rel(data->accel_input, REL_Z, acc.z - data->acc_cal[2]);
+	input_report_rel(data->accel_input, REL_X, data->acc_data.x - data->acc_cal[0]);
+	input_report_rel(data->accel_input, REL_Y, data->acc_data.y - data->acc_cal[1]);
+	input_report_rel(data->accel_input, REL_Z, data->acc_data.z - data->acc_cal[2]);
 
 	if ((ktime_to_ns(data->accel_delay) * (int64_t)data->count_logtime)
 		>= ((int64_t)MPU6500_LOGTIME * NSEC_PER_SEC)) {
 		pr_info("[SENSOR] %s, %d, %d, %d (Count = %d)\n",
-			__func__, acc.x, acc.y, acc.z, data->count_logtime);
+			__func__, data->acc_data.x, data->acc_data.y, data->acc_data.z, data->count_logtime);
 		data->count_logtime = 0;
 	} else
 		data->count_logtime++;
@@ -464,7 +466,6 @@ static void mpu6500_input_report_gyro_xyz(struct mpu6500_input_data *data)
 {
 	u8 regs[6];
 	s16 raw_tmp[3];
-	struct mpu6500_v gyro;
 	int result;
 
 	result = mpu6500_i2c_read_reg(data->client, MPUREG_GYRO_XOUT_H, 6, regs);
@@ -478,39 +479,39 @@ static void mpu6500_input_report_gyro_xyz(struct mpu6500_input_data *data)
 	raw_tmp[1] = (((s16) ((s16) regs[2] << 8)) | regs[3]);
 	raw_tmp[2] = (((s16) ((s16) regs[4] << 8)) | regs[5]);
 
-	gyro.x = raw_tmp[0] - (s16) data->gyro_bias[0];
-	gyro.y = raw_tmp[1] - (s16) data->gyro_bias[1];
-	gyro.z = raw_tmp[2] - (s16) data->gyro_bias[2];
+	data->gyro_data.x = raw_tmp[0] - (s16) data->gyro_bias[0];
+	data->gyro_data.y = raw_tmp[1] - (s16) data->gyro_bias[1];
+	data->gyro_data.z = raw_tmp[2] - (s16) data->gyro_bias[2];
 
-	if (!(gyro.x >> 15 == raw_tmp[0] >> 15) &&\
+	if (!(data->gyro_data.x >> 15 == raw_tmp[0] >> 15) &&\
 		!((s16) data->gyro_bias[0] >> 15 == raw_tmp[0] >> 15)) {
 		pr_info("[SENSOR] %s GYRO X is overflowed!!!\n", __func__);
-		gyro.x = (gyro.x >= 0 ? MIN_GYRO : MAX_GYRO);
+		data->gyro_data.x = (data->gyro_data.x >= 0 ? MIN_GYRO : MAX_GYRO);
 
 	}
-	if (!(gyro.y >> 15 == raw_tmp[1] >> 15) &&\
+	if (!(data->gyro_data.y >> 15 == raw_tmp[1] >> 15) &&\
 		!((s16) data->gyro_bias[1] >> 15 == raw_tmp[1] >> 15)) {
 		pr_info("[SENSOR] %s GYRO Y is overflowed!!!\n", __func__);
-		gyro.y = (gyro.y >= 0 ? MIN_GYRO : MAX_GYRO);
+		data->gyro_data.y = (data->gyro_data.y >= 0 ? MIN_GYRO : MAX_GYRO);
 
 	}
-	if (!(gyro.z >> 15 == raw_tmp[2] >> 15) &&\
+	if (!(data->gyro_data.z >> 15 == raw_tmp[2] >> 15) &&\
 		!((s16) data->gyro_bias[2] >> 15 == raw_tmp[2] >> 15)) {
 		pr_info("[SENSOR] %s GYRO Z is overflowed!!!\n", __func__);
-		gyro.z = (gyro.z >= 0 ? MIN_GYRO : MAX_GYRO);
+		data->gyro_data.z = (data->gyro_data.z >= 0 ? MIN_GYRO : MAX_GYRO);
 	}
 
-	remap_sensor_data(gyro.v, data->chip_pos);
+	remap_sensor_data(data->gyro_data.v, data->chip_pos);
 
-	input_report_rel(data->gyro_input, REL_RX, gyro.x);
-	input_report_rel(data->gyro_input, REL_RY, gyro.y);
-	input_report_rel(data->gyro_input, REL_RZ, gyro.z);
+	input_report_rel(data->gyro_input, REL_RX, data->gyro_data.x);
+	input_report_rel(data->gyro_input, REL_RY, data->gyro_data.y);
+	input_report_rel(data->gyro_input, REL_RZ, data->gyro_data.z);
 
 
 	if ((ktime_to_ns(data->gyro_delay) * (int64_t)data->count_logtime)
 		>= ((int64_t)MPU6500_LOGTIME * NSEC_PER_SEC)) {
 		pr_info("[SENSOR] %s, %d, %d, %d (Count = %d)\n",
-			__func__, gyro.x, gyro.y, gyro.z, data->count_logtime_gyro);
+			__func__, data->gyro_data.x, data->gyro_data.y, data->gyro_data.z, data->count_logtime_gyro);
 		data->count_logtime_gyro = 0;
 	} else
 		data->count_logtime_gyro++;
@@ -669,6 +670,89 @@ static int mpu6500_input_set_odr(struct mpu6500_input_data *data, int odr)
 	return result;
 }
 
+#if defined(CONFIG_MPU6500_ADJUST_SMART_ALERT)
+static int mpu6500_input_set_motion_interrupt(struct mpu6500_input_data *data,
+					      int enable, bool factory_test)
+{
+	struct motion_int_data *mot_data = &data->mot_data;
+	unsigned char reg;
+
+	atomic_set(&data->reactive_state, false);
+
+	if (enable) {
+		mpu6500_i2c_read_reg(data->client, MPUREG_INT_STATUS, 1, &reg);
+		printk(KERN_INFO "@@Initialize motion interrupt : INT_STATUS=%x\n", reg);
+
+		reg = 0x01;		// Make cycle and sleep bit 0
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_PWR_MGMT_1, reg);
+		msleep(50);
+
+		reg = 0x0;		// Clear gyro and accel config
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_CONFIG, reg);
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_CONFIG, reg);
+
+		reg = 0x08;		// Set accel fchoice 0 to use lp accel low power odr
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_CONFIG2, reg);
+
+		reg = 0x05;		// Set frequency of wake up (7.81Hz)
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_LP_ACCEL_ODR, reg);
+
+		if (factory_test)
+			reg = 0x41;		// Enable motion interrupt and raw data ready
+		else
+			reg = 0x40;     // Enable motion interrupt
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_INT_ENABLE, reg);
+
+		reg = 0xC0;		// Enable wake on motion detection logic
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_INTEL_CTRL, reg);
+
+		if (factory_test)
+			reg = 0x00;
+		else
+			reg = 0x30;		// Set Motion Threshold. (1LSB = 4mg)
+		mpu6500_i2c_write_single_reg(data->client, MPUREG_WOM_THR, reg);
+
+		if (!factory_test) {
+			reg = 0x07;	// Put gyro in standby and accel running
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_PWR_MGMT_2, reg);
+
+			reg = 0x1;
+			reg |= 0x20;	// Set the cycle bit to be 1 (LP Mode)
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_PWR_MGMT_1, reg);
+		}
+		data->motion_recg_st_time = jiffies;
+	} else {
+		if (mot_data->is_set) {
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_PWR_MGMT_1,
+				mot_data->pwr_mnt[0]);
+			msleep(50);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_PWR_MGMT_2,
+				mot_data->pwr_mnt[1]);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_CONFIG,
+				mot_data->cfg);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_CONFIG,
+				mot_data->accel_cfg);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_CONFIG2,
+				mot_data->accel_cfg2);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_GYRO_CONFIG,
+				mot_data->gyro_cfg);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_INT_ENABLE,
+				mot_data->int_cfg);
+			reg = 0xff; /* Motion Duration =1 ms */
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_ACCEL_INTEL_ENABLE, reg);
+			/* Motion Threshold =1mg, based on the data sheet. */
+			reg = 0xff;
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_WOM_THR, reg);
+			mpu6500_i2c_read_reg(data->client, MPUREG_INT_STATUS, 1, &reg);
+			mpu6500_i2c_write_single_reg(data->client, MPUREG_SMPLRT_DIV, mot_data->smplrt_div);
+			pr_info("%s: disable interrupt\n", __func__);
+		}
+	}
+	mot_data->is_set = enable;
+
+	return 0;
+}
+#else
 static int mpu6500_input_set_motion_interrupt(struct mpu6500_input_data *data,
 					      int enable, bool factory_test)
 {
@@ -769,6 +853,7 @@ static int mpu6500_input_set_motion_interrupt(struct mpu6500_input_data *data,
 
 	return 0;
 }
+#endif
 
 static int mpu6500_input_set_irq(struct mpu6500_input_data *data, unsigned char irq)
 {
@@ -974,6 +1059,8 @@ static int mpu6500_input_activate_devices(struct mpu6500_input_data *data,
 		CHECK_RESULT(mpu6500_set_delay(data));
 	} else {
 		unsigned char reg;
+		data->accel_delay = ns_to_ktime(MPU6500_DEFAULT_DELAY);
+		data->gyro_delay = ns_to_ktime(MPU6500_DEFAULT_DELAY);
 		/*enable reactive alert when all sensors go off*/
 		if (atomic_read(&data->motion_recg_enable))
 			mpu6500_input_set_motion_interrupt(data, true,
@@ -1107,11 +1194,7 @@ static ssize_t mpu6500_input_accel_enable_store(struct device *dev,
 		mpu6500_input_activate_devices(data,
 			MPU6500_SENSOR_ACCEL, true);
 
-#if defined(CONFIG_SEC_S3VE_PROJECT)
-		msleep(200);
-#endif
-
-		schedule_delayed_work(&data->accel_work, msecs_to_jiffies(5));
+		schedule_delayed_work(&data->accel_work, msecs_to_jiffies(ktime_to_ms(data->accel_delay)));
 	}
 	if (!value && atomic_read(&data->accel_enable)) {
 		cancel_delayed_work_sync(&data->accel_work);
@@ -1287,7 +1370,7 @@ static ssize_t mpu6500_input_gyro_enable_store(struct device *dev,
 		mpu6500_input_activate_devices(data,
 			MPU6500_SENSOR_GYRO, true);
 		schedule_delayed_work(&data->gyro_work,
-			msecs_to_jiffies(5));
+			msecs_to_jiffies(ktime_to_ms(data->gyro_delay)));
 	}
 	if (!value && atomic_read(&data->gyro_enable)) {
 		cancel_delayed_work_sync(&data->gyro_work);
@@ -1542,7 +1625,7 @@ static void mpu6500_request_gpio(struct mpu6500_platform_data *pdata)
 
 /* samsung factory test */
 
-static int read_accel_raw_xyz(struct mpu6500_input_data *data, struct mpu6500_v *acc)
+static int read_accel_raw_xyz(struct mpu6500_input_data *data)
 {
 	u8 regs[6];
 	int result;
@@ -1553,38 +1636,18 @@ static int read_accel_raw_xyz(struct mpu6500_input_data *data, struct mpu6500_v 
 		return result;
 	}
 
-	acc->x = ((s16) ((s16) regs[0] << 8)) | regs[1];
-	acc->y = ((s16) ((s16) regs[2] << 8)) | regs[3];
-	acc->z = ((s16) ((s16) regs[4] << 8)) | regs[5];
+	data->acc_data.x = ((s16) ((s16) regs[0] << 8)) | regs[1];
+	data->acc_data.y = ((s16) ((s16) regs[2] << 8)) | regs[3];
+	data->acc_data.z = ((s16) ((s16) regs[4] << 8)) | regs[5];
 
-	remap_sensor_data(acc->v, data->chip_pos);
+	remap_sensor_data(data->acc_data.v, data->chip_pos);
 
-	return 0;
-}
-
-static int read_accel_raw_xyz_cal(struct mpu6500_input_data *data, struct mpu6500_v *acc)
-{
-	struct mpu6500_v acc_raw;
-	if (!(data->enabled_sensors & MPU6500_SENSOR_ACCEL)) {
-		mpu6500_input_resume_accel(data);
-		usleep_range(10000, 11000);
-	}
-	read_accel_raw_xyz(data, &acc_raw);
-	acc->x = acc_raw.x - data->acc_cal[0];
-	acc->y = acc_raw.y - data->acc_cal[1];
-	acc->z = acc_raw.z - data->acc_cal[2];
-
-	if (!(data->enabled_sensors & MPU6500_SENSOR_ACCEL)) {
-		mpu6500_input_suspend_accel(data);
-		usleep_range(10000, 11000);
-	}
 	return 0;
 }
 
 static int accel_do_calibrate(struct mpu6500_input_data *data, int enable)
 {
 	struct file *cal_filp;
-	struct mpu6500_v acc;
 	int sum[3] = { 0, };
 	int err;
 	int i;
@@ -1596,16 +1659,16 @@ static int accel_do_calibrate(struct mpu6500_input_data *data, int enable)
 	}
 
 	for (i = 0; i < ACC_CAL_TIME; i++) {
-		err = read_accel_raw_xyz(data, &acc);
+		err = read_accel_raw_xyz(data);
 		if (err < 0) {
 			pr_err("[SENSOR] %s: accel_read_accel_raw_xyz() "
 				"failed in the %dth loop\n", __func__, i);
 			goto done;
 		}
 		usleep_range(10000, 11000);
-		sum[0] += acc.x/ACC_CAL_DIV;
-		sum[1] += acc.y/ACC_CAL_DIV;
-		sum[2] += acc.z/ACC_CAL_DIV;
+		sum[0] += data->acc_data.x/ACC_CAL_DIV;
+		sum[1] += data->acc_data.y/ACC_CAL_DIV;
+		sum[2] += data->acc_data.z/ACC_CAL_DIV;
 	}
 
 	if (!(data->enabled_sensors & MPU6500_SENSOR_ACCEL))
@@ -1870,11 +1933,17 @@ static ssize_t acc_data_read(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct mpu6500_input_data *data = dev_get_drvdata(dev);
-	struct mpu6500_v acc;
 
-	read_accel_raw_xyz_cal(data, &acc);
+	if (!(data->enabled_sensors & MPU6500_SENSOR_ACCEL)) {
+		mpu6500_input_resume_accel(data);
+		usleep_range(10000, 11000);
+		read_accel_raw_xyz(data);
+		mpu6500_input_suspend_accel(data);
+		usleep_range(10000, 11000);
+	}
 
-	return sprintf(buf, "%d, %d, %d\n", acc.x, acc.y, acc.z);
+	return sprintf(buf, "%d, %d, %d\n", data->acc_data.x - data->acc_cal[0], 
+		   data->acc_data.y - data->acc_cal[1], data->acc_data.z - data->acc_cal[2]);
 }
 static struct device_attribute dev_attr_raw_data =
 	__ATTR(raw_data, S_IRUSR | S_IRGRP, acc_data_read,
@@ -2019,9 +2088,9 @@ static void mpu6500_work_func_acc(struct work_struct *work)
 			struct mpu6500_input_data, accel_work);
 	mpu6500_input_report_accel_xyz(data);
 
-	if (ktime_to_ns(data->accel_delay) < 60) {
-		usleep_range(ktime_to_ns(data->accel_delay) * 1000,
-			ktime_to_ns(data->accel_delay) * 1100);
+	if (ktime_to_ms(data->accel_delay) < 60) {
+		usleep_range(ktime_to_ms(data->accel_delay) * 1000,
+			ktime_to_ms(data->accel_delay) * 1100);
 		schedule_delayed_work(&data->accel_work, 0);
 	} else {
 		schedule_delayed_work(&data->accel_work,
@@ -2038,9 +2107,9 @@ static void mpu6500_work_func_gyro(struct work_struct *work)
 
 	mpu6500_input_report_gyro_xyz(data);
 
-	if (ktime_to_ns(data->gyro_delay) < 60) {
-		usleep_range(ktime_to_ns(data->gyro_delay) * 1000,
-			ktime_to_ns(data->gyro_delay) * 1100);
+	if (ktime_to_ms(data->gyro_delay) < 60) {
+		usleep_range(ktime_to_ms(data->gyro_delay) * 1000,
+			ktime_to_ms(data->gyro_delay) * 1100);
 		schedule_delayed_work(&data->gyro_work, 0);
 	} else {
 		schedule_delayed_work(&data->gyro_work,
@@ -2132,6 +2201,7 @@ static int mpu6500_accel_input_init(struct mpu6500_input_data *data)
 
 	atomic_set(&data->accel_enable, 0);
 	data->accel_delay = ns_to_ktime(MPU6500_DEFAULT_DELAY);
+	data->gyro_delay = ns_to_ktime(MPU6500_DEFAULT_DELAY);
 	atomic_set(&data->motion_recg_enable, 0);
 	atomic_set(&data->reactive_state, 0);
 	return 0;
@@ -2189,6 +2259,7 @@ static int __devinit mpu6500_input_probe(struct i2c_client *client,
 	int error = 0;
 	unsigned char whoami = 0;
 	int ret = -ENODEV;
+	int retry = 5;
 
 	pr_info("[SENSOR] %s: IN\n", __func__);
 
@@ -2230,27 +2301,35 @@ static int __devinit mpu6500_input_probe(struct i2c_client *client,
 	data->pdata = pdata;
 #if defined(CONFIG_SEC_BERLUTI_PROJECT)
 	data->chip_pos = MPU6500_BOTTOM_LEFT_LOWER;
-#elif defined(CONFIG_SEC_S3VE_PROJECT)
+#elif defined(CONFIG_SEC_S3VE_PROJECT) || defined(CONFIG_SEC_VICTOR3GDSDTV_PROJECT)
 	data->chip_pos = MPU6500_TOP_LEFT_UPPER;
 #else
 	data->chip_pos = MPU6500_BOTTOM_RIGHT_LOWER;
 #endif
 	gb_mpu_data = data;
 
-#if !defined(CONFIG_SEC_S3VE_PROJECT)
 	mpu6500_vdd_on(data, 1);
-	msleep(100);
-#endif
 
-	error = mpu6500_i2c_read_reg(client, MPUREG_WHOAMI, 1, &whoami);
-	pr_info("%s : addr = 0x%x, whoami = 0x%x, error = 0x%x \n", __func__,
-		client->addr,whoami, error);
-
+	do {
+		retry--;
+		/* Check if the device is there or not. */
+		error = mpu6500_i2c_read_reg(client, MPUREG_WHOAMI, 1, &whoami);
+		pr_info("%s : addr = 0x%x, whoami = 0x%x, error = 0x%x \n", __func__,
+			client->addr,whoami, error);
+		if (error < 0) {
+			pr_err("%s: checking i2c error.(%d), retry %d\n",
+				__func__, error, retry);
+			msleep(20);
+		} else {
+			break;
+		}
+	} while (retry);
 	if (error < 0) {
 		pr_err("[SENSOR] %s: failed : threre is no such device.\n",
 			__func__);
 		goto err_checking_device;
 	}
+
 	if (!(whoami == MPU6500_ID || whoami == MPU6515_ID)) {
 		pr_err("[SENSOR] %s: mpu6500 probe failed\n", __func__);
 		error = -EIO;
@@ -2465,4 +2544,3 @@ MODULE_LICENSE("GPL");
 
 module_init(mpu6500_init);
 module_exit(mpu6500_exit);
-

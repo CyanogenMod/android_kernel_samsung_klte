@@ -310,7 +310,7 @@ exit:
 }
 
 static int k2hh_i2c_read(struct k2hh_p *data,
-		unsigned char reg_addr, unsigned char *buf)
+		unsigned char reg_addr, unsigned char *buf, unsigned int len)
 {
 	int ret, retries = 0;
 	struct i2c_msg msg[2];
@@ -322,7 +322,7 @@ static int k2hh_i2c_read(struct k2hh_p *data,
 
 	msg[1].addr = data->client->addr;
 	msg[1].flags = I2C_M_RD;
-	msg[1].len = 1;
+	msg[1].len = len;
 	msg[1].buf = buf;
 
 	do {
@@ -393,7 +393,7 @@ static int k2hh_set_range(struct k2hh_p *data, unsigned char range)
 	}
 
 	mask = K2HH_ACC_FS_MASK;
-	ret = k2hh_i2c_read(data, CTRL4_REG, &temp);
+	ret = k2hh_i2c_read(data, CTRL4_REG, &temp, 1);
 #ifndef OUTPUT_ALWAYS_ANTI_ALIASED
 	buf = (mask & new_range) | ((~mask) & temp);
 #else
@@ -425,7 +425,7 @@ static int k2hh_set_odr(struct k2hh_p *data)
 	new_odr = k2hh_acc_odr_table[i].mask;
 
 	mask = K2HH_ACC_ODR_MASK;
-	ret = k2hh_i2c_read(data, CTRL1_REG, &temp);
+	ret = k2hh_i2c_read(data, CTRL1_REG, &temp, 1);
 	buf = ((mask & new_odr) | ((~mask) & temp));
 	ret += k2hh_i2c_write(data, CTRL1_REG, buf);
 
@@ -443,13 +443,13 @@ static int k2hh_set_mode(struct k2hh_p *data, unsigned char mode)
 	switch (mode) {
 	case K2HH_MODE_NORMAL:
 		mask = K2HH_ACC_AXES_MASK;
-		ret = k2hh_i2c_read(data, CTRL1_REG, &temp);
+		ret = k2hh_i2c_read(data, CTRL1_REG, &temp, 1);
 		buf = ((mask & ACC_ENABLE_ALL_AXES) | ((~mask) & temp));
 		ret += k2hh_i2c_write(data, CTRL1_REG, buf);
 		break;
 	case K2HH_MODE_SUSPEND:
 		mask = K2HH_ACC_AXES_MASK;
-		ret = k2hh_i2c_read(data, CTRL1_REG, &temp);
+		ret = k2hh_i2c_read(data, CTRL1_REG, &temp, 1);
 		buf = ((mask & ACC_PM_OFF) | ((~mask) & temp));
 		ret += k2hh_i2c_write(data, CTRL1_REG, buf);
 		break;
@@ -466,13 +466,11 @@ static int k2hh_set_mode(struct k2hh_p *data, unsigned char mode)
 
 static int k2hh_read_accel_xyz(struct k2hh_p *data, struct k2hh_v *acc)
 {
-	int ret = 0, i;
+	int ret = 0;
 	struct k2hh_v rawdata;
 	unsigned char buf[READ_DATA_LENTH];
 
-	for (i = 0; i < READ_DATA_LENTH; i++) {
-		ret += k2hh_i2c_read(data, AXISDATA_REG + i, &buf[i]);
-	}
+	ret += k2hh_i2c_read(data, AXISDATA_REG, buf, READ_DATA_LENTH);
 
 	if (ret < 0)
 		goto exit;
@@ -950,7 +948,7 @@ static ssize_t k2hh_selftest_show(struct device *dev,
 
 	for (i = 0; i < 5; i++) {
 		while (1) {
-			if (k2hh_i2c_read(data, STATUS_REG, &temp) < 0) {
+			if (k2hh_i2c_read(data, STATUS_REG, &temp, 1) < 0) {
 				pr_err("[SENSOR] %s: i2c error", __func__);
 				goto exit_status_err;
 			}
@@ -976,7 +974,7 @@ static ssize_t k2hh_selftest_show(struct device *dev,
 
 	for (i = 0; i < 5; i++) {
 		while (1) {
-			if (k2hh_i2c_read(data, STATUS_REG, &temp) < 0) {
+			if (k2hh_i2c_read(data, STATUS_REG, &temp, 1) < 0) {
 				pr_err("[SENSOR] %s: i2c error", __func__);
 				goto exit_status_err;
 			}
@@ -1056,7 +1054,7 @@ static void k2hh_irq_work_func(struct work_struct *work)
 	unsigned char buf;
 
 	k2hh_i2c_write(data, INT_CFG1_REG, 0x00);
-	k2hh_i2c_read(data, INT_SRC1_REG, &buf);
+	k2hh_i2c_read(data, INT_SRC1_REG, &buf, 1);
 }
 
 static irqreturn_t k2hh_irq_thread(int irq, void *k2hh_data_p)
@@ -1343,7 +1341,7 @@ static int k2hh_probe(struct i2c_client *client,
 	/* read chip id */
 	k2hh_set_mode(data, K2HH_MODE_NORMAL);
 	for (i = 0; i < CHIP_ID_RETRIES; i++) {
-		ret = k2hh_i2c_read(data, WHOAMI_REG, &temp);
+		ret = k2hh_i2c_read(data, WHOAMI_REG, &temp, 1);
 		if (temp != K2HH_CHIP_ID) {
 			pr_err("[SENSOR]: %s - chip id failed 0x%x : %d\n",
 				__func__, temp, ret);

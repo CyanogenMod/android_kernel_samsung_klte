@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,21 +17,78 @@
 
 static unsigned int tp_pid_state;
 
+DEFINE_PER_CPU(u32, previous_ccnt);
+DEFINE_PER_CPU(u32[NUM_L1_CTRS], previous_l1_cnts);
+DEFINE_PER_CPU(u32[NUM_L2_PERCPU], previous_l2_cnts);
+DEFINE_PER_CPU(u32, old_pid);
+DEFINE_PER_CPU(u32, hotplug_flag);
+/* Reset per_cpu variables that store counter values uppn CPU hotplug */
+static int tracectr_cpu_hotplug_notifier(struct notifier_block *self,
+				    unsigned long action, void *hcpu)
+{
+	int ret = NOTIFY_OK;
+	int cpu = (int)hcpu;
+
+	if ((action & (~CPU_TASKS_FROZEN)) == CPU_STARTING)
+		per_cpu(hotplug_flag, cpu) = 1;
+
+	return ret;
+}
+
+static struct notifier_block tracectr_cpu_hotplug_notifier_block = {
+	.notifier_call = tracectr_cpu_hotplug_notifier,
+};
+
+static void setup_prev_cnts(u32 cpu)
+{
+	int i;
+	u32 cnten_val;
+
+	/* Read PMCNTENSET */
+	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r"(cnten_val));
+	/* Disable all the counters that were enabled */
+	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r"(cnten_val));
+	if (cnten_val & CC) {
+		/* Read value */
+		asm volatile("mrc p15, 0, %0, c9, c13, 0"
+			: "=r"(per_cpu(previous_ccnt, cpu)));
+	}
+
+	for (i = 0; i < NUM_L1_CTRS; i++) {
+		if (cnten_val & (1 << i)) {
+			/* Select */
+			asm volatile("mcr p15, 0, %0, c9, c12, 5"
+				: : "r"(i));
+			/* Read value */
+			asm volatile("mrc p15, 0, %0, c9, c13, 2"
+				: "=r"(per_cpu(previous_l1_cnts[i], cpu)));
+		}
+	}
+	/* Enable all the counters that were disabled */
+	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r"(cnten_val));
+}
+
 static int tracectr_notifier(struct notifier_block *self, unsigned long cmd,
 		void *v)
 {
-	static int old_pid = -1;
 	struct thread_info *thread = v;
 	int current_pid;
+	u32 cpu = thread->cpu;
 
 	if (cmd != THREAD_NOTIFY_SWITCH)
-		return old_pid;
+		return -EFAULT;
 
 	current_pid = thread->task->pid;
-	if (old_pid != -1)
-		trace_sched_switch_with_ctrs(old_pid, current_pid);
-	old_pid = current_pid;
-	return old_pid;
+	if (per_cpu(old_pid, cpu) != -1) {
+		if (per_cpu(hotplug_flag, cpu) == 1) {
+			per_cpu(hotplug_flag, cpu) = 0;
+			setup_prev_cnts(cpu);
+		} else
+			trace_sched_switch_with_ctrs(per_cpu(old_pid, cpu),
+				current_pid);
+	}
+	per_cpu(old_pid, cpu) = current_pid;
+	return NOTIFY_OK;
 }
 
 static struct notifier_block tracectr_notifier_block = {
@@ -102,6 +159,7 @@ int __init init_tracecounters(void)
 	struct dentry *dir;
 	struct dentry *file;
 	unsigned int value = 1;
+	int cpu;
 
 	dir = debugfs_create_dir("perf_debug_tp", NULL);
 	if (!dir)
@@ -112,6 +170,15 @@ int __init init_tracecounters(void)
 		debugfs_remove(dir);
 		return -ENOMEM;
 	}
+	register_cpu_notifier(&tracectr_cpu_hotplug_notifier_block);
+	for_each_possible_cpu(cpu)
+		per_cpu(old_pid, cpu) = -1;
+	return 0;
+}
+
+int __exit exit_tracecounters(void)
+{
+	unregister_cpu_notifier(&tracectr_cpu_hotplug_notifier_block);
 	return 0;
 }
 late_initcall(init_tracecounters);

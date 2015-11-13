@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Yamaha Corporation
+ * Copyright (c) 2013-2014 Yamaha Corporation
  *
  * This software is provided 'as-is', without any express or implied
  * warranty.  In no event will the authors be held liable for any damages
@@ -73,7 +73,7 @@
 struct yas_cal_data {
 	int8_t rxy1y2[3];
 	uint8_t fxy1y2[3];
-	int32_t Cx, Cy1, Cy2;
+	int32_t cx, cy1, cy2;
 	int32_t a2, a3, a4, a5, a6, a7, a8, a9, k;
 };
 #if 1 < YAS532_MAG_TEMPERATURE_LOG
@@ -161,9 +161,9 @@ static int get_cal_data_yas532(struct yas_cal_data *c)
 	c->rxy1y2[1] = ((int8_t)(((data[11]>>1) & 0x3f)<<2))>>2;
 	c->fxy1y2[2] = (uint8_t)(((data[12]&0x01)<<1) | ((data[13]>>7)&0x01));
 	c->rxy1y2[2] = ((int8_t)(((data[12]>>1) & 0x3f)<<2))>>2;
-	c->Cx = data[0] * 10 - 1280;
-	c->Cy1 = data[1] * 10 - 1280;
-	c->Cy2 = data[2] * 10 - 1280;
+	c->cx = data[0] * 10 - 1280;
+	c->cy1 = data[1] * 10 - 1280;
+	c->cy2 = data[2] * 10 - 1280;
 	c->a2 = ((data[3]>>2)&0x03f) - 32;
 	c->a3 = (uint8_t)(((data[3]<<2) & 0x0c) | ((data[4]>>6) & 0x03)) - 8;
 	c->a4 = (uint8_t)(data[4] & 0x3f) - 32;
@@ -445,9 +445,9 @@ static int yas_measure(struct yas_data *data, int num, int temp_correction,
 	sy1 = xy1y2_linear[1];
 	sy2 = xy1y2_linear[2];
 	if (temp_correction) {
-		sx  -= (c->Cx  * tmp) / 1000;
-		sy1 -= (c->Cy1 * tmp) / 1000;
-		sy2 -= (c->Cy2 * tmp) / 1000;
+		sx  -= (c->cx  * tmp) / 1000;
+		sy1 -= (c->cy1 * tmp) / 1000;
+		sy2 -= (c->cy2 * tmp) / 1000;
 	}
 	sy = sy1 - sy2;
 	sz = -sy1 - sy2;

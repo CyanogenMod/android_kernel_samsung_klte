@@ -170,8 +170,14 @@ int es705_configure_tty(struct tty_struct *tty, u32 bps, int stop)
 		termios.c_cflag |= CSTOPB;
 
 	/* set uart port to raw mode (see termios man page for flags) */
-	termios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP
-		| INLCR | IGNCR | ICRNL | IXON);
+    termios.c_iflag &= ~(PARMRK    /* disable mark parity errors */ 
+                            | ISTRIP    /* disable clear high bit of input characters */  
+                            | INLCR           /* disable translate NL to CR */ 
+                            | IGNCR           /* disable ignore CR */ 
+                            | ICRNL           /* disable translate CR to NL */ 
+                            | IXON);    /* disable enable XON/XOFF flow control */ 
+	termios.c_iflag |= IGNBRK;    /* enable ignore break */
+
 	termios.c_oflag &= ~(OPOST);
 	termios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
 

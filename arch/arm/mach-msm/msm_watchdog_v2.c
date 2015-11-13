@@ -66,6 +66,10 @@ struct msm_watchdog_data {
 	struct notifier_block panic_blk;
 };
 
+#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+	static struct msm_watchdog_data gdata;
+#endif
+
 /*
  * On the kernel command line specify
  * msm_watchdog_v2.enable=1 to enable the watchdog
@@ -345,6 +349,20 @@ static int msm_watchdog_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+void msm_cause_bite(void)
+{
+	printk(KERN_INFO "Causing a watchdog bite!\n");
+	__raw_writel(1, gdata.base + WDT0_BITE_TIME);
+	mb();
+	__raw_writel(1, gdata.base + WDT0_RST);
+	mb();
+	/* Delay to make sure bite occurs */
+	mdelay(1);
+	printk(KERN_INFO "Failed to casue a watchdog bite\n!");
+}
+#endif
+
 static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 {
 	struct msm_watchdog_data *wdog_dd = (struct msm_watchdog_data *)dev_id;
@@ -533,8 +551,9 @@ static int __devinit msm_wdog_dt_to_pdata(struct platform_device *pdev,
 	wdog_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	pdata->size = resource_size(wdog_resource);
 	pdata->phys_base = wdog_resource->start;
-	if (unlikely(!(devm_request_region(&pdev->dev, pdata->phys_base,
-					pdata->size, "msm-watchdog")))) {
+	if (unlikely(!(devm_request_mem_region(&pdev->dev, pdata->phys_base,
+					       pdata->size, "msm-watchdog")))) {
+
 		dev_err(&pdev->dev, "%s cannot reserve watchdog region\n",
 								__func__);
 		return -ENXIO;
@@ -595,6 +614,9 @@ static int __devinit msm_watchdog_probe(struct platform_device *pdev)
 	if (!wdog_dd)
 		return -EIO;
 	ret = msm_wdog_dt_to_pdata(pdev, wdog_dd);
+#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+	gdata = *wdog_dd;
+#endif
 	if (ret)
 		goto err;
 	wdog_dd->dev = &pdev->dev;

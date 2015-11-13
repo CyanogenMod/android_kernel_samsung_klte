@@ -589,8 +589,12 @@ static ssize_t snfc_rfs_read(struct file *file, char __user *buf, \
 #define SNFC_UART_NAME					"snfc_uart"
 #if defined(CONFIG_ARCH_EXYNOS)
 #define UART_DEV_NAME					"/dev/ttySAC1"
-#elif defined(CONFIG_ARCH_APQ8064) || defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+#elif defined(CONFIG_ARCH_APQ8064)
 #define UART_DEV_NAME					"/dev/ttyHSL2"
+#elif defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_SBM)
+#define UART_DEV_NAME					"/dev/ttyHSL2"
+#elif defined(CONFIG_MACH_HLTEDCM)	|| defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+#define UART_DEV_NAME					"/dev/ttyHSL1"
 #endif
 
 /* function prototype */

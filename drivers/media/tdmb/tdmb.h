@@ -146,16 +146,6 @@ struct tdmb_ebi_dt_data {
 };
 #endif
 
-#if defined(CONFIG_TDMB_TSIF)
-struct tdmb_tsi_dt_data {
-	int clk;
-	int sync;
-	int valid;
-	int error;
-	int data;
-};
-#endif
-
 #if defined(CONFIG_TDMB_I2C)
 struct tdmb_i2c_dev {
 	struct i2c_client *client;
@@ -170,6 +160,10 @@ struct tdmb_dt_platform_data {
 	int tdmb_use_irq;
 #ifdef CONFIG_TDMB_ANT_DET
 	int tdmb_ant_irq;
+#endif
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	struct regulator *tdmb_vreg;
+	const char *tdmb_vreg_name;
 #endif
 };
 
@@ -221,9 +215,11 @@ extern struct tcbd_fic_ensbl *tcbd_fic_get_ensbl_info(s32 _disp);
 
 extern unsigned long tdmb_get_if_handle(void);
 
-#ifdef CONFIG_TDMB_TSIF
+#if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 extern int tdmb_tsi_start(void (*callback)(u8 *data, u32 length), int packet_cnt);
 extern int tdmb_tsi_stop(void);
+extern int tdmb_tsi_init(void);
+extern void tdmb_tsi_deinit(void);
 #endif
 
 #ifdef CONFIG_SAMSUNG_LPM_MODE

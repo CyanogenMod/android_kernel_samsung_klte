@@ -16,35 +16,38 @@
 #include "dmpKey.h"
 #include "dmpmap.h"
 
-#define CFG_OUT_PRESS       (2027)
-#define CFG_PED_ENABLE      (2140)
-#define CFG_OUT_GYRO        (1959)
-#define OUT_3QUAT_DAT       (1831)
-#define CFG_PEDSTEP_DET     (2744)
-#define OUT_GYRO_DAT        (1968)
-#define CFG_FIFO_INT        (2138)
-#define OUT_CPASS_DAT       (2002)
-#define CFG_AUTH            (1111)
-#define OUT_ACCL_DAT        (1934)
-#define FCFG_1              (1139)
-#define FCFG_3              (1164)
-#define FCFG_2              (1143)
-#define CFG_OUT_CPASS       (1993)
-#define FCFG_7              (1150)
-#define CFG_OUT_3QUAT       (1821)
-#define OUT_PRESS_DAT       (2036)
-#define CFG_LCD_UP_DOWN_INT (1555)
-#define CFG_7               (1361)
-#define OUT_PQUAT_DAT       (1900)
-#define CFG_OUT_6QUAT       (1856)
-#define CFG_PED_INT         (2733)
-#define SMD_TP2             (1326)
-#define SMD_TP1             (1305)
-#define CFG_MOTION_BIAS     (1363)
-#define CFG_OUT_ACCL        (1925)
-#define CFG_OUT_STEPDET     (1791)
-#define OUT_6QUAT_DAT       (1866)
-#define CFG_OUT_PQUAT       (1891)
+#define CFG_OUT_PRESS           (2214)
+#define CFG_FB_GAIN_GYRO_ON     (1674)
+#define CFG_OUT_GYRO            (2146)
+#define CFG_PEDSTEP_DET         (3363)
+#define OUT_GYRO_DAT            (2155)
+#define CFG_FIFO_INT            (2325)
+#define OUT_CPASS_DAT           (2189)
+#define CFG_AUTH                (1355)
+#define CFG_QSHOT_FINISH_INT    (1918)
+#define OUT_ACCL_DAT            (2121)
+#define FCFG_1                  (1383)
+#define FCFG_3                  (1413)
+#define FCFG_2                  (1387)
+#define CFG_OUT_CPASS           (2180)
+#define FCFG_7                  (1394)
+#define CFG_OUT_3QUAT           (2008)
+#define OUT_PRESS_DAT           (2223)
+#define OUT_3QUAT_DAT           (2018)
+#define CFG_QSHOT_START_INT     (1895)
+#define CFG_7                   (1610)
+#define OUT_PQUAT_DAT           (2087)
+#define CFG_OUT_6QUAT           (2043)
+#define CFG_PED_INT             (3352)
+#define SMD_TP2                 (1575)
+#define SMD_TP1                 (1554)
+#define CFG_S_HEALTH_INT        (2614)
+#define CFG_PED_ENABLE          (2327)
+#define CFG_MOTION_BIAS         (1612)
+#define CFG_OUT_ACCL            (2112)
+#define CFG_OUT_STEPDET         (1978)
+#define OUT_6QUAT_DAT           (2053)
+#define CFG_OUT_PQUAT           (2078)
 
 #define D_0_22                  (22+512)
 #define D_0_24                  (24+512)
@@ -116,8 +119,8 @@
 #define CPASS_MTX_21            (34 * 16 + 4)
 #define CPASS_MTX_22            (34 * 16 + 8)
 #define D_EXT_GYRO_BIAS_X       (61 * 16)
-#define D_EXT_GYRO_BIAS_Y       (61 * 16 + 4)
-#define D_EXT_GYRO_BIAS_Z       (61 * 16 + 8)
+#define D_EXT_GYRO_BIAS_Y       (61 * 16) + 4
+#define D_EXT_GYRO_BIAS_Z       (61 * 16) + 8
 #define D_ACT0                  (40 * 16)
 #define D_ACSX                  (40 * 16 + 4)
 #define D_ACSY                  (40 * 16 + 8)
@@ -150,6 +153,9 @@
 #define D_LCD_DOWN_Z_THRESH		(30 * 16 + 12)
 #define D_LCD_STATUS			(29 * 16)
 
+#define D_QSHOT_START_ANGLE		(13 * 16 + 8)
+#define D_QSHOT_FINISH_ANGLE	(13 * 16 + 12)
+
 #define D_AUTH_OUT              (992)
 #define D_AUTH_IN               (996)
 #define D_AUTH_A                (1000)
@@ -173,6 +179,62 @@
 #define D_PEDSTD_SB2			(60 * 16 + 14)
 #define D_STPDET_TIMESTAMP      (28 * 16 + 8)
 #define D_PEDSTD_DRIVE_STATE    (58)
+
+/* S-Health keys */
+#define D_S_HEALTH_WALK_RUN_1   (16*69 + 12)
+#define D_S_HEALTH_WALK_RUN_2   (16*69 +  8)
+#define D_S_HEALTH_WALK_RUN_3   (16*69 +  4)
+#define D_S_HEALTH_WALK_RUN_4   (16*69 +  0)
+#define D_S_HEALTH_WALK_RUN_5   (16*68 + 12)
+#define D_S_HEALTH_WALK_RUN_6   (16*68 +  8)
+#define D_S_HEALTH_WALK_RUN_7   (16*68 +  4)
+#define D_S_HEALTH_WALK_RUN_8   (16*68 +  0)
+#define D_S_HEALTH_WALK_RUN_9   (16*67 + 12)
+#define D_S_HEALTH_WALK_RUN_10  (16*67 +  8)
+#define D_S_HEALTH_WALK_RUN_11  (16*67 +  4)
+#define D_S_HEALTH_WALK_RUN_12  (16*67 +  0)
+#define D_S_HEALTH_WALK_RUN_13  (16*66 + 12)
+#define D_S_HEALTH_WALK_RUN_14  (16*66 +  8)
+#define D_S_HEALTH_WALK_RUN_15  (16*66 +  4)
+#define D_S_HEALTH_WALK_RUN_16  (16*66 +  0)
+#define D_S_HEALTH_WALK_RUN_17  (16*65 + 12)
+#define D_S_HEALTH_WALK_RUN_18  (16*65 +  8)
+#define D_S_HEALTH_WALK_RUN_19  (16*65 +  4)
+#define D_S_HEALTH_WALK_RUN_20  (16*65 +  0)
+#define D_S_HEALTH_WALK_RUN_21   (16*70 +  8)
+#define D_S_HEALTH_CADENCE1     (16*69 + 14)
+#define D_S_HEALTH_CADENCE2     (16*69 + 10)
+#define D_S_HEALTH_CADENCE3     (16*69 +  6)
+#define D_S_HEALTH_CADENCE4     (16*69 +  2)
+#define D_S_HEALTH_CADENCE5     (16*68 + 14)
+#define D_S_HEALTH_CADENCE6     (16*68 + 10)
+#define D_S_HEALTH_CADENCE7     (16*68 +  6)
+#define D_S_HEALTH_CADENCE8     (16*68 +  2)
+#define D_S_HEALTH_CADENCE9     (16*67 + 14)
+#define D_S_HEALTH_CADENCE10    (16*67 + 10)
+#define D_S_HEALTH_CADENCE11    (16*67 +  6)
+#define D_S_HEALTH_CADENCE12    (16*67 +  2)
+#define D_S_HEALTH_CADENCE13    (16*66 + 14)
+#define D_S_HEALTH_CADENCE14    (16*66 + 10)
+#define D_S_HEALTH_CADENCE15    (16*66 +  6)
+#define D_S_HEALTH_CADENCE16    (16*66 +  2)
+#define D_S_HEALTH_CADENCE17    (16*65 + 14)
+#define D_S_HEALTH_CADENCE18    (16*65 + 10)
+#define D_S_HEALTH_CADENCE19    (16*65 +  6)
+#define D_S_HEALTH_CADENCE20    (16*65 +  2)
+#define D_S_HEALTH_CADENCE21     (16*70 + 10)
+
+#define D_S_HEALTH_INT_PERIOD   (16*70 +  2)
+#define D_S_HEALTH_INT_PERIOD2  (16*70 +  6)
+#define D_S_HEALTH_FREQ_TH      (16*25 +  0)
+#define D_S_HEALTH_ALPHA1       (16*35 +  4)
+#define D_S_HEALTH_ALPHA2       (16*35 +  8)
+
+#define D_S_HEALTH_MIN_CNTR	(16*64 + 2)
+#define D_S_HEALTH_MIN_CONST	(16*64 + 6)
+#define D_S_HEALTH_STEP_CNT	(16*64 + 8)
+#define D_S_HEALTH_STEP_CNT_P	(16*64 + 12)
+
 
 #define D_HOST_NO_MOT           (976)
 #define D_ACCEL_BIAS            (660)
@@ -226,7 +288,6 @@
 #define D_FS_9Q2                (2*16 + 8)
 #define D_FS_9Q3                (2*16 + 12)
 
-#define D_AKCPASS_FLAG			(2*16 + 4)
 #define D_CPASS_STATUS_CHK		(22*16 + 8)
 
 static const struct tKeyLabel dmpTConfig[] = {
@@ -246,27 +307,10 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_CFG_MOTION_BIAS,           CFG_MOTION_BIAS},
 	{KEY_CFG_PEDSTEP_DET,           CFG_PEDSTEP_DET},
 	{KEY_D_0_22,                    D_0_22},
-	{KEY_D_0_96,                    D_0_96},
 	{KEY_D_0_104,                   D_0_104},
-	{KEY_D_0_108,                   D_0_108},
-	{KEY_D_1_36,                    D_1_36},
-	{KEY_D_1_40,                    D_1_40},
-	{KEY_D_1_44,                    D_1_44},
-	{KEY_D_1_72,                    D_1_72},
 	{KEY_D_1_74,                    D_1_74},
-	{KEY_D_1_79,                    D_1_79},
-	{KEY_D_1_88,                    D_1_88},
-	{KEY_D_1_90,                    D_1_90},
-	{KEY_D_1_92,                    D_1_92},
-	{KEY_D_1_160,                   D_1_160},
-	{KEY_D_1_176,                   D_1_176},
-	{KEY_D_1_218,                   D_1_218},
 	{KEY_D_1_232,                   D_1_232},
 	{KEY_D_1_250,                   D_1_250},
-	{KEY_DMP_SH_TH_Y,               DMP_SH_TH_Y},
-	{KEY_DMP_SH_TH_X,               DMP_SH_TH_X},
-	{KEY_DMP_SH_TH_Z,               DMP_SH_TH_Z},
-	{KEY_DMP_ORIENT,                DMP_ORIENT},
 	{KEY_D_AUTH_OUT,                D_AUTH_OUT},
 	{KEY_D_AUTH_IN,                 D_AUTH_IN},
 	{KEY_D_AUTH_A,                  D_AUTH_A},
@@ -283,10 +327,6 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_CPASS_MTX_20,          CPASS_MTX_20},
 	{KEY_CPASS_MTX_21,          CPASS_MTX_21},
 	{KEY_CPASS_MTX_22,          CPASS_MTX_22},
-	{KEY_D_ACT0,                    D_ACT0},
-	{KEY_D_ACSX,                    D_ACSX},
-	{KEY_D_ACSY,                    D_ACSY},
-	{KEY_D_ACSZ,                    D_ACSZ},
 	{KEY_D_PEDSTD_BP_B,             D_PEDSTD_BP_B},
 	{KEY_D_PEDSTD_BP_A4,            D_PEDSTD_BP_A4},
 	{KEY_D_PEDSTD_BP_A3,            D_PEDSTD_BP_A3},
@@ -305,12 +345,64 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_D_PEDSTD_SB2,				D_PEDSTD_SB2},
 	{KEY_D_PEDSTD_DRIVE_STATE,      D_PEDSTD_DRIVE_STATE},
 	{KEY_D_STPDET_TIMESTAMP,		D_STPDET_TIMESTAMP},
+	{KEY_D_S_HEALTH_WALK_RUN_1,     D_S_HEALTH_WALK_RUN_1},
+	{KEY_D_S_HEALTH_WALK_RUN_2,     D_S_HEALTH_WALK_RUN_2},
+	{KEY_D_S_HEALTH_WALK_RUN_3,     D_S_HEALTH_WALK_RUN_3},
+	{KEY_D_S_HEALTH_WALK_RUN_4,     D_S_HEALTH_WALK_RUN_4},
+	{KEY_D_S_HEALTH_WALK_RUN_5,     D_S_HEALTH_WALK_RUN_5},
+	{KEY_D_S_HEALTH_WALK_RUN_6,     D_S_HEALTH_WALK_RUN_6},
+	{KEY_D_S_HEALTH_WALK_RUN_7,     D_S_HEALTH_WALK_RUN_7},
+	{KEY_D_S_HEALTH_WALK_RUN_8,     D_S_HEALTH_WALK_RUN_8},
+	{KEY_D_S_HEALTH_WALK_RUN_9,     D_S_HEALTH_WALK_RUN_9},
+	{KEY_D_S_HEALTH_WALK_RUN_10,    D_S_HEALTH_WALK_RUN_10},
+	{KEY_D_S_HEALTH_WALK_RUN_11,    D_S_HEALTH_WALK_RUN_11},
+	{KEY_D_S_HEALTH_WALK_RUN_12,    D_S_HEALTH_WALK_RUN_12},
+	{KEY_D_S_HEALTH_WALK_RUN_13,    D_S_HEALTH_WALK_RUN_13},
+	{KEY_D_S_HEALTH_WALK_RUN_14,    D_S_HEALTH_WALK_RUN_14},
+	{KEY_D_S_HEALTH_WALK_RUN_15,    D_S_HEALTH_WALK_RUN_15},
+	{KEY_D_S_HEALTH_WALK_RUN_16,    D_S_HEALTH_WALK_RUN_16},
+	{KEY_D_S_HEALTH_WALK_RUN_17,    D_S_HEALTH_WALK_RUN_17},
+	{KEY_D_S_HEALTH_WALK_RUN_18,    D_S_HEALTH_WALK_RUN_18},
+	{KEY_D_S_HEALTH_WALK_RUN_19,    D_S_HEALTH_WALK_RUN_19},
+	{KEY_D_S_HEALTH_WALK_RUN_20,    D_S_HEALTH_WALK_RUN_20},
+	{KEY_D_S_HEALTH_WALK_RUN_21,    D_S_HEALTH_WALK_RUN_21},
+	{KEY_D_S_HEALTH_CADENCE1,       D_S_HEALTH_CADENCE1},
+	{KEY_D_S_HEALTH_CADENCE2,       D_S_HEALTH_CADENCE2},
+	{KEY_D_S_HEALTH_CADENCE3,       D_S_HEALTH_CADENCE3},
+	{KEY_D_S_HEALTH_CADENCE4,       D_S_HEALTH_CADENCE4},
+	{KEY_D_S_HEALTH_CADENCE5,       D_S_HEALTH_CADENCE5},
+	{KEY_D_S_HEALTH_CADENCE6,       D_S_HEALTH_CADENCE6},
+	{KEY_D_S_HEALTH_CADENCE7,       D_S_HEALTH_CADENCE7},
+	{KEY_D_S_HEALTH_CADENCE8,       D_S_HEALTH_CADENCE8},
+	{KEY_D_S_HEALTH_CADENCE9,       D_S_HEALTH_CADENCE9},
+	{KEY_D_S_HEALTH_CADENCE10,      D_S_HEALTH_CADENCE10},
+	{KEY_D_S_HEALTH_CADENCE11,      D_S_HEALTH_CADENCE11},
+	{KEY_D_S_HEALTH_CADENCE12,      D_S_HEALTH_CADENCE12},
+	{KEY_D_S_HEALTH_CADENCE13,      D_S_HEALTH_CADENCE13},
+	{KEY_D_S_HEALTH_CADENCE14,      D_S_HEALTH_CADENCE14},
+	{KEY_D_S_HEALTH_CADENCE15,      D_S_HEALTH_CADENCE15},
+	{KEY_D_S_HEALTH_CADENCE16,      D_S_HEALTH_CADENCE16},
+	{KEY_D_S_HEALTH_CADENCE17,      D_S_HEALTH_CADENCE17},
+	{KEY_D_S_HEALTH_CADENCE18,      D_S_HEALTH_CADENCE18},
+	{KEY_D_S_HEALTH_CADENCE19,      D_S_HEALTH_CADENCE19},
+	{KEY_D_S_HEALTH_CADENCE20,      D_S_HEALTH_CADENCE20},
+	{KEY_D_S_HEALTH_CADENCE21,      D_S_HEALTH_CADENCE21},
+	{KEY_S_HEALTH_INT_PERIOD,       D_S_HEALTH_INT_PERIOD},
+	{KEY_S_HEALTH_INT_PERIOD2,      D_S_HEALTH_INT_PERIOD2},
+	{KEY_S_HEALTH_MIN_CNTR,         D_S_HEALTH_MIN_CNTR},
+	{KEY_S_HEALTH_MIN_CONST,        D_S_HEALTH_MIN_CONST},
+	{KEY_S_HEALTH_STEP_CNT,         D_S_HEALTH_STEP_CNT},
+	{KEY_S_HEALTH_STEP_CNT_P,       D_S_HEALTH_STEP_CNT_P},
+	{KEY_S_HEALTH_FREQ_TH,          D_S_HEALTH_FREQ_TH},
+	{KEY_S_HEALTH_ALPHA1,           D_S_HEALTH_ALPHA1},
+	{KEY_S_HEALTH_ALPHA2,           D_S_HEALTH_ALPHA2},
 	{KEY_D_HOST_NO_MOT,             D_HOST_NO_MOT},
 	{KEY_D_ACCEL_BIAS,              D_ACCEL_BIAS},
 	{KEY_CFG_EXT_GYRO_BIAS_X,       D_EXT_GYRO_BIAS_X},
 	{KEY_CFG_EXT_GYRO_BIAS_Y,       D_EXT_GYRO_BIAS_Y},
 	{KEY_CFG_EXT_GYRO_BIAS_Z,       D_EXT_GYRO_BIAS_Z},
 	{KEY_CFG_PED_INT,               CFG_PED_INT},
+	{KEY_CFG_S_HEALTH_INT,          CFG_S_HEALTH_INT},
 	{KEY_SMD_ENABLE,                D_SMD_ENABLE},
 	{KEY_SMD_ACCEL_THLD,            D_SMD_MOT_THLD},
 	{KEY_SMD_DELAY_THLD,            D_SMD_DELAY_THLD},
@@ -338,7 +430,7 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_CFG_9QUAT_ODR,             D_ODR_S8},
 	{KEY_CFG_PQUAT9_ODR,            D_ODR_S9},
 	{KEY_ODR_CNTR_3QUAT,            D_ODR_CNTR_S1},
-	{KEY_ODR_CNTR_6QUAT,             D_ODR_CNTR_S2},
+	{KEY_ODR_CNTR_6QUAT,            D_ODR_CNTR_S2},
 	{KEY_ODR_CNTR_PQUAT,            D_ODR_CNTR_S3},
 	{KEY_ODR_CNTR_ACCL,             D_ODR_CNTR_S4},
 	{KEY_ODR_CNTR_GYRO,             D_ODR_CNTR_S5},
@@ -359,9 +451,8 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_DMP_9Q1,					D_FS_9Q1},
 	{KEY_DMP_9Q2,					D_FS_9Q2},
 	{KEY_DMP_9Q3,					D_FS_9Q3},
-	{KEY_AKCPASS_FLAG,				D_AKCPASS_FLAG},
 	{KEY_CPASS_STATUS_CHK,          D_CPASS_STATUS_CHK},
-	{KEY_CFG_LCD_UP_DOWN_INT,		CFG_LCD_UP_DOWN_INT},
+	{KEY_CFG_FB_GAIN_GYRO_ON,		CFG_FB_GAIN_GYRO_ON},
 	{KEY_LCD_UP_DOWN_ENABLE,		D_LCD_UP_DOWN_ENABLE},
 	{KEY_LCD_TIME_THRESH,			D_LCD_TIME_THRESH},
 	{KEY_LCD_UP_X_THRESH,			D_LCD_UP_X_THRESH},
@@ -371,13 +462,10 @@ static const struct tKeyLabel dmpTConfig[] = {
 	{KEY_LCD_DOWN_Y_THRESH,			D_LCD_DOWN_Y_THRESH},
 	{KEY_LCD_DOWN_Z_THRESH,			D_LCD_DOWN_Z_THRESH},
 	{KEY_LCD_STATUS,				D_LCD_STATUS},
-	{KEY_TEST_01,                   OUT_ACCL_DAT},
-	{KEY_TEST_02,                   OUT_GYRO_DAT},
-	{KEY_TEST_03,                   OUT_CPASS_DAT},
-	{KEY_TEST_04,                   OUT_PRESS_DAT},
-	{KEY_TEST_05,                   OUT_3QUAT_DAT},
-	{KEY_TEST_06,                   OUT_6QUAT_DAT},
-	{KEY_TEST_07,                   OUT_PQUAT_DAT}
+	{KEY_CFG_QSHOT_START_INT,		CFG_QSHOT_START_INT},
+	{KEY_CFG_QSHOT_FINISH_INT,		CFG_QSHOT_FINISH_INT},
+	{KEY_D_QSHOT_START_ANGLE,		D_QSHOT_START_ANGLE},
+	{KEY_D_QSHOT_FINISH_ANGLE,		D_QSHOT_FINISH_ANGLE},
 };
 #define NUM_LOCAL_KEYS (sizeof(dmpTConfig)/sizeof(dmpTConfig[0]))
 

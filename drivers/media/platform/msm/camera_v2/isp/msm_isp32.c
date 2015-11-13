@@ -269,6 +269,14 @@ static void msm_vfe32_process_error_status(struct vfe_device *vfe_dev)
 		pr_err("%s: axi error\n", __func__);
 }
 
+static int msm_vfe32_get_reg_update(uint32_t irq0_status, uint32_t irq1_status)
+{
+	int rc = 0;
+	if ((irq0_status & 0x20) || (irq1_status & 0x1C000000))
+		rc = 1;
+	return rc;
+}
+
 static void msm_vfe32_read_irq_status(struct vfe_device *vfe_dev,
 				      uint32_t *irq_status0, uint32_t *irq_status1)
 {
@@ -1036,6 +1044,7 @@ struct msm_vfe_hardware_info vfe32_hw_info = {
 			.get_platform_data	= msm_vfe32_get_platform_data,
 			.get_error_mask		= msm_vfe32_get_error_mask,
 			.process_error_status	= msm_vfe32_process_error_status,
+			.get_regupdate_status = msm_vfe32_get_reg_update,
 		},
 		.stats_ops			= {
 			.get_stats_idx		= msm_vfe32_get_stats_idx,

@@ -213,8 +213,7 @@ static struct platform_driver cpubw_driver = {
 
 static int __init cpubw_init(void)
 {
-	platform_driver_probe(&cpubw_driver, cpubw_probe);
-	return 0;
+	return platform_driver_probe(&cpubw_driver, cpubw_probe);
 }
 device_initcall(cpubw_init);
 

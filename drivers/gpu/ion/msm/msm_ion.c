@@ -1016,7 +1016,8 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
 			return ret;
 		break;
 	}
-#ifdef CONFIG_MACH_KLTE_JPN
+
+#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_DTCP_ION_PHYS)
 	case ION_IOC_GET_PHYS:
 	{
 		struct ion_buffer_data data;
@@ -1043,7 +1044,28 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
 			return -EFAULT;
 		break;
 	}
+#elif defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+	case ION_IOC_GET_PHYS:
+	{
+		struct ion_buffer_data data;
+		int ret = 0;
+
+		if (copy_from_user(&data, (void __user *)arg,
+					sizeof(struct ion_buffer_data)))
+			return -EFAULT;
+
+		ret = ion_phys(client, data.handle,
+				(ion_phys_addr_t*)(&data.paddr), &data.length);
+		if (ret < 0)
+			return ret;
+
+		if (copy_to_user((void __user *)arg, &data,
+					sizeof(struct ion_buffer_data)))
+			return -EFAULT;
+		break;
+	}
 #endif
+
 	case ION_IOC_PREFETCH:
 	{
 		struct ion_prefetch_data data;

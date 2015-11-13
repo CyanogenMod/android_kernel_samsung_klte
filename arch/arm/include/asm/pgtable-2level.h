@@ -209,7 +209,6 @@ static inline void copy_pmd(pmd_t *pmdpd, pmd_t *pmdps)
 		if (pmdpd[0] != pmdps[0] || pmdpd[1] != pmdps[1]) {
 			printk(KERN_ERR"TIMA: pmdpd[0] %lx != pmdps[0] %lx -- pmdpd[1] %lx != pmdps[1] %lx in tima_wr_out = %lx\n",
 					(unsigned long) pmdpd[0], (unsigned long) pmdps[0], (unsigned long) pmdpd[1], (unsigned long) pmdps[1], tima_wr_out);
-			tima_send_cmd((unsigned long) pmdpd[0], 0x3f810221);
 		}
 		flush_pmd_entry(pmdpd);
 
@@ -242,7 +241,7 @@ extern void cpu_v7_tima_iommu_opt(unsigned long start,
 #ifdef  CONFIG_TIMA_RKP_L1_TABLES
 static inline void pmd_clear(pmd_t *pmdp)
 {
-	unsigned long cmd_id = 0x3f80a221;
+	unsigned long cmd_id =  0x3f80a221;
 	unsigned long tima_wr_out;
 
 	cpu_dcache_clean_area(pmdp, 8);	
@@ -308,7 +307,7 @@ static inline void set_pte_ext(pte_t *ptep,pte_t pte,unsigned int ext)
 
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
 
-#define TIMA_LAZY_MMU_CMDID  0x3f825221
+#define TIMA_LAZY_MMU_CMDID  0x25
 #define TIMA_LAZY_MMU_START  0
 #define TIMA_LAZY_MMU_STOP   1
 

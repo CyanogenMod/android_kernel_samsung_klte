@@ -38,6 +38,7 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/nfc/sec_nfc.h>
+#include <linux/wakelock.h>
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
 #ifdef CONFIG_SEC_NFC_CLK_REQ
@@ -67,7 +68,7 @@ struct sec_nfc_i2c_info {};
 enum sec_nfc_irq {
 	SEC_NFC_NONE,
 	SEC_NFC_INT,
-	SEC_NFC_TRY_AGAIN,
+	SEC_NFC_SKIP,
 };
 
 struct sec_nfc_i2c_info {
@@ -92,22 +93,44 @@ struct sec_nfc_info {
 	bool clk_ctl;
 	bool clk_state;
 #endif
+	struct wake_lock wake_lock;
 	struct regulator *L22;
 	struct regulator *L6;
 };
 
+#ifndef CONFIG_SEC_NFC_NO_POWER_CONTROL
 int nfc_power_onoff(struct sec_nfc_info *info, bool onoff);
+#endif
 
 #ifdef CONFIG_SEC_NFC_IF_I2C
 static irqreturn_t sec_nfc_irq_thread_fn(int irq, void *dev_id)
 {
 	struct sec_nfc_info *info = dev_id;
+	struct sec_nfc_platform_data *pdata = info->pdata;
+
+	dev_dbg(info->dev, "[NFC] Read Interrupt is occurred!\n");
+
+	if(gpio_get_value(pdata->irq) == 0) {
+		dev_err(info->dev, "[NFC] Warning,irq-gpio state is low!\n");
+		return IRQ_HANDLED;
+    }
 
 	mutex_lock(&info->i2c_info.read_mutex);
+	/* Skip during power switching */
+	if (info->i2c_info.read_irq == SEC_NFC_SKIP) {
+		mutex_unlock(&info->i2c_info.read_mutex);
+		return IRQ_HANDLED;
+	}
 	info->i2c_info.read_irq = SEC_NFC_INT;
 	mutex_unlock(&info->i2c_info.read_mutex);
 
 	wake_up_interruptible(&info->i2c_info.read_wait);
+
+	if(!wake_lock_active(&info->wake_lock))
+	{
+		dev_dbg(info->dev, "%s: Set wake_lock_timeout for 2 sec. !!!\n", __func__);
+		wake_lock_timeout(&info->wake_lock, 2 * HZ);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -218,8 +241,13 @@ static ssize_t sec_nfc_write(struct file *file, const char __user *buf,
 		ret = -EFAULT;
 		goto out;
 	}
-
+	/* Skip interrupt during power switching
+	 * It is released after first write */
+	mutex_lock(&info->i2c_info.read_mutex);
 	ret = i2c_master_send(info->i2c_info.i2c_dev, info->i2c_info.buf, count);
+	if (info->i2c_info.read_irq == SEC_NFC_SKIP)
+		info->i2c_info.read_irq = SEC_NFC_NONE;
+	mutex_unlock(&info->i2c_info.read_mutex);
 
 	if (ret == -EREMOTEIO) {
 		dev_err(info->dev, "send failed: return: %d count: %d\n",
@@ -306,8 +334,10 @@ int sec_nfc_i2c_probe(struct i2c_client *client)
 	mutex_init(&info->i2c_info.read_mutex);
 	init_waitqueue_head(&info->i2c_info.read_wait);
 	i2c_set_clientdata(client, info);
-#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)
+#ifndef CONFIG_SEC_NFC_NO_POWER_CONTROL
+#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)&& !defined(CONFIG_MACH_SLTE_SPR)
 	nfc_power_onoff(info,1);
+#endif
 #endif
 	ret = request_threaded_irq(client->irq, NULL, sec_nfc_irq_thread_fn,
 			IRQF_TRIGGER_RISING | IRQF_ONESHOT, SEC_NFC_DRIVER_NAME,
@@ -421,11 +451,20 @@ static void sec_nfc_set_mode(struct sec_nfc_info *info,
 					enum sec_nfc_mode mode)
 {
 	struct sec_nfc_platform_data *pdata = info->pdata;
-
+	/* intfo lock is aleady gotten before calling this function */
+	if (info->mode == mode) {
+		dev_dbg(info->dev, "Power mode is already %d", mode);
+		return;
+	}
 	pr_err("\n %s start %d", __func__, mode);
 	/* intfo lock is aleady getten before calling this function */
 	info->mode = mode;
-
+#ifdef CONFIG_SEC_NFC_IF_I2C
+	/* Skip during power switching */
+	mutex_lock(&info->i2c_info.read_mutex);
+	info->i2c_info.read_irq = SEC_NFC_SKIP;
+	mutex_unlock(&info->i2c_info.read_mutex);
+#endif
 	gpio_set_value_cansleep(pdata->ven, 0);
 	gpio_set_value(pdata->ven, SEC_NFC_PW_OFF);
 	if (pdata->firm) gpio_set_value(pdata->firm, SEC_NFC_FW_OFF);
@@ -438,12 +477,17 @@ static void sec_nfc_set_mode(struct sec_nfc_info *info,
 	    gpio_set_value_cansleep(pdata->ven, 1);
 		gpio_set_value(pdata->ven, SEC_NFC_PW_ON);
 		sec_nfc_clk_ctl_enable(info);
+#ifdef CONFIG_SEC_NFC_IF_I2C
+		enable_irq_wake(info->i2c_info.i2c_dev->irq);
+#endif
 		msleep(SEC_NFC_VEN_WAIT_TIME/2);
 	} else {
 		sec_nfc_clk_ctl_disable(info);
+#ifdef CONFIG_SEC_NFC_IF_I2C
+		disable_irq_wake(info->i2c_info.i2c_dev->irq);
+#endif
 	}
 
-	sec_nfc_i2c_irq_clear(info);
 	dev_dbg(info->dev, "Power mode is : %d\n", mode);
 }
 
@@ -486,13 +530,19 @@ static long sec_nfc_ioctl(struct file *file, unsigned int cmd,
 
 #elif defined(CONFIG_SEC_NFC_PRODUCT_N5)
 	case SEC_NFC_SLEEP:
-		if (info->mode != SEC_NFC_MODE_BOOTLOADER)
+		if (info->mode != SEC_NFC_MODE_BOOTLOADER) {
+			if(wake_lock_active(&info->wake_lock))
+				wake_unlock(&info->wake_lock);
 			gpio_set_value(pdata->wake, SEC_NFC_WAKE_SLEEP);
+		}
 		break;
 
 	case SEC_NFC_WAKEUP:
-		if (info->mode != SEC_NFC_MODE_BOOTLOADER)
+		if (info->mode != SEC_NFC_MODE_BOOTLOADER) {
 			gpio_set_value(pdata->wake, SEC_NFC_WAKE_UP);
+			if(!wake_lock_active(&info->wake_lock))
+				wake_lock(&info->wake_lock);
+		}
 		break;
 #endif
 
@@ -554,6 +604,7 @@ static const struct file_operations sec_nfc_fops = {
 	.unlocked_ioctl	= sec_nfc_ioctl,
 };
 
+#ifndef CONFIG_SEC_NFC_NO_POWER_CONTROL
 int nfc_power_onoff(struct sec_nfc_info *data, bool onoff)
 {
 	int ret = -1;
@@ -586,10 +637,11 @@ int nfc_power_onoff(struct sec_nfc_info *data, bool onoff)
 				__func__, ret);
 			return ret;
 		}
-*/		
+*/
 	}
 
 	if(onoff){
+#if !defined(CONFIG_MACH_ATLANTICLTE_VZW) && !defined(CONFIG_MACH_ATLANTICLTE_ATT) && !defined(CONFIG_MACH_ATLANTICLTE_USC)
 		ret = regulator_enable(data->L22);
 		regulator_set_mode(data->L22, REGULATOR_MODE_NORMAL);
 		if (ret) {
@@ -597,6 +649,7 @@ int nfc_power_onoff(struct sec_nfc_info *data, bool onoff)
 				__func__);
 			return ret;
 		}
+#endif
 
 		ret = regulator_enable(data->L6);
 		if (ret) {
@@ -607,14 +660,16 @@ int nfc_power_onoff(struct sec_nfc_info *data, bool onoff)
 
 	}
 	else {
+#if !defined(CONFIG_MACH_ATLANTICLTE_VZW) && !defined(CONFIG_MACH_ATLANTICLTE_ATT) && !defined(CONFIG_MACH_ATLANTICLTE_USC)
 		ret = regulator_disable(data->L22);
 		if (ret) {
 			pr_err("%s: Failed to disable regulatorL22.\n",
 				__func__);
 			return ret;
 		}
+#endif
 
-		ret = regulator_enable(data->L6);
+		ret = regulator_disable(data->L6);
 		if (ret) {
 			pr_err("%s: Failed to disable regulator L6.\n",
 				__func__);
@@ -624,6 +679,7 @@ int nfc_power_onoff(struct sec_nfc_info *data, bool onoff)
 	}
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_PM
 static int sec_nfc_suspend(struct device *dev)
@@ -638,17 +694,21 @@ static int sec_nfc_suspend(struct device *dev)
 
 	mutex_unlock(&info->mutex);
 
-#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)
+#ifndef CONFIG_SEC_NFC_NO_POWER_CONTROL
+#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)&& !defined(CONFIG_MACH_SLTE_SPR)
 	nfc_power_onoff(info,0);
+#endif
 #endif
 	return ret;
 }
 
 static int sec_nfc_resume(struct device *dev)
 {
-#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)
+#ifndef CONFIG_SEC_NFC_NO_POWER_CONTROL
+#if !defined(CONFIG_MACH_KSPORTSLTE_SPR)&& !defined(CONFIG_MACH_SLTE_SPR)
 	struct sec_nfc_info *info = SEC_NFC_GET_INFO(dev);
 	nfc_power_onoff(info,1);
+#endif
 #endif
 	return 0;
 }
@@ -786,6 +846,7 @@ static int __sec_nfc_probe(struct device *dev)
 		gpio_direction_output(pdata->firm, SEC_NFC_FW_OFF);
 	}
 
+	wake_lock_init(&info->wake_lock, WAKE_LOCK_SUSPEND, "NFCWAKE");
 
 	dev_dbg(dev, "%s: info: %p, pdata %p\n", __func__, info, pdata);
 	pr_err("\n %s success", __func__);
@@ -818,6 +879,7 @@ static int __sec_nfc_remove(struct device *dev)
 	gpio_set_value_cansleep(pdata->ven, 0);
 	gpio_free(pdata->ven);
 	if (pdata->firm) gpio_free(pdata->firm);
+	wake_lock_destroy(&info->wake_lock);
 
 	kfree(info);
 

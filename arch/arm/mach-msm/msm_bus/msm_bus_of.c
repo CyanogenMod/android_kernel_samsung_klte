@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -173,7 +173,7 @@ struct msm_bus_scale_pdata *msm_bus_cl_get_pdata(struct platform_device *pdev)
 	of_node = pdev->dev.of_node;
 	pdata = get_pdata(pdev, of_node);
 	if (!pdata) {
-		pr_err("Error getting bus pdata!\n");
+		pr_err("client has to provide missing entry for successful registration\n");
 		return NULL;
 	}
 
@@ -214,7 +214,7 @@ struct msm_bus_scale_pdata *msm_bus_pdata_from_node(
 
 	pdata = get_pdata(pdev, of_node);
 	if (!pdata) {
-		pr_err("Error getting bus pdata!\n");
+		pr_err("client has to provide missing entry for successful registration\n");
 		return NULL;
 	}
 
@@ -290,7 +290,7 @@ static u64 *get_th_params(struct platform_device *pdev,
 
 	ret_arr = devm_kzalloc(&pdev->dev, (*nports * sizeof(u64)),
 							GFP_KERNEL);
-	arr = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+	arr = kzalloc(size, GFP_KERNEL);
 	if ((size > 0) && (ZERO_OR_NULL_PTR(arr)
 				|| ZERO_OR_NULL_PTR(ret_arr))) {
 		pr_err("Error: Failed to alloc mem for %s\n", prop);
@@ -306,12 +306,12 @@ static u64 *get_th_params(struct platform_device *pdev,
 	for (i = 0; i < *nports; i++)
 		ret_arr[i] = (uint64_t)KBTOB(arr[i]);
 
-	pr_info("%s: num entries %d prop %s", __func__, *nports, prop);
+	MSM_BUS_DBG("%s: num entries %d prop %s", __func__, *nports, prop);
 
 	for (i = 0; i < *nports; i++)
-		pr_info("Th %d val %llu", i, ret_arr[i]);
+		MSM_BUS_DBG("Th %d val %llu", i, ret_arr[i]);
 
-	devm_kfree(&pdev->dev, arr);
+	kfree(arr);
 	return ret_arr;
 err:
 	devm_kfree(&pdev->dev, arr);
@@ -401,6 +401,7 @@ static struct msm_bus_node_info *get_nodes(struct device_node *of_node,
 		of_property_read_u32(child_node, "qcom,buswidth",
 			&info[i].buswidth);
 		of_property_read_u32(child_node, "qcom,ws", &info[i].ws);
+
 		info[i].dual_conf =
 			of_property_read_bool(child_node, "qcom,dual-conf");
 
@@ -441,7 +442,7 @@ static struct msm_bus_node_info *get_nodes(struct device_node *of_node,
 		}
 
 		ret = of_property_read_string(child_node, "qcom,mode",
-			&sel_str);
+				&sel_str);
 		if (ret)
 			info[i].mode = 0;
 		else {
@@ -605,6 +606,11 @@ struct msm_bus_fabric_registration
 
 	if (of_property_read_bool(of_node, "qcom,virt"))
 		pdata->virt = true;
+
+	ret = of_property_read_u32(of_node, "qcom,qos-baseoffset",
+						&pdata->qos_baseoffset);
+	if (ret)
+		pr_debug("%s:qos_baseoffset not available\n", __func__);
 
 	if (of_property_read_bool(of_node, "qcom,rpm-en"))
 		pdata->rpm_enabled = 1;

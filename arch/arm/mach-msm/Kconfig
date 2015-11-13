@@ -291,7 +291,6 @@ config ARCH_MSM8974
 config ARCH_MSM8974PRO
 	bool "MSM8974PRO"
 	depends on ARCH_MSM8974
-	select BW_LIMITER_FIX
 	select SECURE_MPU_LOCK
 
 config ARCH_APQ8084
@@ -345,7 +344,6 @@ config ARCH_FSM9900
 	select MSM_GPIOMUX
 	select MULTI_IRQ_HANDLER
 	select PM_DEVFREQ
-	select MSM_DEVFREQ_CPUBW
 	select MSM_PIL
 	select MSM_NATIVE_RESTART
 	select MSM_RESTART_V2
@@ -733,6 +731,34 @@ config SEC_MATISSE_PROJECT
          Common flag for all the Matisse Models and variants. Please use this flag for all
 	 the features common in all the Matisse Variants(3G,LTE,Wifi & Carrier).
 
+config SEC_RUBENS_PROJECT
+        bool "RUBENS Projects"
+        default n
+        help
+         Common flag for all the Rubens Models and variants. Please use this flag for all
+         the features common in all the Rubens Variants(3G,LTE,Wifi & Carrier).
+
+config MACH_VASTALTE_CHN_CMCC_DUOS
+        bool "VASTALTE_CHN_CMCC Projects"
+        default n
+        help
+         Common flag for all the vastalte chn-cmcc Models and variants. Please use this flag for all
+         the features common in all the vastalte chn cmcc Variants.
+
+config VASTALTE_CHN_CMCC_DUOS_COMMON
+        bool "VASTA LTE CHN_CMCC Common"
+        default n
+        help
+         MSM8926 MODEL VSAT C TDC Varaints common flag. Specific changes for differentiating
+         between variants must be added in the MACH specific flag.
+
+config SEC_VASTALTE_CHN_CMMCC_DUOS_PROJECT
+        bool "VASTALTE_CHN_CMCC Projects"
+        default n
+        help
+         Common flag for all the vastalte tdc Models and variants. Please use this flag for all
+         the features common in all the vastalte chn-cmcc Variants.
+
 config SEC_ATLANTIC_PROJECT
 	bool "ATLANTIC Projects"
         default n
@@ -740,12 +766,39 @@ config SEC_ATLANTIC_PROJECT
          Common flag for all the Atlantic Models and variants. Please use this flag for all
 	 the features common in all the Atlantic Variants(3G,LTE,Wifi & Carrier).
 
+config MACH_HESTIALTE_ATT
+	bool "HESTIA ATT Projects"
+        default n
+        help
+         Common flag for all the HESTIA Models and variants. Please use this flag for ATT Crrier changes.
+
+config MACH_HESTIALTE_EUR
+	bool "HESTIA Projects"
+        default n
+        help
+         Common flag for all the HESTIA Models and variants. Please use this flag for all
+	 the features common in all the HESTIA Variants(3G,LTE,Wifi & Carrier).
+
+config SEC_HESTIA_PROJECT
+	bool "HESTIA Projects"
+        default n
+        help
+         Common flag for all the HESTIA Models and variants. Please use this flag for all
+	 the features common in all the HESTIA Variants(3G,LTE,Wifi & Carrier).
+
 config SEC_AFYON_PROJECT
 	bool "AFYON Projects"
         default n
         help
          Common flag for all the Afyon Models and variants. Please use this flag for all
 	 the features common in all the Afyon Variants(3G,LTE,Wifi & Carrier).
+
+config SEC_MEGA2_PROJECT
+	bool "MEGA2 Projects"
+        default n
+        help
+         Common flag for all the MEGA2 Models and variants. Please use this flag for all
+	 the features common in all the MEGA2 Variants(3G,LTE,Wifi & Carrier).
 	 
 config SEC_AFYONLTE_COMMON 
 	bool "AFYON LTE Projects"
@@ -766,6 +819,20 @@ config SEC_DEGASLTE_COMMON
         default n
         help
          MSM8226 MODEL DEGAS LTE Varaints common flag. Specific changes for differentiating
+         between variants must be added in the MACH specific flag.
+
+config SEC_RUBENSLTE_COMMON
+        bool "RUBENS LTE Common"
+        default n
+        help
+         MSM8226 MODEL RUBENS LTE Varaints common flag. Specific changes for differentiating
+         between variants must be added in the MACH specific flag.
+
+config SEC_RUBENSWIFI_COMMON
+        bool "RUBENS WIFI Common"
+        default n
+        help
+         MSM8226 MODEL RUBENS WIFI Varaints common flag. Specific changes for differentiating
          between variants must be added in the MACH specific flag.
 
 config SEC_MILLETWIFI_COMMON
@@ -796,6 +863,13 @@ config SEC_S3VE_PROJECT
          Common flag for all the S3VE Models and variants. Please use this flag for all
 	 the features common in all the S3VE Variants.
 
+config SEC_VICTOR3GDSDTV_PROJECT
+	bool "VICTOR3GDSDTV Projects"
+        default n
+        help
+         Common flag for all the Victor 3G DS DTV Models and variants. Please use this flag for all
+	 the features common in all the Victor 3G DS DTV Variants.
+
 config SEC_MATISSELTE_COMMON
 	bool "MATISSE LTE Common"
         default n
@@ -809,14 +883,35 @@ config SEC_ATLANTICLTE_COMMON
         help
          Common flag for all Atlantic LTE Models and variants. Please use this flag for all
 	 the features common in all the Atlantic LTE Variants(EUR, ATT, VZW etc., different carriers).
-	 
+
+config SEC_HESTIALTE_COMMON
+	bool "HESTIA LTE Common"
+        default n
+        help
+         Common flag for all HESTIA LTE Models and variants. Please use this flag for all
+	 the features common in all the HESTIA LTE Variants(EUR, ATT, VZW etc., different carriers).
+
 config SEC_ATLANTIC3G_COMMON
 	bool "Atlantic 3G Common"
         default n
         help
          Common flag for all the Atlantic 3G Models and variants. Please use this flag for all
 	 the features common in all the Atlantic 3G Variants(EUR, ATT, VZW etc., different carriers).
-	 
+
+config SEC_MEGA23G_COMMON
+	bool "MEGA2 3G Common"
+        default n
+        help
+         Common flag for all MEGA2 3G Models and variants. Please use this flag for all
+	 the features common in all the MEGA2 3G Variants(EUR, ATT, VZW etc., different carriers).
+
+config SEC_MEGA2LTE_COMMON
+	bool "MEGA2 LTE Common"
+        default n
+        help
+         Common flag for all MEGA2 LTE Models and variants. Please use this flag for all
+	 the features common in all the MEGA2 LTEariants(KOR etc., different carriers).
+
 config SEC_VICTOR_PROJECT
 	bool "VICTOR Projects"
         default n
@@ -824,12 +919,33 @@ config SEC_VICTOR_PROJECT
          Common flag for all the Victor Models and variants. Please use this flag for all
 	 the features common in all the Victor Variants(3G,LTE,Wifi & Carrier).
 
+config SEC_VASTA_PROJECT
+	bool "VASTA Projects"
+	default n
+	help
+	 Common flag for all the Vasta Models and variants. Please use this flag for all
+	 the features common in all the Vasta Variants(3G,LTE,Wifi & Carrier).
+
 config SEC_FRESCONEO_PROJECT
 	bool "Fresco Projects"
         default n
         help
          Common flag for all the Victor Models and variants. Please use this flag for all
 	 the features common in all the Fresconeo Variants(3G,LTE,Wifi & Carrier).	 
+
+config SEC_GNOTE_PROJECT
+	bool "Grandnote Projects"
+        default n
+        help
+         Common flag for all the Grandnote Models and variants. Please use this flag for all
+	 the features common in all the Grandnote Variants.
+
+config SEC_GNOTELTEDS_COMMON
+	bool "Grandnote LTE DS Common"
+        default n
+        help
+         Common flag for all the Grandnote LTE DS Models and variants. Please use this flag for all
+	 the features common in all the Grandnote LTE DS Variants(EUR, ATT, VZW etc., different carriers).
 
 config MACH_MATISSELTE_OPEN
 	bool "MATISSE LTE EUR TAB"
@@ -914,6 +1030,13 @@ config MACH_MILLET3G_EUR
          MSM8226 MODEL MILLET 3G EUR TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config MACH_MILLET3G_CHN_OPEN
+	bool "MILLET 3G CHN OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL MILLET 3G CHN OPEN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
 config MACH_MILLETLTE_OPEN
 	bool "MILLET LTE OPEN TAB"
         default n
@@ -928,11 +1051,46 @@ config MACH_MILLETLTE_ATT
          MSM8226 MODEL MILLET LTE ATT TAB SM-T337 Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config MACH_MILLETLTE_CAN
+        bool "MILLET LTE CAN TAB"
+        default n
+        help
+         MSM8226 MODEL MILLET LTE CAN TAB SM-T337W Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_MILLETLTE_TMO
+        bool "MILLET LTE TMO TAB"
+        default n
+        help
+         MSM8226 MODEL MILLET LTE TMO TAB SM-T337 Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
 config MACH_MILLETLTE_VZW
 	bool "MILLET LTE VZW TAB"
         default n
         help
          MSM8226 MODEL MILLET LTE VZW TAB SM-T337 Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_MILLETLTE_KOR
+	bool "MILLET LTE KOR TAB"
+        default n
+        help
+         MSM8226 MODEL MILLET LTE KOR TAB SM T-335 Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_RUBENSLTE_OPEN
+        bool "RUBENS LTE OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL RUBENS LTE OPEN TAB SM T-365 Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_RUBENSWIFI_OPEN
+        bool "RUBENS WIFI OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL RUBENS WIFI OPEN TAB SM T-360 Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
 config MACH_DEGASLTE_SPR
@@ -942,11 +1100,25 @@ config MACH_DEGASLTE_SPR
          MSM8226 MODEL DEGAS LTE SPR TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config MACH_DEGASLTE_VZW
+        bool "DEGAS LTE VZW TAB"
+        default n
+        help
+         MSM8226 MODEL DEGAS LTE VZW TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
 config MACH_MATISSE3G_OPEN
 	bool "MATTISE 3G OPEN TAB"
         default n
         help
          MSM8226 MODEL MATISSE 3G OPEN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_MATISSE3G_CHN_OPEN
+	bool "MATISSE 3G CHN OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL MATISSE 3G CHN OPEN TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
 config MACH_AFYONLTE_TMO
@@ -956,29 +1128,56 @@ config MACH_AFYONLTE_TMO
          MSM8226 MODEL AFYON LTE TMO TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config MACH_AFYONLTE_MTR
+        bool "AFYON LTE MTR TAB"
+        default n
+        help
+         MSM8226 MODEL AFYON LTE MTR TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_AFYONLTE_CAN
+	bool "AFYON LTE CAN TAB"
+        default n
+        help
+         MSM8226 MODEL AFYON LTE CAN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
 config MACH_ATLANTICLTE_VZW
 	bool "ATLANTIC VZW LTE"
         default n
         help
-         MSM8928 Model Atlantic LTE VZW Specific flag. 
+         MSM8928 Model Atlantic LTE VZW Specific flag.
 
 config MACH_ATLANTICLTE_ATT
 	bool "ATLANTIC ATT LTE"
         default n
         help
-         MSM8928 Model Atlantic LTE ATT Specific flag. 
+         MSM8928 Model Atlantic LTE ATT Specific flag.
+
+config MACH_ATLANTICLTE_USC
+	bool "ATLANTIC ATT USC"
+        default n
+        help
+         MSM8928 Model Atlantic LTE USC Specific flag.
 
 config MACH_ATLANTIC3GEUR_OPEN
 	bool "ATLANTIC VZW LTE"
         default n
         help
-         MSM8228 Model Atlantic 3G Euro Open Specific flag. 
+         MSM8228 Model Atlantic 3G Euro Open Specific flag.
 
 config MACH_BERLUTI3G_EUR
 	bool "BERLUTI 3G EUR TAB"
         default n
         help
          MSM8226 MODEL BERLUTI 3G EUR TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_BERLUTI3G_COMMON
+	bool "BERLUTI 3G COMMON TAB"
+        default n
+        help
+         MSM8226 MODEL BERLUTI 3G COMMON TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
 config MACH_BERLUTILTE_EUR
@@ -988,6 +1187,13 @@ config MACH_BERLUTILTE_EUR
          MSM8926 MODEL BERLUTI LTE EUR TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config MACH_BERLUTILTE_COMMON
+	bool "BERLUTI LTE COMMON TAB"
+        default n
+        help
+         MSM8926 MODEL BERLUTI LTE COMMON TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
 config MACH_S3VE3G_EUR
 	bool "S3VE3G EUR"
         default n
@@ -995,11 +1201,45 @@ config MACH_S3VE3G_EUR
          MSM8226 MODEL S3VE 3G EUR Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
+config SEC_MS01_PROJECT
+        bool "MS01 Projects"
+        default n
+        help
+         Common flag for all the MS01 Models and variants. Please use this flag for all
+         the features common in all the MS01 Variants.
+
+config MACH_MS01_EUR_3G
+        depends on SEC_MS01_PROJECT
+        bool "MSM8226 MS01 EUR 3G"
+        help
+          Support for the Samsung MS01 EUR 3G device
+
+config MACH_MS01_EUR_LTE
+        depends on SEC_MS01_PROJECT
+        bool "MSM8226 MS01 EUR 3G"
+        help
+          Support for the Samsung MS01 EURO LTE device
+
+config MACH_VICTOR3GDSDTV_LTN
+	bool "VICTOR3GDSDTV LTN"
+        default n
+        help
+         MSM8226 MODEL VICTOR3GDSDTV LTN Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+
 config MACH_VICTORLTE
 	bool "VICTOR LTE"
         default n
         help
          MSM8226 MODEL Victor LTE CTC  TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config MACH_VASTALTE
+	bool "VASTA LTE"
+        default n
+        help
+         MSM8226 MODEL Vasta LTE CTC  TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
 
 config MACH_VICTORLTE_CMCC
@@ -1015,6 +1255,13 @@ config MACH_VICTORLTE_CTC
         help
          MSM8226 MODEL Victor LTE CTC  TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.
+         
+config MACH_VASTALTE_CTC
+	bool "VASTA LTE CTC"
+	default n
+	help
+	 MSM8226 MODEL Vasta LTE CTC  TAB Specific changes for differentiating
+	 it with the other models on the same MSM8x26 chipset.
 
 config MACH_FRESCONEOLTE_CTC
 	bool "FRESCONEO LTE CTC TAB"
@@ -1022,6 +1269,66 @@ config MACH_FRESCONEOLTE_CTC
         help
          MSM8226 MODEL Victor LTE CMCC  TAB Specific changes for differentiating
          it with the other models on the same MSM8x26 chipset.         
+
+config MACH_MEGA23GEUR_OPEN
+	bool "MEGA23G EUR"
+        default n
+        help
+         MSM8228 Model MEGA2 3G Euro Open Specific flag.
+
+config MACH_MEGA2LTE_KTT
+	bool "MEGA2LTE KOR"
+        default n
+        help
+         MSM8228 Model MEGA2 LTE KOR Specific flag.
+
+config MACH_GNOTELTEDS_OPEN
+	bool "Grandnote LTE DS"
+        default n
+        help
+         MSM8228 Model Grandnote LTE DS Euro Open Specific flag. 
+
+config MACH_T10_3G_OPEN
+        bool "T10 3G OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL T10 3G OPEN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config SEC_T10_PROJECT
+        bool "T10 Klein Projects"
+        default n
+        help
+         Common flag for all the Klein Models and variants. Please use this flag for all
+         the features common in all the Klein Variants(3G,LTE,Wifi & Carrier).
+
+config MACH_T8_3G_OPEN
+        bool "T8 3G OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL T8 3G OPEN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config SEC_T8_PROJECT
+        bool "Lorraine Projects"
+        default n
+        help
+         Common flag for all the Lorraine Models and variants. Please use this flag for all
+         the features common in all the Lorraine Variants(3G,LTE,Wifi & Carrier).
+
+config MACH_T10_WIFI_OPEN
+        bool "T10 WIFI OPEN TAB"
+        default n
+        help
+         MSM8226 MODEL T10 WIFI OPEN TAB Specific changes for differentiating
+         it with the other models on the same MSM8x26 chipset.
+
+config SEC_T10_WIFI_COMMON
+	bool "T10 Wifi Common"
+        default n
+        help
+         Common flag for all the T10 Wifi Models and variants. Please use this flag for all
+	 the features common in all the Matisse Wifi Variants(EUR_OPEN, ATT, VZW).
 
 menu "MSM Board Selection"
 
@@ -1470,6 +1777,85 @@ config SEC_FACTORY
         help
           It will support a sec factory mode
 
+config SEC_S_PROJECT
+	depends on ARCH_MSM8974PRO
+        default n
+        bool "Samsung S project"
+        help
+          Support for Samsung S project.
+
+config MACH_SLTE_ATT
+        default n
+        bool "Samsung model SLTE_ATT"
+        help
+          Support for Samsung SLTE_ATT device.
+
+config MACH_SLTE_SPR
+        default n
+        bool "Samsung model SLTE_SPR"
+        help
+          Support for Samsung SLTE_SPR device.
+
+config MACH_SLTE_TMO
+        default n
+        bool "Samsung model SLTE_TMO"
+        help
+          Support for Samsung SLTE_TMO device.
+
+config MACH_SLTE_USC
+        default n
+        bool "Samsung model SLTE_USC"
+        help
+          Support for Samsung SLTE_USC device.
+
+config MACH_SLTE_VZW
+        default n
+        bool "Samsung model SLTE_VZW"
+        help
+          Support for Samsung SLTE_VZW device.
+
+config MACH_SLTE_CMCC
+        default n
+        bool "Samsung model SLTE_CMCC"
+        help
+          Support for Samsung SLTE_CMCC device.
+
+config MACH_SLTE_CTC
+        default n
+        bool "Samsung model SLTE_CTC"
+        help
+          Support for Samsung SLTE_CTC device.
+
+config MACH_SLTE_CU
+        default n
+        bool "Samsung model SLTE_CU"
+        help
+          Support for Samsung SLTE_CU device.
+
+config MACH_SLTE_TD
+        default n
+        bool "Samsung model SLTE_TD_OPEN"
+        help
+          Support for Samsung SLTE_TD_OPEN device.
+
+config MACH_SLTE_DCM
+        default n
+        bool "Samsung model SLTE_DCM"
+        help
+          Support for Samsung SLTE_DCM device.
+
+config MACH_SLTE_KDI
+        default n
+        bool "Samsung model SLTE_KDI"
+        help
+          Support for Samsung SLTE_KDI device.
+
+config MACH_SLTE_CAN
+        default n
+        bool "Samsung model SLTE_CAN"
+        help
+          Support for Samsung SLTE_CAN device.
+
 config SEC_K_PROJECT
 	depends on ARCH_MSM8974PRO
         default n
@@ -1568,6 +1954,12 @@ config MACH_KLTE_CHN
         help
           Support for Samsung KLTE CHN device.
 
+config MACH_KLTE_LTNDUOS
+        default n
+        bool "Samsung model KLTE_LTNDUOS"
+        help
+          Support for Samsung KLTE LTNDUOS device.
+
 config MACH_K3GDUOS_CTC
         default n
         bool "Samsung model K3GDUOS_CTC"
@@ -1653,6 +2045,19 @@ config MACH_KLTE_JPN_WLAN_OBSOLETE
         help
           Support for Samsung KLTE_JPN old wlan port.
 
+config SEC_PATEK_PROJECT
+	depends on ARCH_MSM8974PRO
+        default n
+        bool "Samsung K project"
+        help
+          Support for Samsung K project.
+
+config MACH_PATEKLTE_CTC
+        default n
+        bool "Samsung model KLTE_EUR"
+        help
+          Support for Samsung KLTE_EUR device.
+
 config SEC_MONDRIAN_PROJECT
 	default n
 	bool "Samsung MONDRIAN project"
@@ -1728,6 +2133,12 @@ config MACH_VIENNAEUR
 	help
 	  Support for Samsung VIENNAEUR device.
 
+config MACH_VIENNAKOR
+	default n
+	bool "Samsung model VIENNAKOR"
+	help
+	  Support for Samsung VIENNAKOR device.
+
 config MACH_VIENNAVZW
 	default n
 	bool "Samsung model VIENNAVZW"
@@ -1769,6 +2180,13 @@ config MACH_HLTEEUR
 	help
 	  Support for Samsung HLTEEUR device.
 	  
+config MACH_HLTECHNTWU
+	default n
+	bool "Samsung model HLTECHNTWU"
+	select SEC_H_PROJECT
+	help
+	  Support for Samsung HLTECHNTWU device.
+
 config MACH_H3G_CHN_OPEN
 	default n
 	bool "Samsung model H3G_CHN_OPEN"
@@ -1832,6 +2250,13 @@ config MACH_HLTEVZW
 	help
 	  Support for Samsung HLTEVZW device.
 
+config MACH_HLTEAUS
+	default n
+	bool "Samsung model HLTEAUS"
+	select SEC_H_PROJECT
+	help
+	  Support for Samsung HLTEAUS device.
+	  
 config SEC_F_PROJECT
 	default n
 	bool "Samsung F project"
@@ -1844,11 +2269,23 @@ config SEC_KS01_PROJECT
 	help
 	  Support for Samsung KS01 project.
 
+config SEC_JACTIVE_PROJECT
+	default n
+	bool "Samsung Jactive project"
+	help
+	  Support for Samsung Jactive series.
+	  
 config SEC_JS_PROJECT
 	default n
 	bool "Samsung JS project"
 	help
 	  Support for Samsung JS project.
+
+config SEC_JSZT_PROJECT
+	default n
+	bool "Samsung JSZT project"
+	help
+	  Support for Samsung JSZT project.
 
 config MACH_H
 	default n
@@ -1869,6 +2306,17 @@ config MACH_HLTE_CHN_CMCC
 	select SEC_H_PROJECT
 	help
 	  Support for Samsung HLTE_CHN_CMCC device.
+
+config MACH_HLTE_CHN_TDOPEN
+	default n
+	bool "Samsung model HLTE_CHN_TDOPEN"
+	select SEC_H_PROJECT
+	help
+	  Support for Samsung HLTE_CHN_TDOPEN device.
+	  
+config MACH_JSGLTE_CHN_CMCC
+	default n
+	bool "Samsung model JSGLTE_CHN_CMCC"
 
 config SEC_N2_PROJECT
 	default n
@@ -1926,6 +2374,24 @@ config MACH_LT03_TMO
 	help
 	  Support for Samsung LT03_TMO device.
 
+config MACH_LT03SKT
+	default n
+	bool "Samsung model LT03_SKT"
+	help
+	  Support for Samsung LT03_SKT device.
+
+config MACH_LT03KTT
+	default n
+	bool "Samsung model LT03_KTT"
+	help
+	  Support for Samsung LT03_KTT device.
+
+config MACH_LT03LGT
+	default n
+	bool "Samsung model LT03_LGT"
+	help
+	  Support for Samsung LT03_LGT device.
+
 config SEC_HEAT_PROJECT
         default n
         bool "Samsung HEAT project"
@@ -1943,6 +2409,80 @@ config MACH_HEAT_AIO
         bool "Samsung model HEAT_AIO"
         help
           Support for Samsung HEAT_AIO device.
+
+config SEC_CHAGALL_PROJECT
+	default n
+	bool "Samsung CHAGALL project"
+	help
+	  Support for Samsung CHAGALL project.
+
+config MACH_CHAGALL
+	default n
+	bool "Samsung model CHAGALL"
+	select SEC_CHAGALL_PROJECT
+	help
+	  Support for Samsung CHAGALL device.
+
+config MACH_CHAGALL_LTE
+	default n
+	bool "Samsung model CHAGALL_LTE"
+	help
+	  Support for Samsung CHAGALL_LTE device.
+
+config MACH_CHAGALL_SPR
+	default n
+	bool "Samsung model CHAGALL_SPR"
+	help
+	  Support for Samsung CHAGALL_SPR device.
+
+config MACH_CHAGALL_VZW
+	default n
+	bool "Samsung model CHAGALL_VZW"
+	help
+	  Support for Samsung CHAGALL_VZW device.
+
+config MACH_CHAGALL_USC
+	default n
+	bool "Samsung model CHAGALL_USC"
+	help
+	  Support for Samsung CHAGALL_USC device.
+
+config MACH_CHAGALL_DCM
+	default n
+	bool "Samsung model CHAGALL_DCM"
+	help
+	  Support for Samsung CHAGALL_DCM device.
+
+config MACH_CHAGALL_KDI
+	default n
+	bool "Samsung model CHAGALL_KDI"
+	help
+	  Support for Samsung CHAGALL_KDI device.
+
+config SEC_KLIMT_PROJECT
+	default n
+	bool "Samsung KLIMT project"
+	help
+	  Support for Samsung KLIMT project.
+
+config MACH_KLIMT
+	default n
+	bool "Samsung model KLIMT"
+	select SEC_KLIMT_PROJECT
+	help
+	  Support for Samsung KLIMT device.
+
+config MACH_KLIMT_LTE
+	default n
+	bool "Samsung model KLIMT_LTE"
+	help
+	  Support for Samsung KLIMT_LTE device.
+
+config MACH_KLIMT_VZW
+	default n
+	bool "Samsung model KLIMT_VZW"
+	help
+	  Support for Samsung KLIMT_VZW device.
 
 config SEC_PICASSO_PROJECT
 	default n
@@ -2042,6 +2582,13 @@ config MACH_JS01LTEDCM
 	help
 	  Support for Samsung JS01LTEDCM device.
 
+config MACH_JS01LTEZT
+	default n
+	bool "Samsung model JS01LTEZT"
+	select SEC_JSZT_PROJECT
+	help
+	  Support for Samsung JS01LTEZT device.
+
 config MACH_HLTESKT
 	default n
 	bool "Samsung model HLTESKT"
@@ -2122,6 +2669,13 @@ config MACH_KS01LGT
 	help
 	  Support for Samsung KS01LTELGT device.
 
+config MACH_JACTIVESKT
+	default n
+	bool "Samsung model JACTIVESKT"
+	select SEC_JACTIVE_PROJECT
+	help
+	  Support for Samsung JACTIVESKT device.
+
 config MACH_KS01EUR
         default n
         bool "Samsung model KS01LTEEUR"
@@ -2183,6 +2737,13 @@ config MACH_KACTIVELTE_SKT
 	help
 	  Support for Samsung KACTIVELTE_SKT device.
 
+config MACH_KACTIVELTE_DCM
+	default n
+	bool "Samsung model KACTIVELTE_DCM"
+	select SEC_KACTIVE_PROJECT
+	help
+	  Support for Samsung KACTIVELTE_DCM device.
+
 config SEC_KSPORTS_PROJECT
 	depends on ARCH_MSM8974PRO
 	default n
@@ -2202,6 +2763,12 @@ config SAMSUNG_PRODUCT_SHIP
 	bool "set up for product shipping"
 	default n
 
+config SEC_LPDDR_6G
+	default n
+	bool "Samsung LPDDR 6Gbit 2Die"
+	help
+	  Support for Samsung LPDDR 6Gbit 2Die.
+
 config MSM_STACKED_MEMORY
 	bool "Stacked Memory"
 	default y
@@ -2212,15 +2779,7 @@ config MSM_STACKED_MEMORY
 
 config RTC_AUTO_PWRON
 	bool "RTC Auto Power on PM8xxx PMICs"
-	depends on ARCH_MSM8974
-	default n
-	help
-	  Support for the auto power on alarm on the PM8XXX PMIC.
-	  Say Y if you want to enable this feature.
-
-config RTC_AUTO_PWRON
-	bool "RTC Auto Power on PM8xxx PMICs"
-	depends on ARCH_MSM8610
+	depends on ARCH_MSM
 	default n
 	help
 	  Support for the auto power on alarm on the PM8XXX PMIC.
@@ -2233,6 +2792,13 @@ config RTC_AUTO_PWRON_PARAM
 	help
 	  This option is used to prevent invalid RTC alarm power on.
 	  Say Y if you want to enable this feature.
+
+config PARAM_SIZE_983000
+	bool "Param Partition Size 0x983000"
+	default n
+	help
+	  This option is for 0x983000(9.5MB) param partition size.
+	  Usually it is 0xA00000(10MB).
 
 config PHYS_OFFSET
 	hex
@@ -2664,20 +3230,6 @@ config MSM_PCIE
 	  Enables the PCIe functionality by configures PCIe core on
 	  MSM chipset and by enabling the ARM PCI framework extension.
 
-config MSM_RPC_SDIO_XPRT
-	depends on MSM_SDIO_AL
-	default y
-	bool "MSM SDIO XPRT Layer"
-	help
-	  SDIO Transport Layer for RPC Rouer
-
-config MSM_RPC_SDIO_DEBUG
-	depends on MSM_RPC_SDIO_XPRT
-	default y
-	bool "MSM SDIO XPRT debug support"
-	help
-	  Support for debugging SDIO XPRT
-
 config MSM_SMD_DEBUG
 	depends on MSM_SMD
 	default y
@@ -2685,21 +3237,6 @@ config MSM_SMD_DEBUG
 	help
 	  Support for debugging the SMD for communication
 	  between the ARM9 and ARM11
-
-config MSM_SDIO_AL
-	depends on ((ARCH_MSM7X30 || MACH_MSM8X60_FUSN_FFA || MACH_TYPE_MSM8X60_FUSION) && HAS_WAKELOCK)
-	default y
-	tristate "SDIO-Abstraction-Layer"
-	help
-	  Support MSM<->MDM Communication over SDIO bus.
-	  MDM SDIO-Client should have pipes support.
-
-config MSM_SDIO_DMUX
-	bool "SDIO Data Mux Driver"
-	depends on MSM_SDIO_AL
-	default n
-	help
-	  Support Muxed Data Channels over SDIO interface.
 
 config MSM_BAM_DMUX
 	bool "BAM Data Mux Driver"
@@ -2781,16 +3318,6 @@ config MSM_SMD_NMEA
 
 	  If in doubt, say yes.
 
-config MSM_SDIO_TTY
-	bool "SDIO TTY Driver"
-	depends on MSM_SDIO_AL
-	default n
-	help
-	  Provides a TTY driver SDIO TTY
-	  This driver can be used by user space
-	  applications for passing data through the
-	  SDIO interface.
-
 config MSM_SMD_TTY
 	bool "SMD TTY Driver"
 	depends on MSM_SMD
@@ -2818,13 +3345,6 @@ config MSM_SMD_PKT
 
 	  If in doubt, say yes.
 
-config MSM_SDIO_CMUX
-	bool "SDIO CMUX Driver"
-	depends on MSM_SDIO_AL
-	default n
-	help
-	  Provides a Muxed port interface over SDIO QMI
-
 config MSM_DSPS
 	bool "Sensors DSPS driver"
 	depends on (MSM_PIL && (ARCH_MSM8X60 || ARCH_MSM8960))
@@ -2836,13 +3356,6 @@ config MSM_DSPS
 	  themself.
 	  The number of clocks and their name may vary between targets.
 	  It also triggers the PIL to load the DSPS firmware.
-
-config MSM_SDIO_CTL
-	bool "SDIO CTL Driver"
-	depends on MSM_SDIO_CMUX
-	default n
-	help
-	  Provides a binary SDIO control port interface.
 
 config MSM_ONCRPCROUTER
 	depends on MSM_SMD
@@ -2975,31 +3488,6 @@ config MSM_RPCSERVER_HANDSET
 	help
 	  Support for receiving handset events like headset detect,
 	  headset switch and clamshell state.
-
-config MSM_RMT_STORAGE_CLIENT
-	depends on (ARCH_MSM && MSM_ONCRPCROUTER)
-	default n
-	bool "Remote Storage RPC client"
-	help
-	  Provide RPC mechanism for remote processors to access storage
-	  device on apps processor.
-
-config MSM_RMT_STORAGE_CLIENT_STATS
-	depends on (MSM_RMT_STORAGE_CLIENT && DEBUG_FS)
-	default n
-	bool "Remote storage RPC client performance statistics"
-	help
-	  Collects performance statistics and shows this information
-	  through a debugfs file rmt_storage_stats.
-
-config MSM_SDIO_SMEM
-        depends on MSM_SDIO_AL
-        default n
-        bool "SDIO SMEM for remote storage"
-        help
-          Copies data from remote MDM9K memory to local MSM8x60
-	  memory. Used by remote storage client to shadow
-	  MDM9K filesystem.
 
 config MSM_DALRPC
 	bool "DAL RPC support"
@@ -3574,14 +4062,6 @@ config MSM_BUS_SCALING
 config MSM_BUS_RPM_MULTI_TIER_ENABLED
 	bool "RPM Multi-tiering Configuration"
 	depends on MSM_BUS_SCALING
-
-config BW_LIMITER_FIX
-	bool "BW Limiter Fix for Memory Latency Issue"
-	default n
-	help
-		This fix is given from qualcomm to fix Memory Latency Issue in CP side.
-		This can be sensitive fix for already-released 8974 project.
-		We first make this to work on selective projects.
 
 config L2_SCM_HANDOFF_LOCK
 	bool "SCM HANDOFF LOCK to serialize power-collapses"
@@ -4213,6 +4693,13 @@ config MSM_UARTDM_Core_v14
 	help
 		Select if BLSP based UART Core v.14 or higher is present.
 
+config MSM_COMMON_LOG
+	bool "Use to export symbols for parsing memory dump"
+	help
+	 Use this to export symbols to a memory dump table. This table
+	 can be used by post analysis tools to extract information from
+	 memory when device crashes.
+
 config MSM_BOOT_STATS
 	bool "Use MSM boot stats reporting"
 	help
@@ -4269,8 +4756,8 @@ config TIMA_RKP
 
 config TIMA_RKP_30
        bool "Enable RKP TIMA 3.0 features"
-       depends on ARCH_MSM8974PRO
-       depends on TIMA_RKP       
+       depends on (ARCH_MSM8974PRO || ARCH_MSM8226 || ARCH_MSM8926 || ARCH_MSM8926_LTE)
+       depends on TIMA_RKP
        default y
        help
          RKP 3.0 features, enabled for msm8974pro only
@@ -4327,6 +4814,12 @@ config TIMA_RKP_DEBUG
        help
          TIMA debug infrastructure.
 
+config TIMA
+       bool "Enable TIMA feature"
+       default n
+       help
+         Enables TIMA
+
 config TIMA_LKMAUTH
        bool "Enable LKM authentication TIMA feature"
        default n
@@ -4350,18 +4843,25 @@ config TIMA_TEST_INFRA
 
 config TIMA_UEVENT
        bool "Uevent message propagation for TIMA"
+       depends on TIMA
        default n
        help
          Uevent messages for TIMA PKM/LKM
 
 config TIMA_LOG
        bool "Log dumping support for TIMA"
+       depends on TIMA
        default n
        help
          TIMA Log dumping support
 
 config PCM_ROUTE_VOICE_STUB
 	bool "External AUXPCM device route to SLIMBUS or WCN(BT) using the VOICE_STUB Front End"
+	default n
+	depends on ARCH_MSM8974
+
+config BT_CALL_FORWARDING
+	bool "External AUXPCM device route to SLIMBUS using the VOICE_STUB Front End"
 	default n
 	depends on ARCH_MSM8974
 
@@ -4383,4 +4883,10 @@ config MUIC_RESET_PIN_ENABLE
         help 
                 This request is from H/W team
 		In case of mUIC voltage drop, mUIC will be reset
+
+config SEC_SMART_MGR_RUNQUEUE_AVG
+	default n
+	bool "Samsung added for read current run queue"
+	help
+	  Support for Smart MGR function.
 endif

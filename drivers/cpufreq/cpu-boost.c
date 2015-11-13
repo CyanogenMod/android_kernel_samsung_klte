@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,9 +17,7 @@
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/cpufreq.h>
-#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
 #include <linux/cpu.h>
-#endif
 #include <linux/sched.h>
 #include <linux/jiffies.h>
 #include <linux/kthread.h>
@@ -61,8 +59,6 @@ module_param(input_boost_ms, uint, 0644);
 static u64 last_input_time;
 #define MIN_INPUT_INTERVAL (150 * USEC_PER_MSEC)
 
-
-#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
 /*
  * The CPUFREQ_ADJUST notifier is used to override the current policy min to
  * make sure policy min >= boost_min. The cpufreq framework then does the job
@@ -107,41 +103,7 @@ static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, voi
 
 	return NOTIFY_OK;
 }
-#else
-/*
- * The CPUFREQ_ADJUST notifier is used to override the current policy min to
- * make sure policy min >= boost_min. The cpufreq framework then does the job
- * of enforcing the new policy.
- */
-static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, void *data)
-{
-	struct cpufreq_policy *policy = data;
-	unsigned int cpu = policy->cpu;
-	struct cpu_sync *s = &per_cpu(sync_info, cpu);
-	unsigned int b_min = s->boost_min;
-	unsigned int ib_min = s->input_boost_min;
-	unsigned int min;
 
-	if (val != CPUFREQ_ADJUST)
-		return NOTIFY_OK;
-
-	if (!b_min && !ib_min)
-		return NOTIFY_OK;
-
-	min = max(b_min, ib_min);
-
-	pr_debug("CPU%u policy min before boost: %u kHz\n",
-		 cpu, policy->min);
-	pr_debug("CPU%u boost min: %u kHz\n", cpu, min);
-
-	cpufreq_verify_within_limits(policy, min, UINT_MAX);
-
-	pr_debug("CPU%u policy min after boost: %u kHz\n",
-		 cpu, policy->min);
-
-	return NOTIFY_OK;
-}
-#endif
 static struct notifier_block boost_adjust_nb = {
 	.notifier_call = boost_adjust_notify,
 };
@@ -178,7 +140,8 @@ static int boost_mig_sync_thread(void *data)
 	unsigned long flags;
 
 	while(1) {
-		wait_event(s->sync_wq, s->pending || kthread_should_stop());
+		wait_event_interruptible(s->sync_wq, s->pending ||
+					kthread_should_stop());
 
 		if (kthread_should_stop())
 			break;
@@ -196,11 +159,14 @@ static int boost_mig_sync_thread(void *data)
 		if (ret)
 			continue;
 
-		if (src_policy.min == src_policy.cur &&
-				src_policy.min <= dest_policy.min){
+		if (dest_policy.cur >= src_policy.cur ) {
+			pr_debug("No sync. CPU%d@%dKHz >= CPU%d@%dKHz\n",
+				 dest_cpu, dest_policy.cur, src_cpu, src_policy.cur);
 			continue;
 		}
 
+		if (sync_threshold && (dest_policy.cur >= sync_threshold))
+			continue;
 
 		cancel_delayed_work_sync(&s->boost_rem);
 		if (sync_threshold) {
@@ -212,19 +178,16 @@ static int boost_mig_sync_thread(void *data)
 			s->boost_min = src_policy.cur;
 		}
 		/* Force policy re-evaluation to trigger adjust notifier. */
-		cpufreq_update_policy(dest_cpu);
-		/* Notify source CPU of policy change */
-		cpufreq_update_policy(src_cpu);
-#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
 		get_online_cpus();
-		if (cpu_online(dest_cpu))
+		if (cpu_online(dest_cpu)) {
+			cpufreq_update_policy(dest_cpu);
 			queue_delayed_work_on(dest_cpu, cpu_boost_wq,
 				&s->boost_rem, msecs_to_jiffies(boost_ms));
+		} else {
+			s->boost_min = 0;
+			pr_debug("Resetting boost_min to 0\n");
+		}
 		put_online_cpus();
-#else
-		queue_delayed_work_on(s->cpu, cpu_boost_wq,
-			&s->boost_rem, msecs_to_jiffies(boost_ms));
-#endif
 	}
 
 	return 0;
@@ -259,6 +222,7 @@ static void do_input_boost(struct work_struct *work)
 	struct cpu_sync *i_sync_info;
 	struct cpufreq_policy policy;
 
+	get_online_cpus();
 	for_each_online_cpu(i) {
 
 		i_sync_info = &per_cpu(sync_info, i);
@@ -275,6 +239,7 @@ static void do_input_boost(struct work_struct *work)
 			&i_sync_info->input_boost_rem,
 			msecs_to_jiffies(input_boost_ms));
 	}
+	put_online_cpus();
 }
 
 static void cpuboost_input_event(struct input_handle *handle,
@@ -372,8 +337,6 @@ static int cpu_boost_init(void)
 	int cpu, ret;
 	struct cpu_sync *s;
 
-	cpufreq_register_notifier(&boost_adjust_nb, CPUFREQ_POLICY_NOTIFIER);
-
 	cpu_boost_wq = alloc_workqueue("cpuboost_wq", WQ_HIGHPRI, 0);
 	if (!cpu_boost_wq)
 		return -EFAULT;
@@ -389,14 +352,13 @@ static int cpu_boost_init(void)
 		INIT_DELAYED_WORK(&s->input_boost_rem, do_input_boost_rem);
 		s->thread = kthread_run(boost_mig_sync_thread, (void *)cpu,
 					"boost_sync/%d", cpu);
-#if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
-		kthread_bind(s->thread, cpu);
-#endif
+		set_cpus_allowed(s->thread, *cpumask_of(cpu));
 	}
+	cpufreq_register_notifier(&boost_adjust_nb, CPUFREQ_POLICY_NOTIFIER);
 	atomic_notifier_chain_register(&migration_notifier_head,
 					&boost_migration_nb);
-
 	ret = input_register_handler(&cpuboost_input_handler);
+
 	return 0;
 }
 late_initcall(cpu_boost_init);

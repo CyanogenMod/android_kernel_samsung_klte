@@ -460,7 +460,11 @@ static struct hash_testvec sha1_tv_template[] = {
 		.plaintext = "abc",
 		.psize	= 3,
 		.digest	= "\xa9\x99\x3e\x36\x47\x06\x81\x6a\xba\x3e"
+#if FIPS_FUNC_TEST == 6
+			  "\x25\x72\x78\x50\xc2\x6c\x9c\xd0\xd8\x9d",
+#else
 			  "\x25\x71\x78\x50\xc2\x6c\x9c\xd0\xd8\x9d",
+#endif
 	}, {
 		.plaintext = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
 		.psize	= 56,
@@ -2245,7 +2249,11 @@ static struct cipher_testvec des_cbc_dec_tv_template[] = {
 static struct cipher_testvec des3_ede_enc_tv_template[] = {
 	{ /* These are from openssl */
 		.key	= "\x01\x23\x45\x67\x89\xab\xcd\xef"
+#if FIPS_FUNC_TEST == 7
+			  "\x53\x55\x55\x55\x55\x55\x55\x55"
+#else
 			  "\x55\x55\x55\x55\x55\x55\x55\x55"
+#endif
 			  "\xfe\xdc\xba\x98\x76\x54\x32\x10",
 		.klen	= 24,
 		.input	= "\x73\x6f\x6d\x65\x64\x61\x74\x61",
@@ -10349,7 +10357,11 @@ static struct aead_testvec aes_ccm_rfc4309_dec_tv_template[] = {
 static struct cprng_testvec ansi_cprng_aes_tv_template[] = {
 	{
 		.key	= "\xf3\xb1\x66\x6d\x13\x60\x72\x42"
+#if FIPS_FUNC_TEST == 8
+			  "\xee\x06\x1c\xab\xb8\xd4\x62\x02",
+#else
 			  "\xed\x06\x1c\xab\xb8\xd4\x62\x02",
+#endif
 		.klen	= 16,
 		.dt	= "\xe6\xb3\xbe\x78\x2a\x23\xfa\x62"
 			  "\xd7\x1d\x4a\xfb\xb0\xe9\x22\xf9",

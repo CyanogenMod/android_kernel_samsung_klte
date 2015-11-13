@@ -44,13 +44,14 @@ extern "C" {
 #define BBM_ES /* deprecated */
 /* #define BBM_ES_CURRENT */ /* deprecated */
 
+/* From TRLTE onwards, the frequency value is set at run-time during probe of fc8300 */
 /* #define BBM_XTAL_FREQ               16000 */
 /* #define BBM_XTAL_FREQ               16384 */
 /* #define BBM_XTAL_FREQ               18000 */
 /*#define BBM_XTAL_FREQ               19200 */
 /* #define BBM_XTAL_FREQ               24000 */
 /* #define BBM_XTAL_FREQ               24576 */
- #define BBM_XTAL_FREQ               26000 
+/* #define BBM_XTAL_FREQ               26000 */
 /* #define BBM_XTAL_FREQ               27000 */
 /* #define BBM_XTAL_FREQ               27120 */
 /* #define BBM_XTAL_FREQ               32000 */

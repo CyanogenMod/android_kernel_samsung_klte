@@ -19,7 +19,6 @@
 #define __LINUX_ABOV_TOUCHKEY_H
 
 #define ABOV_TK_NAME "abov-touchkey"
-#define ABOV_ID 0x40
 
 struct abov_touchkey_platform_data {
 	unsigned long irq_flag;
@@ -30,6 +29,8 @@ struct abov_touchkey_platform_data {
 	int gpio_tkey_led_en;
 	struct regulator *vdd_io_vreg;
 	struct regulator *avdd_vreg;
+	const char *supply_name;
+	struct regulator *vtouch_3p3;
 	void (*input_event) (void *data);
 	int (*power) (struct abov_touchkey_platform_data *pdata, bool on);
 	int (*keyled) (bool on);

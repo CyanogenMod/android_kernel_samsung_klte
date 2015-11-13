@@ -50,6 +50,12 @@
 #define CHIP_NAME			"YAS532"
 #endif
 
+#if defined(CONFIG_MACH_SLTE_CMCC) || defined(CONFIG_MACH_SLTE_CU) || defined(CONFIG_MACH_SLTE_TD) \
+|| defined(CONFIG_MACH_SLTE_ATT) || defined(CONFIG_MACH_SLTE_TMO) \
+|| defined(CONFIG_MACH_SLTE_DCM) || defined(CONFIG_MACH_SLTE_KDI)
+extern unsigned int system_rev;
+#endif
+
 static struct i2c_client *this_client;
 
 enum {
@@ -60,6 +66,7 @@ enum {
 };
 struct yas_state {
 	struct mutex lock;
+	spinlock_t spin_lock;
 	struct yas_mag_driver mag;
 	struct i2c_client *client;
 	struct iio_trigger  *trig;
@@ -71,6 +78,7 @@ struct yas_state {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend sus;
 #endif
+	int position;
 };
 
 static int yas_device_open(int32_t type)
@@ -132,16 +140,24 @@ static uint32_t yas_current_time(void)
 static int yas_pseudo_irq_enable(struct iio_dev *indio_dev)
 {
 	struct yas_state *st = iio_priv(indio_dev);
-	if (!atomic_cmpxchg(&st->pseudo_irq_enable, 0, 1))
+	if (!atomic_cmpxchg(&st->pseudo_irq_enable, 0, 1)) {
+		mutex_lock(&st->lock);
+		st->mag.set_enable(1);
+		mutex_unlock(&st->lock);
 		schedule_delayed_work(&st->work, 0);
+	}
 	return 0;
 }
 
 static int yas_pseudo_irq_disable(struct iio_dev *indio_dev)
 {
 	struct yas_state *st = iio_priv(indio_dev);
-	if (atomic_cmpxchg(&st->pseudo_irq_enable, 1, 0))
+	if (atomic_cmpxchg(&st->pseudo_irq_enable, 1, 0)) {
 		cancel_delayed_work_sync(&st->work);
+		mutex_lock(&st->lock);
+		st->mag.set_enable(0);
+		mutex_unlock(&st->lock);
+	}
 	return 0;
 }
 
@@ -157,7 +173,10 @@ static int yas_set_pseudo_irq(struct iio_dev *indio_dev, int enable)
 static int yas_data_rdy_trig_poll(struct iio_dev *indio_dev)
 {
 	struct yas_state *st = iio_priv(indio_dev);
+	unsigned long flags;
+	spin_lock_irqsave(&st->spin_lock, flags);
 	iio_trigger_poll(st->trig, iio_get_time_ns());
+	spin_unlock_irqrestore(&st->spin_lock, flags);
 	return 0;
 }
 
@@ -172,11 +191,8 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 	int32_t *mag;
 
 	mag = (int32_t *) kmalloc(datasize, GFP_KERNEL);
-	if (mag == NULL) {
-		dev_err(indio_dev->dev.parent,
-				"memory alloc failed in buffer bh");
-		return -ENOMEM;
-	}
+	if (mag == NULL)
+		goto done;
 	if (!bitmap_empty(indio_dev->active_scan_mask, indio_dev->masklength)) {
 		j = 0;
 		for (i = 0; i < 3; i++) {
@@ -190,13 +206,11 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 
 	/* Guaranteed to be aligned with 8 byte boundary */
 	if (buffer->scan_timestamp)
-		*(s64 *)(((phys_addr_t)mag + len
-					+ sizeof(s64) - 1) & ~(sizeof(s64) - 1))
-			= pf->timestamp;
-	buffer->access->store_to(buffer, (u8 *)mag, pf->timestamp);
-
-	iio_trigger_notify_done(indio_dev->trig);
+		*(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = pf->timestamp;
+	iio_push_to_buffer(indio_dev->buffer, (u8 *)mag, 0);
 	kfree(mag);
+done:
+	iio_trigger_notify_done(indio_dev->trig);
 	return IRQ_HANDLED;
 }
 
@@ -383,7 +397,9 @@ static ssize_t yas_sampling_frequency_store(struct device *dev,
 		return ret;
 	if (data <= 0)
 		return -EINVAL;
+	mutex_lock(&st->lock);
 	st->sampling_frequency = data;
+	mutex_unlock(&st->lock);
 	return count;
 }
 
@@ -427,7 +443,7 @@ static ssize_t yas_self_test_show(struct device *dev,
 		"[SENSOR] Test7 - err = %d, offset = %d,%d,%d\n"
 		"[SENSOR] Test2 - err = %d\n", __func__,
 		err[0], r.id, err[2], err[3], r.xy1y2[0], r.xy1y2[1],
-		r.xy1y2[2], err[4], r.dir, err[5], r.sx, r.sy, 
+		r.xy1y2[2], err[4], r.dir, err[5], r.sx, r.sy,
 		err[6], r.xyz[0], r.xyz[1], r.xyz[2], err[1]);
 
 	return sprintf(buf,
@@ -538,12 +554,86 @@ static ssize_t yas53x_name_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s\n", CHIP_NAME);
 }
 
+static ssize_t yas_selftest_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct yas_state *st = dev_get_drvdata(dev);
+	struct yas532_self_test_result r;
+	int ret;
+	s8 err[7] = { 0, };
+	mutex_lock(&st->lock);
+	ret = st->mag.ext(YAS532_SELF_TEST, &r);
+	mutex_unlock(&st->lock);
+
+	if (unlikely(r.id != 0x2))
+		err[0] = -1;
+	if (unlikely(r.xy1y2[0] < -30 || r.xy1y2[0] > 30))
+		err[3] = -1;
+	if (unlikely(r.xy1y2[1] < -30 || r.xy1y2[1] > 30))
+		err[3] = -1;
+	if (unlikely(r.xy1y2[2] < -30 || r.xy1y2[2] > 30))
+		err[3] = -1;
+	if (unlikely(r.sx < 17 || r.sy < 22))
+		err[5] = -1;
+	if (unlikely(r.xyz[0] < -600 || r.xyz[0] > 600))
+		err[6] = -1;
+	if (unlikely(r.xyz[1] < -600 || r.xyz[1] > 600))
+		err[6] = -1;
+	if (unlikely(r.xyz[2] < -600 || r.xyz[2] > 600))
+		err[6] = -1;
+
+	pr_info("[SENSOR] %s\n"
+		"[SENSOR] Test1 - err = %d, id = %d\n"
+		"[SENSOR] Test3 - err = %d\n"
+		"[SENSOR] Test4 - err = %d, offset = %d,%d,%d\n"
+		"[SENSOR] Test5 - err = %d, direction = %d\n"
+		"[SENSOR] Test6 - err = %d, sensitivity = %d,%d\n"
+		"[SENSOR] Test7 - err = %d, offset = %d,%d,%d\n"
+		"[SENSOR] Test2 - err = %d\n", __func__,
+		err[0], r.id, err[2], err[3], r.xy1y2[0], r.xy1y2[1],
+		r.xy1y2[2], err[4], r.dir, err[5], r.sx, r.sy,
+		err[6], r.xyz[0], r.xyz[1], r.xyz[2], err[1]);
+
+	return sprintf(buf,
+			"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+			err[0], r.id, err[2], err[3], r.xy1y2[0],
+			r.xy1y2[1], r.xy1y2[2], err[4], r.dir,
+			err[5], r.sx, r.sy, err[6],
+			r.xyz[0], r.xyz[1], r.xyz[2], err[1]);
+}
+
+static ssize_t yas_raw_data_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct yas_state *st = dev_get_drvdata(dev);
+	int32_t xyz_raw[3];
+	int ret;
+	mutex_lock(&st->lock);
+	ret = st->mag.ext(YAS532_SELF_TEST_NOISE, xyz_raw);
+	mutex_unlock(&st->lock);
+	if (ret < 0)
+		return -EFAULT;
+	return sprintf(buf, "%d,%d,%d\n", xyz_raw[0], xyz_raw[1], xyz_raw[2]);
+}
+
+static ssize_t yas_raw_data_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	pr_info("%s: \n", __func__);
+	return count;
+}
+
 static DEVICE_ATTR(name, S_IRUGO, yas53x_name_show, NULL);
 static DEVICE_ATTR(vendor, S_IRUGO, yas53x_vendor_show, NULL);
+static DEVICE_ATTR(selftest, S_IRUSR, yas_selftest_show, NULL);
+static DEVICE_ATTR(raw_data, S_IRUSR|S_IWUSR, yas_raw_data_show, yas_raw_data_store);
 
 static struct device_attribute *sensor_attrs[] = {
 	&dev_attr_name,
 	&dev_attr_vendor,
+	&dev_attr_selftest,
+	&dev_attr_raw_data,
 	NULL,
 };
 #endif
@@ -605,8 +695,10 @@ static void yas_early_suspend(struct early_suspend *h)
 {
 	struct yas_state *st = container_of(h,
 			struct yas_state, sus);
-	if (atomic_read(&st->pseudo_irq_enable))
+	if (atomic_read(&st->pseudo_irq_enable)) {
 		cancel_delayed_work_sync(&st->work);
+		st->mag.set_enable(0);
+	}
 }
 
 
@@ -614,15 +706,39 @@ static void yas_late_resume(struct early_suspend *h)
 {
 	struct yas_state *st = container_of(h,
 			struct yas_state, sus);
-	if (atomic_read(&st->pseudo_irq_enable))
+	if (atomic_read(&st->pseudo_irq_enable)) {
+		st->mag.set_enable(1);
 		schedule_delayed_work(&st->work, 0);
+	}
 }
 #endif
+
+static int yas_parse_dt(struct device *dev,
+			struct  yas_state *st)
+{
+	struct device_node *np = dev->of_node;
+
+	if (!of_property_read_u32(np, "yas,orientation",
+				&st->position))
+		pr_info("[SENSOR] yas,orientation = %d\n", st->position);
+	else
+		return -EINVAL;
+#if defined(CONFIG_MACH_SLTE_CMCC) || defined(CONFIG_MACH_SLTE_CU) || defined(CONFIG_MACH_SLTE_TD)
+	if (system_rev < 2)
+		st->position = 2;
+#elif defined(CONFIG_MACH_SLTE_ATT) || defined(CONFIG_MACH_SLTE_TMO) \
+|| defined(CONFIG_MACH_SLTE_DCM) || defined(CONFIG_MACH_SLTE_KDI)
+	if (system_rev < 1)
+		st->position = 4;
+#endif
+	return 0;
+}
 
 static int yas_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 {
 	struct yas_state *st;
 	struct iio_dev *indio_dev;
+	int position, i;
 	int ret;
 
 	pr_info("[SENSOR] %s is called!!\n", __func__);
@@ -668,6 +784,8 @@ static int yas_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
         goto err_yas_sensor_register_failed;
     }
 #endif
+	for (i = 0; i < 3; i++)
+		st->compass_data[i] = 0;
 
 	ret = yas_probe_buffer(indio_dev);
 	if (ret)
@@ -688,18 +806,18 @@ static int yas_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		ret = -EFAULT;
 		goto error_unregister_iio;
 	}
-	ret = st->mag.set_enable(1);
-	if (ret < 0) {
-		ret = -EFAULT;
-		goto error_driver_term;
+	ret = yas_parse_dt(&i2c->dev, st);
+	if(!ret){
+	    position = st->position;
+	    ret = st->mag.set_position(position);
+	    pr_info("[SENSOR] set_position (%d)\n", position);
 	}
 
+	spin_lock_init(&st->spin_lock);
 	pr_info("[SENSOR] %s is finished!!\n", __func__);
 
 	return 0;
 
-error_driver_term:
-	st->mag.term();
 error_unregister_iio:
 	iio_device_unregister(indio_dev);
 error_remove_trigger:
@@ -746,9 +864,10 @@ static int yas_suspend(struct device *dev)
 {
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct yas_state *st = iio_priv(indio_dev);
-	if (atomic_read(&st->pseudo_irq_enable))
+	if (atomic_read(&st->pseudo_irq_enable)) {
 		cancel_delayed_work_sync(&st->work);
-	st->mag.set_enable(0);
+		st->mag.set_enable(0);
+	}
 	return 0;
 }
 
@@ -756,9 +875,10 @@ static int yas_resume(struct device *dev)
 {
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct yas_state *st = iio_priv(indio_dev);
-	st->mag.set_enable(1);
-	if (atomic_read(&st->pseudo_irq_enable))
+	if (atomic_read(&st->pseudo_irq_enable)) {
+		st->mag.set_enable(1);
 		schedule_delayed_work(&st->work, 0);
+	}
 	return 0;
 }
 

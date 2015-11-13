@@ -607,6 +607,15 @@ config LEDS_MAX77804K
 	  Now camera_class is exceptioned
 	  by sanghoon.lee.
 
+config LEDS_MAX77888
+	bool "LED support for the MAX77888"
+	depends on LEDS_CLASS
+	depends on MFD_MAX77888
+	default n
+	help
+	  This option enables support for the LEDs
+	  Now camera_class is exceptioned
+
 config LEDS_MAX77828
 	bool "LED support for the MAX77828"
 	depends on LEDS_CLASS

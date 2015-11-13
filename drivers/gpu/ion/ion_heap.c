@@ -2,7 +2,7 @@
  * drivers/gpu/ion/ion_heap.c
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -26,6 +26,7 @@
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
+#include <linux/dma-mapping.h>
 #include "ion_priv.h"
 
 void *ion_heap_map_kernel(struct ion_heap *heap,
@@ -119,17 +120,15 @@ int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
  * chunks to minimize the number of memsets and vmaps/vunmaps.
  *
  * Note that the `pages' array should be composed of all 4K pages.
+ *
+ * NOTE: This function does not guarantee synchronization of the caches
+ * and thus caller is responsible for handling any cache maintenance
+ * operations needed.
  */
-int ion_heap_pages_zero(struct page **pages, int num_pages,
-				bool should_invalidate)
+int ion_heap_pages_zero(struct page **pages, int num_pages)
 {
-	int i, j, k, npages_to_vmap;
+	int i, j, npages_to_vmap;
 	void *ptr = NULL;
-	/*
-	 * It's cheaper just to use writecombine memory and skip the
-	 * cache vs. using a cache memory and trying to flush it afterwards
-	 */
-	pgprot_t pgprot = pgprot_writecombine(pgprot_kernel);
 
 	/*
 	 * As an optimization, we manually zero out all of the pages
@@ -145,7 +144,7 @@ int ion_heap_pages_zero(struct page **pages, int num_pages,
 		for (j = 0; j < MAX_VMAP_RETRIES && npages_to_vmap;
 			++j) {
 			ptr = vmap(&pages[i], npages_to_vmap,
-					VM_IOREMAP, pgprot);
+					VM_IOREMAP, PAGE_KERNEL);
 			if (ptr)
 				break;
 			else
@@ -155,31 +154,18 @@ int ion_heap_pages_zero(struct page **pages, int num_pages,
 			return -ENOMEM;
 
 		memset(ptr, 0, npages_to_vmap * PAGE_SIZE);
-		if (should_invalidate) {
-			/*
-			 * invalidate the cache to pick up the zeroing
-			 */
-			for (k = 0; k < npages_to_vmap; k++) {
-				void *p = kmap_atomic(pages[i + k]);
-				phys_addr_t phys = page_to_phys(
-							pages[i + k]);
-
-				dmac_inv_range(p, p + PAGE_SIZE);
-				outer_inv_range(phys, phys + PAGE_SIZE);
-				kunmap_atomic(p);
-			}
-		}
 		vunmap(ptr);
 	}
 
 	return 0;
 }
 
-static int ion_heap_alloc_pages_mem(int page_tbl_size,
-				struct pages_mem *pages_mem)
+int ion_heap_alloc_pages_mem(struct pages_mem *pages_mem)
 {
 	struct page **pages;
+	unsigned int page_tbl_size;
 	pages_mem->free_fn = kfree;
+	page_tbl_size = sizeof(struct page *) * (pages_mem->size >> PAGE_SHIFT);
 	if (page_tbl_size > SZ_8K) {
 		/*
 		 * Do fallback to ensure we have a balance between
@@ -203,27 +189,27 @@ static int ion_heap_alloc_pages_mem(int page_tbl_size,
 	return 0;
 }
 
-static void ion_heap_free_pages_mem(struct pages_mem *pages_mem)
+void ion_heap_free_pages_mem(struct pages_mem *pages_mem)
 {
 	pages_mem->free_fn(pages_mem->pages);
 }
 
-int ion_heap_high_order_page_zero(struct page *page,
-				int order, bool should_invalidate)
+int ion_heap_high_order_page_zero(struct page *page, int order)
 {
 	int i, ret;
 	struct pages_mem pages_mem;
 	int npages = 1 << order;
-	int page_tbl_size = sizeof(struct page *) * npages;
+	pages_mem.size = npages * PAGE_SIZE;
 
-	if (ion_heap_alloc_pages_mem(page_tbl_size, &pages_mem))
+	if (ion_heap_alloc_pages_mem(&pages_mem))
 		return -ENOMEM;
 
 	for (i = 0; i < (1 << order); ++i)
 		pages_mem.pages[i] = page + i;
 
-	ret = ion_heap_pages_zero(pages_mem.pages, npages,
-				should_invalidate);
+	ret = ion_heap_pages_zero(pages_mem.pages, npages);
+	dma_sync_single_for_device(NULL, page_to_phys(page), pages_mem.size,
+					DMA_BIDIRECTIONAL);
 	ion_heap_free_pages_mem(&pages_mem);
 	return ret;
 }
@@ -232,16 +218,12 @@ int ion_heap_buffer_zero(struct ion_buffer *buffer)
 {
 	struct sg_table *table = buffer->sg_table;
 	struct scatterlist *sg;
-	int i, j, ret = 0, npages = 0, page_tbl_size = 0;
+	int i, j, ret = 0, npages = 0;
 	struct pages_mem pages_mem;
 
-	for_each_sg(table->sgl, sg, table->nents, i) {
-		unsigned long len = sg_dma_len(sg);
-		int nrpages = len >> PAGE_SHIFT;
-		page_tbl_size += sizeof(struct page *) * nrpages;
-	}
+	pages_mem.size = PAGE_ALIGN(buffer->size);
 
-	if (ion_heap_alloc_pages_mem(page_tbl_size, &pages_mem))
+	if (ion_heap_alloc_pages_mem(&pages_mem))
 		return -ENOMEM;
 
 	for_each_sg(table->sgl, sg, table->nents, i) {
@@ -252,46 +234,10 @@ int ion_heap_buffer_zero(struct ion_buffer *buffer)
 			pages_mem.pages[npages++] = page + j;
 	}
 
-	ret = ion_heap_pages_zero(pages_mem.pages, npages,
-				ion_buffer_cached(buffer));
+	ret = ion_heap_pages_zero(pages_mem.pages, npages);
+	dma_sync_sg_for_device(NULL, table->sgl, table->nents,
+					DMA_BIDIRECTIONAL);
 	ion_heap_free_pages_mem(&pages_mem);
-	return ret;
-}
-
-int ion_heap_buffer_zero_old(struct ion_buffer *buffer)
-{
-	struct sg_table *table = buffer->sg_table;
-	pgprot_t pgprot;
-	struct scatterlist *sg;
-	struct vm_struct *vm_struct;
-	int i, j, ret = 0;
-
-	if (buffer->flags & ION_FLAG_CACHED)
-		pgprot = PAGE_KERNEL;
-	else
-		pgprot = pgprot_writecombine(PAGE_KERNEL);
-
-	vm_struct = get_vm_area(PAGE_SIZE, VM_ALLOC);
-	if (!vm_struct)
-		return -ENOMEM;
-
-	for_each_sg(table->sgl, sg, table->nents, i) {
-		struct page *page = sg_page(sg);
-		unsigned long len = sg_dma_len(sg);
-
-		for (j = 0; j < len / PAGE_SIZE; j++) {
-			struct page *sub_page = page + j;
-			struct page **pages = &sub_page;
-			ret = map_vm_area(vm_struct, pgprot, &pages);
-			if (ret)
-				goto end;
-			memset(vm_struct->addr, 0, PAGE_SIZE);
-			unmap_kernel_range((unsigned long)vm_struct->addr,
-					   PAGE_SIZE);
-		}
-	}
-end:
-	free_vm_area(vm_struct);
 	return ret;
 }
 
@@ -367,7 +313,6 @@ size_t ion_heap_freelist_drain(struct ion_heap *heap, size_t size)
 
 size_t ion_heap_freelist_drain_from_shrinker(struct ion_heap *heap, size_t size)
 {
-	
 	return _ion_heap_freelist_drain(heap, size, true);
 }
 

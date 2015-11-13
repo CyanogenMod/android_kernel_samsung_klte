@@ -21,7 +21,11 @@ extern "C" {
 /* #define BBM_XTAL_FREQ               18000 */
 /* #define BBM_XTAL_FREQ               19200 */
 /* #define BBM_XTAL_FREQ               24000 */
+#ifdef CONFIG_ISDBT_FC8150_HKDI
+#define BBM_XTAL_FREQ               	19200
+#else
 #define BBM_XTAL_FREQ               26000
+#endif
 /* #define BBM_XTAL_FREQ               27000 */
 /* #define BBM_XTAL_FREQ               27120 */
 //#define BBM_XTAL_FREQ               24576 

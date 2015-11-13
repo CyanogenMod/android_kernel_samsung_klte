@@ -31,6 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/earlysuspend.h>
+#include <linux/uaccess.h>
 
 /*
  *       ISC Mode Porting Guide
@@ -113,9 +114,13 @@ typedef enum {
 	ISC_LIMIT
 } eISCRet_t;
 
+enum {
+	BUILT_IN = 0,
+	UMS,
+};
 /*
  *       Entry point of ISC functions to provide ISC feature to Linux system.
  */
-eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_update);
+eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_update, int fw_location);
 #endif /* __MMS100_ISC_H__ */
 

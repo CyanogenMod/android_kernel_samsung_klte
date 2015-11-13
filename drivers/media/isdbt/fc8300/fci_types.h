@@ -86,6 +86,11 @@ enum BROADCAST_TYPE {
 	ISDBT_CATV_1SEG  = 7
 };
 
+enum ISDBT_INTERRUPT_TYPE {
+	ISDBT_INTERRUPT_5_PKT       = 0, /*Interrupt at every 5 pkt */
+	ISDBT_INTERRUPT_32_PKT     = 1 /* Interrupt at every 32 pkt */
+};
+
 #ifdef __cplusplus
 }
 #endif

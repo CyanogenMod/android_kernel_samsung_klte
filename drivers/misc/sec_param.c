@@ -20,7 +20,11 @@
 #define PARAM_WR	1
 
 #define SEC_PARAM_FILE_NAME	"/dev/block/platform/msm_sdcc.1/by-name/param"	/* parameter block */
+#if defined(CONFIG_PARAM_SIZE_983000)
+#define SEC_PARAM_FILE_SIZE	0x983000		/* 9.5MB */
+#else
 #define SEC_PARAM_FILE_SIZE	0xA00000		/* 10MB */
+#endif
 #define SEC_PARAM_FILE_OFFSET (SEC_PARAM_FILE_SIZE - 0x100000)
 
 /* single global instance */
@@ -125,7 +129,7 @@ bool sec_get_param(enum sec_param_index index, void *value)
 				sizeof(unsigned int));
 		break;
 #endif
-#ifdef CONFIG_GSM_MODEM_SPRD6500
+#if defined(CONFIG_GSM_MODEM_SPRD6500) || defined(CONFIG_SGLTE_QSC_MODEM)
 	case param_update_cp_bin:
 		memcpy(value, &(param_data->update_cp_bin),
 				sizeof(unsigned int));
@@ -148,6 +152,7 @@ bool sec_get_param(enum sec_param_index index, void *value)
 		memcpy(&(param_data->normal_poweroff), value, sizeof(unsigned int));
 		break;
 #endif
+
 	default:
 		return false;
 	}
@@ -192,7 +197,7 @@ bool sec_set_param(enum sec_param_index index, void *value)
 				value, sizeof(unsigned int));
 		break;
 #endif
-#ifdef CONFIG_GSM_MODEM_SPRD6500
+#if defined(CONFIG_GSM_MODEM_SPRD6500) || defined(CONFIG_SGLTE_QSC_MODEM)
 	case param_update_cp_bin:
 		memcpy(&(param_data->update_cp_bin),
 				value, sizeof(unsigned int));
@@ -243,7 +248,7 @@ static ssize_t movinand_checksum_done_show
 		pr_err("checksum is not in valuable range.\n");
 		ret = 1;
 	}
-	return snprintf(buf, sizeof(buf), "%u\n", ret);
+	return snprintf(buf, PAGE_SIZE, "%u\n", ret);
 }
 static DEVICE_ATTR(movinand_checksum_done,
 				0664, movinand_checksum_done_show, NULL);
@@ -258,7 +263,7 @@ static ssize_t movinand_checksum_pass_show
 		pr_err("checksum is not in valuable range.\n");
 		ret = 1;
 	}
-	return snprintf(buf, sizeof(buf), "%u\n", ret);
+	return snprintf(buf, PAGE_SIZE, "%u\n", ret);
 }
 static DEVICE_ATTR(movinand_checksum_pass,
 				0664, movinand_checksum_pass_show, NULL);

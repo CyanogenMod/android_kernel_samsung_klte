@@ -416,15 +416,15 @@ int flush(struct ssp_data *data, u8 uSensorType) {
 	msg->buffer = &buffer;
 	msg->free_buffer = 0;
 
+	ssp_dbg("[SSP]: %s Sensor Type = 0x%x, data = %u\n", __func__,
+		uSensorType, buffer);
+
 	iRet = ssp_spi_sync(data, msg, 1000);
 
 	if (iRet != SUCCESS) {
 		pr_err("[SSP]: %s - fail %d\n", __func__, iRet);
 		return ERROR;
 	}
-
-	ssp_dbg("[SSP]: %s Sensor Type = 0x%x, data = %u\n", __func__, uSensorType,
-			buffer);
 
 	return buffer ? 0 : -1;
 }
@@ -533,18 +533,23 @@ void set_proximity_threshold(struct ssp_data *data,
 
 	msg= kzalloc(sizeof(*msg), GFP_KERNEL);
 	msg->cmd = MSG2SSP_AP_SENSOR_PROXTHRESHOLD;
+#if defined(CONFIG_SENSORS_SSP_MAX88921)
+	msg->length = 4;
+#else
 	msg->length = 2;
+#endif
 	msg->options = AP2HUB_WRITE;
 	msg->buffer = (char*) kzalloc(4, GFP_KERNEL);
 	msg->free_buffer = 1;
 
 	pr_err("[SSP]: %s - SENSOR_PROXTHRESHOL",__func__);
 
-	//msg->buffer[0] = ((char) (uData1 >> 8) & 0x07);
-	//msg->buffer[1] = (char) uData1;
-	//msg->buffer[2] = ((char) (uData2 >> 8) & 0x07);
-	//msg->buffer[3] = (char) uData2;
-
+#if defined(CONFIG_SENSORS_SSP_MAX88921)
+	msg->buffer[0] = ((char) (uData1 >> 8) & 0x07);
+	msg->buffer[1] = (char) uData1;
+	msg->buffer[2] = ((char) (uData2 >> 8) & 0x07);
+	msg->buffer[3] = (char) uData2;
+#else
 	if (uData1 < uData2) {
 		pr_info("[SSP] %s - invalid threshold (%u, %u)\n",
 			__func__, uData1, uData2);
@@ -553,7 +558,7 @@ void set_proximity_threshold(struct ssp_data *data,
 	}
 	msg->buffer[0] = (char)uData1;
 	msg->buffer[1] = (char)uData2;
-
+#endif
 	iRet = ssp_spi_async(data, msg);
 
 	if (iRet != SUCCESS) {
@@ -561,7 +566,6 @@ void set_proximity_threshold(struct ssp_data *data,
 			__func__, iRet);
 		return;
 	}
-
 	pr_info("[SSP]: Proximity Threshold - %u, %u\n", uData1, uData2);
 }
 
@@ -585,7 +589,6 @@ void set_proximity_barcode_enable(struct ssp_data *data, bool bEnable)
 				__func__, iRet);
 		return;
 	}
-
 	pr_info("[SSP] Proximity Barcode En : %u\n", bEnable);
 }
 
@@ -607,7 +610,6 @@ void set_gesture_current(struct ssp_data *data, unsigned char uData1)
 				iRet);
 		return;
 	}
-
 	pr_info("[SSP]: Gesture Current Setting - %u\n", uData1);
 }
 

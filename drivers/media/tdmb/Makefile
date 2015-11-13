@@ -24,6 +24,7 @@ obj-$(CONFIG_TDMB_MTV319) += mtv319/
 obj-$(CONFIG_TDMB_SPI) += tdmb_spi.o
 obj-$(CONFIG_TDMB_EBI) += tdmb_ebi.o
 obj-$(CONFIG_TDMB_I2C) += tdmb_i2c.o
-obj-$(CONFIG_TDMB_TSIF) += tdmb_tsi.o
+obj-$(CONFIG_TDMB_TSIF_SLSI) += tdmb_tsi_slsi.o
+obj-$(CONFIG_TDMB_TSIF_QC) += tdmb_tsi_qc.o
 
 obj-$(CONFIG_TDMB_DEBUG) += tdmb_debug.o

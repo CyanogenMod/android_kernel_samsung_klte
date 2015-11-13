@@ -42,10 +42,6 @@ void __check_kvm_seq(struct mm_struct *mm);
 #define ASID_MASK		((~0) << ASID_BITS)
 #define ASID_FIRST_VERSION	(1 << ASID_BITS)
 
-#ifdef CONFIG_TIMA_RKP_DEBUG
-extern unsigned long tima_debug_infra_cnt;
-#endif
-
 extern unsigned int cpu_last_asid;
 #ifdef CONFIG_SMP
 DECLARE_PER_CPU(struct mm_struct *, current_mm);
@@ -121,12 +117,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 #ifdef	CONFIG_TIMA_RKP
 	unsigned long flags;
 #endif
-#ifdef CONFIG_TIMA_RKP_DEBUG
-	int i;
-	unsigned long pmd;
-	unsigned long va;
-	int ret;
-#endif 
 #ifdef CONFIG_MMU
 	unsigned int cpu = smp_processor_id();
 
@@ -148,39 +138,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		tima_switch_count++;
 		spin_unlock_irqrestore(&tima_switch_count_lock, flags);
 #endif
-	#ifdef CONFIG_TIMA_RKP_DEBUG
-		/* 
-		 * if debug infrastructure is enabled,
-		 * check is L1 and L2 page tables of a 
-		 * process are protected (readonly) at 
-		 * each context switch
-		 */
-		#ifdef CONFIG_TIMA_RKP_L1_TABLES
-		for (i=0; i<4; i++) {
-			if (tima_debug_page_protection(((unsigned long)next->pgd + i*0x1000), 1, 1) == 0) {
-				tima_debug_signal_failure(0x3f80f221, 1);
-				//tima_send_cmd((unsigned long)next->pgd, 0x3f80e221);
-				//printk(KERN_ERR"TIMA: New L1 PGT not protected\n");
-			}
-		}
-		#endif
-		#ifdef CONFIG_TIMA_RKP_L2_TABLES
-		for (i=0; i<0x1000; i++) {
-			pmd = *(unsigned long *)((unsigned long)next->pgd + i*4);
-			if ((pmd & 0x3) != 0x1)
-				continue;
-			if((0x07e00000 <= pmd) && (pmd <= 0x07f00000)) /* skip sect to pgt region */
-			       continue;	
-			va = (unsigned long)phys_to_virt(pmd & (~0x3ff)) ;
-			if ((ret = tima_debug_page_protection(va, 0x101, 1)) == 0) {
-				tima_debug_signal_failure(0x3f80f221, 101);
-				//printk(KERN_ERR"TIMA: New L2 PGT not RO va=%lx pa=%lx tima_debug_infra_cnt=%lx ret=%d\n", va, pmd, tima_debug_infra_cnt, ret);
-			} else if (ret == 1) {
-				tima_debug_infra_cnt++;
-			}
-		}
-		#endif /* CONFIG_TIMA_RKP_L2_TABLES */
-	#endif /* CONFIG_TIMA_RKP_DEBUG */
 		if (cache_is_vivt())
 			cpumask_clear_cpu(cpu, mm_cpumask(prev));
 	}

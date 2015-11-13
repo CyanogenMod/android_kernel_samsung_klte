@@ -140,6 +140,8 @@ struct companion_device {
 	uint8_t eeprom_fw_ver[12];
 	uint8_t *eeprom_fw_bin;
 	uint32_t eeprom_fw_bin_size;
+	uint32_t loading_fw_bin_size;
+	uint32_t crc_by_ap;
 #ifdef STATS2_WORKQUEUE
 	struct workqueue_struct *companion_queue;
 	struct work_struct companion_read_work;

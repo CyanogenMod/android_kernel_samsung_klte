@@ -76,7 +76,11 @@ static void hnotifier_work(struct work_struct *w)
 	case HNOTIFY_ID:
 		pr_info("!ID\n");
 		host_state_notify(&pinfo->ndev,	NOTIFY_HOST_ADD);
+#if defined(CONFIG_MUIC_MAX77804K_SUPPORT_LANHUB)
+		safe_boost(pinfo, 2);
+#else
 		safe_boost(pinfo, 1);
+#endif
 		sec_handle_event(1);
 		break;
 	case HNOTIFY_ENUMERATED:
@@ -191,6 +195,10 @@ static int host_notifier_probe(struct platform_device *pdev)
 
 	ninfo.ndev.set_booster = host_notifier_booster;
 	ninfo.phy = usb_get_transceiver();
+
+	if(!ninfo.phy){
+		return -ENODEV;
+	}
 	ATOMIC_INIT_NOTIFIER_HEAD(&ninfo.phy->notifier);
 
 	ret = host_notify_dev_register(&ninfo.ndev);

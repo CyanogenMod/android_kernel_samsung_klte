@@ -22,7 +22,9 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/err.h>
-
+#ifdef CONFIG_ADSP_FACTORY
+#include <linux/kernel.h>
+#endif
 struct class *sensors_class;
 struct class *sensors_event_class;
 static struct device *symlink_dev;
@@ -117,6 +119,19 @@ void remap_sensor_data(s16 *val, u32 idx)
 	}
 }
 
+void remap_sensor_data_32(int *val, u32 idx)
+{
+	int tmp[3];
+
+	if (idx < MAX_AXIS_REMAP_TAB_SZ) {
+		tmp[0] = val[axis_table[idx].src_x] * axis_table[idx].sign_x;
+		tmp[1] = val[axis_table[idx].src_y] * axis_table[idx].sign_y;
+		tmp[2] = val[axis_table[idx].src_z] * axis_table[idx].sign_z;
+
+		memcpy(val, &tmp, sizeof(tmp));
+	}
+}
+
 int sensors_create_symlink(struct kobject *target, const char *name)
 {
 	int err = 0;
@@ -189,11 +204,12 @@ void sensors_unregister(struct device *dev,
 
 void destroy_sensor_class(void)
 {
+#ifdef CONFIG_ADSP_FACTORY
 	if (sensors_class) {
 		class_destroy(sensors_class);
 		sensors_class = NULL;
 	}
-
+#endif
 	if (sensors_event_class) {
 		device_destroy(sensors_event_class, symlink_dev->devt);
 		class_destroy(sensors_event_class);
@@ -202,17 +218,25 @@ void destroy_sensor_class(void)
 	}
 }
 
+#ifdef CONFIG_ADSP_FACTORY
+
+extern  struct class* get_adsp_sensor_class( void );
+#endif
+
 static int __init sensors_class_init(void)
 {
 	pr_info("[SENSORS CORE] sensors_class_init\n");
 
+#ifdef CONFIG_ADSP_FACTORY
+	sensors_class = get_adsp_sensor_class();
+#else
 	sensors_class = class_create(THIS_MODULE, "sensors");
 	if (IS_ERR(sensors_class)) {
 		pr_err("%s, create sensors_class is failed.(err=%ld)\n",
 			__func__, IS_ERR(sensors_class));
 		return PTR_ERR(sensors_class);
 	}
-
+#endif
 	/* For symbolic link */
 	sensors_event_class = class_create(THIS_MODULE, "sensor_event");
 	if (IS_ERR(sensors_event_class)) {

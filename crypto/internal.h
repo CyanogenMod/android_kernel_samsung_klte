@@ -36,6 +36,9 @@
  * FIPS_FUNC_TEST 3 will make sure all the logs needed in no error mode
  * FIPS_FUNC_TEST 4 will make the necessary dumps for zeroization test
  * FIPS_FUNC_TEST 5 will make the continous PRNG test fail
+ * FIPS_FUNC_TEST 6 will make the SHA1 test fail
+ * FIPS_FUNC_TEST 7 will make the TDES test fail
+ * FIPS_FUNC_TEST 8 will make the RNG test fail
  */
 
 
@@ -74,7 +77,7 @@ extern struct blocking_notifier_head crypto_chain;
 bool in_fips_err(void);
 void set_in_fips_err(void);
 void crypto_init_proc(int *fips_error);
-void do_integrity_check(void);
+int do_integrity_check(void);
 int testmgr_crypto_proc_init(void);
 #else
 void __init crypto_init_proc(void);

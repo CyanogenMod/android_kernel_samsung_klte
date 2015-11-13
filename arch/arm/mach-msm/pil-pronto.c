@@ -62,6 +62,9 @@
 
 #define PRONTO_PMU_CCPU_BOOT_REMAP_ADDR			0x2004
 
+#define PRONTO_PMU_SPARE				0x1088
+#define PRONTO_PMU_SPARE_SSR_BIT			BIT(23)
+
 #define CLK_CTL_WCNSS_RESTART_BIT			BIT(0)
 
 #define AXI_HALTREQ					0x0
@@ -85,6 +88,7 @@ struct pronto_data {
 	bool crash;
 	struct delayed_work cancel_vote_work;
 	struct ramdump_device *ramdump_dev;
+	struct work_struct wcnss_wdog_bite_work;
 };
 
 static int pil_pronto_make_proxy_vote(struct pil_desc *pil)
@@ -322,6 +326,16 @@ static irqreturn_t wcnss_err_fatal_intr_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void wcnss_wdog_bite_work_hdlr(struct work_struct *wcnss_work)
+{
+	struct pronto_data *drv = container_of(wcnss_work, struct pronto_data,
+		wcnss_wdog_bite_work);
+
+	wcnss_log_debug_regs_on_bite();
+
+	restart_wcnss(drv);
+}
+
 static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 {
 	struct pronto_data *drv = subsys_to_drv(dev_id);
@@ -334,10 +348,9 @@ static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 		pr_err("Ignoring wcnss bite irq, restart in progress\n");
 		return IRQ_HANDLED;
 	}
-	wcnss_log_debug_regs_on_bite();
 
 	drv->restart_inprogress = true;
-	restart_wcnss(drv);
+	schedule_work(&drv->wcnss_wdog_bite_work);
 
 	return IRQ_HANDLED;
 }
@@ -366,7 +379,15 @@ static int wcnss_powerup(const struct subsys_desc *subsys)
 	struct pronto_data *drv = subsys_to_drv(subsys);
 	struct platform_device *pdev = wcnss_get_platform_device();
 	struct wcnss_wlan_config *pwlanconfig = wcnss_get_wlan_config();
-	int    ret = -1;
+	void __iomem *base = drv->base;
+	u32 reg;
+	int ret = -1;
+
+	if (base) {
+		reg = readl_relaxed(base + PRONTO_PMU_SPARE);
+		reg |= PRONTO_PMU_SPARE_SSR_BIT;
+		writel_relaxed(reg, base + PRONTO_PMU_SPARE);
+	}
 
 	if (pdev && pwlanconfig)
 		ret = wcnss_wlan_power(&pdev->dev, pwlanconfig,
@@ -490,6 +511,7 @@ static int __devinit pil_pronto_probe(struct platform_device *pdev)
 	drv->subsys_desc.wdog_bite_handler = wcnss_wdog_bite_irq_hdlr;
 
 	INIT_DELAYED_WORK(&drv->cancel_vote_work, wcnss_post_bootup);
+	INIT_WORK(&drv->wcnss_wdog_bite_work, wcnss_wdog_bite_work_hdlr);
 
 	drv->subsys = subsys_register(&drv->subsys_desc);
 	if (IS_ERR(drv->subsys)) {

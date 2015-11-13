@@ -121,7 +121,6 @@ config OF_BATTERYDATA
 config OF_SUBCMDLINE_PARSE
 	bool "subcmdline"
 	default n
-	depends on W1
 	help
 	  OpenFirmware subcmdline parsing, it is add to meet
 		many customized bootargs.

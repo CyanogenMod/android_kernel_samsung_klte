@@ -48,6 +48,10 @@ static int err_fg_working;
 static int lcd_attached;
 static int lcd_id;
 int get_lcd_attached(void);
+extern int system_rev;
+void __iomem *virt_mmss_gp0_base;
+#define MMSS_GP0_BASE 0xFD8C3420
+#define MMSS_GP0_SIZE  0x28
 
 #if defined(CONFIG_TC358764_I2C_CONTROL)
 struct i2c_client *lvds_i2c_client;
@@ -372,8 +376,8 @@ void mdss_dsi_tc358764_panel_reset(struct mdss_panel_data *pdata, int enable)
 
 		if (gpio_is_valid(msd.bl_ldi_en)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
-				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-				GPIO_CFG_ENABLE);
+				GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
+				GPIO_CFG_DISABLE);
 			if (rc)
 				pr_err("tlmm config bl_ldi_en failed, rc=%d\n",rc);
 		}
@@ -393,22 +397,30 @@ void mdss_dsi_tc358764_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 		if (gpio_is_valid(msd.lcd_en_gpio))
 			gpio_set_value_cansleep(msd.lcd_en_gpio,0);
+#if defined(CONFIG_MACH_MATISSELTE_USC)
 		if (gpio_is_valid(msd.bl_ldi_en)) {
 			gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
 				GPIO_CFG_DISABLE);
 		}
+#else
+		if (gpio_is_valid(msd.bl_ldi_en)) {
+			gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
+				GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
+				GPIO_CFG_DISABLE);
+		}
+#endif
 		if (gpio_is_valid(msd.bl_sda)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_sda, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-				GPIO_CFG_ENABLE);
+				GPIO_CFG_DISABLE);
 			if (rc)
 				pr_err("tlmm config bl_sda failed, rc=%d\n",rc);
 		}
 		if (gpio_is_valid(msd.bl_scl)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_scl, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-				GPIO_CFG_ENABLE);
+				GPIO_CFG_DISABLE);
 			if (rc)
 				pr_err("tlmm config bl_scl failed, rc=%d\n",rc);
 		}
@@ -837,7 +849,12 @@ static int mdss_panel_parse_dt_gpio(struct device_node *np,
 			gpio_free(msd.bl_ldi_en);
 
 		} else {
+			if(system_rev>4)
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
+					GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
+					GPIO_CFG_DISABLE);
+			else
+				rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
 					GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
 					GPIO_CFG_ENABLE);
 			if (rc)
@@ -1447,6 +1464,11 @@ int mdss_dsi_panel_init(struct device_node *node,
 	else
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 
+	virt_mmss_gp0_base = ioremap(MMSS_GP0_BASE,MMSS_GP0_SIZE);
+	if(virt_mmss_gp0_base == NULL) {
+		pr_err("%s: I/O remap failed \n", __func__);
+		return 0;
+	}
 
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {

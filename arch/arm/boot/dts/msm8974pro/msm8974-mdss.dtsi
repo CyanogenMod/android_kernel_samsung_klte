@@ -66,7 +66,7 @@
 			compatible = "qcom,mdss-fb";
 			qcom,memory-reservation-type = "EBI1";
 			qcom,memory-reservation-size = <0x800000>;
-			qcom,memblock-reserve = <0x03200000 0x01E00000>;
+			qcom,memblock-reserve = <0x03200000 0x00F00000>;
 		};
 
 		mdss_fb1: qcom,mdss_fb_external {
@@ -108,7 +108,7 @@
 				qcom,supply-enable-load = <100000>;
 				qcom,supply-disable-load = <100>;
 				qcom,supply-pre-on-sleep = <0>;
-				qcom,supply-post-on-sleep = <20>;
+				qcom,supply-post-on-sleep = <0>;
 				qcom,supply-pre-off-sleep = <0>;
 				qcom,supply-post-off-sleep = <0>;
 		};
@@ -119,7 +119,7 @@
 				qcom,supply-enable-load = <100000>;
 				qcom,supply-disable-load = <100>;
 				qcom,supply-pre-on-sleep = <0>;
-				qcom,supply-post-on-sleep = <20>;
+				qcom,supply-post-on-sleep = <0>;
 				qcom,supply-pre-off-sleep = <0>;
 				qcom,supply-post-off-sleep = <0>;
 		};

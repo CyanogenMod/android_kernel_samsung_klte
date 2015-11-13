@@ -27,12 +27,17 @@
 
 #include "../../gpio/gpio-msm-common.h"
 
+#define MAX_SAMPLE	30
+
 #define gpio_direction_input(gpio) __msm_gpio_set_config_direction_no_log(gpio, 1, 0)
 #define gpio_direction_output(gpio, val) __msm_gpio_set_config_direction_no_log(gpio, 0, val)
 #define gpio_set_value_msm(gpio, val) __msm_gpio_set_inout_no_log(gpio, val)
 #define gpio_get_value_msm(gpio) __msm_gpio_get_inout_no_log(gpio)
 
 static DEFINE_SPINLOCK(w1_gpio_msm_lock);
+#if defined(CONFIG_W1_FAST_CHECK)
+bool w1_is_resumed;
+#endif
 
 static int w1_delay_parm = 1;
 static void w1_delay(unsigned long tm)
@@ -307,9 +312,8 @@ static u8 w1_gpio_reset_bus(void *data)
 	struct w1_gpio_msm_platform_data *pdata = data;
 	void	(*write_bit)(void *, u8);
 	unsigned long irq_flags;
-	int temp_read[15]={1, 1, 1, 1, 1,
-			   1, 1, 1, 1, 1,
-			   1, 1, 1, 1, 1};
+	int temp_read[MAX_SAMPLE]={'1',};
+	int loop_cnt = 3;
 
 	if (pdata->is_open_drain) {
 		write_bit = w1_gpio_write_bit_val;
@@ -318,32 +322,42 @@ static u8 w1_gpio_reset_bus(void *data)
 	}
 
 	spin_lock_irqsave(&w1_gpio_msm_lock, irq_flags);
-	write_bit(data, 0);
-		/* minimum 48, max 80 us(In DS Documnet)
-		 * be nice and sleep, except 18b20 spec lists 960us maximum,
-		 * so until we can sleep with microsecond accuracy, spin.
-		 * Feel free to come up with some other way to give up the
-		 * cpu for such a short amount of time AND get it back in
-		 * the maximum amount of time.
+
+	while (loop_cnt > 0) {
+		write_bit(data, 0);
+			/* minimum 48, max 80 us(In DS Documnet)
+			 * be nice and sleep, except 18b20 spec lists 960us maximum,
+			 * so until we can sleep with microsecond accuracy, spin.
+			 * Feel free to come up with some other way to give up the
+			 * cpu for such a short amount of time AND get it back in
+			 * the maximum amount of time.
+			 */
+		(pdata->slave_speed == 0)? __const_udelay(500*UDELAY_MULT) : __const_udelay(50*UDELAY_MULT);
+		write_bit(data, 1);
+
+		(pdata->slave_speed == 0)? __const_udelay(60*UDELAY_MULT) : __const_udelay(1*UDELAY_MULT);
+
+		for(i=0;i<MAX_SAMPLE;i++)
+			temp_read[i] = gpio_get_value_msm(pdata->pin);
+
+		for(i=0;i<MAX_SAMPLE;i++)
+			result &= temp_read[i];
+
+		/* minmum 70 (above) + 410 = 480 us
+		 * There aren't any timing requirements between a reset and
+		 * the following transactions.  Sleeping is safe here.
 		 */
-	(pdata->slave_speed == 0)? w1_delay(500) : w1_delay(50);
-	write_bit(data, 1);
+		/* w1_delay(410); min required time */
+		(pdata->slave_speed == 0)? msleep(1) : __const_udelay(40*UDELAY_MULT);
 
-	(pdata->slave_speed == 0)? w1_delay(60) : w1_delay(6);
-
-	for(i=0;i<15;i++)
-		temp_read[i] = gpio_get_value_msm(pdata->pin);
-
-	for(i=0;i<15;i++)
-		result &= temp_read[i];
-	/* minmum 70 (above) + 410 = 480 us
-	 * There aren't any timing requirements between a reset and
-	 * the following transactions.  Sleeping is safe here.
-	 */
-	/* w1_delay(410); min required time */
-	(pdata->slave_speed == 0)? msleep(1) : w1_delay(40);
+		if (result)
+			loop_cnt--;
+		else
+			break;
+	}
 
 	spin_unlock_irqrestore(&w1_gpio_msm_lock, irq_flags);
+
 	return result;
 }
 
@@ -554,6 +568,10 @@ static int w1_gpio_msm_resume(struct platform_device *pdev)
 
 	gpio_tlmm_config(GPIO_CFG(pdata->pin, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 	gpio_direction_output(pdata->pin, 1);
+
+#if defined(CONFIG_W1_FAST_CHECK)
+	w1_is_resumed = true;
+#endif
 #ifdef CONFIG_W1_WORKQUEUE
 	schedule_delayed_work(&w1_gdev->w1_dwork, HZ * 2);
 #endif

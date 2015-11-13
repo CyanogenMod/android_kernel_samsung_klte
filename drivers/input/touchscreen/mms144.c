@@ -59,8 +59,6 @@
 #define MAX_FINGERS		10
 #define MAX_WIDTH		30
 #define MAX_PRESSURE		255
-#define MAX_ANGLE		90
-#define MIN_ANGLE		-90
 
 /* Registers */
 #define MMS_MODE_CONTROL	0x01
@@ -843,7 +841,6 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 #endif
 		input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, tmp[6]);
 		input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, tmp[7]);
-		input_report_abs(info->input_dev, ABS_MT_ANGLE, angle);
 		input_report_abs(info->input_dev, ABS_MT_PALM, palm);
 #if defined(SEC_TSP_DEBUG)
 		if (info->finger_state[id] == 0) {
@@ -1388,7 +1385,7 @@ int mms100_ISC_download_mbinary(struct mms_ts_info *info)
 
 	pr_info("[TSP ISC] %s\n", __func__);
 
-	mms100_reset(info);
+	mms_pwr_on_reset(info);
 /*
 	ret_msg = mms100_check_operating_mode(_client, EC_BOOT_ON_SUCCEEDED);
 	if (ret_msg != ISC_SUCCESS)
@@ -2213,7 +2210,7 @@ static void get_raw_data_all(struct mms_ts_info *info, u8 cmd)
 
 		/* wating for the interrupt */
 		while (gpio_get_value(gpio))
-			udelay(100);
+			udelay(30);
 	}
 
 	max_value = 0;
@@ -2249,21 +2246,21 @@ static void get_raw_data_all(struct mms_ts_info *info, u8 cmd)
 
 			if (cmd == MMS_VSC_CMD_INTENSITY) {
 				info->intensity[j * RX_NUM + i] = raw_data;
-				dev_dbg(&info->client->dev, "[TSP] intensity[%d][%d] = %d\n",
-					i, j, info->intensity[j * RX_NUM + i]);
+				/*dev_dbg(&info->client->dev, "[TSP] intensity[%d][%d] = %d\n",
+					i, j, info->intensity[j * RX_NUM + i]);*/
 			} else if (cmd == MMS_VSC_CMD_CM_DELTA) {
 				info->inspection[j * RX_NUM + i] = raw_data;
-				dev_dbg(&info->client->dev, "[TSP] delta[%d][%d] = %d\n",
-					i, j, info->inspection[j * RX_NUM + i]);
+				/*dev_dbg(&info->client->dev, "[TSP] delta[%d][%d] = %d\n",
+					i, j, info->inspection[j * RX_NUM + i]);*/
 			} else if (cmd == MMS_VSC_CMD_CM_ABS) {
 				info->raw[j * RX_NUM + i] = raw_data;
-				dev_dbg(&info->client->dev, "[TSP] raw[%d][%d] = %d\n",
-					i, j, info->raw[j * RX_NUM + i]);
+				/*dev_dbg(&info->client->dev, "[TSP] raw[%d][%d] = %d\n",
+					i, j, info->raw[j * RX_NUM + i]);*/
 			} else if (cmd == MMS_VSC_CMD_REFER) {
 				info->reference[j * RX_NUM + i] =
 						raw_data >> 3;
-				dev_dbg(&info->client->dev, "[TSP] reference[%d][%d] = %d\n",
-					i, j, info->reference[j * RX_NUM + i]);
+				/*dev_dbg(&info->client->dev, "[TSP] reference[%d][%d] = %d\n",
+					i, j, info->reference[j * RX_NUM + i]);*/
 			}
 		}
 	}
@@ -2450,6 +2447,8 @@ static void fw_update(void *device_data)
 			&& fw_ver >= fw_bin_ver) {
 		dev_info(&client->dev,
 			"fw version update does not need\n");
+		snprintf(result_buff, sizeof(result_buff), "OK");
+		set_cmd_result(info, result_buff, strnlen(result_buff, sizeof(result_buff)));
 		goto do_not_need_update;
 	}
 
@@ -2616,8 +2615,7 @@ static void get_config_ver(void *device_data)
 
 	set_default_result(info);
 
-//	snprintf(buff, sizeof(buff), "%s", info->config_fw_version);
-	snprintf(buff, sizeof(buff), "N/A");
+	snprintf(buff, sizeof(buff), "I9301I_Me_0114");
 	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
 	info->cmd_state = 2;
 	dev_info(&info->client->dev, "%s: %s(%d)\n", __func__,
@@ -3341,7 +3339,7 @@ int __devinit mms_ts_probe(struct i2c_client *client,
 	if (!pdata)
 		return -EINVAL;
 
-	melfas_request_gpio(pdata);
+
 #endif
 	info = kzalloc(sizeof(struct mms_ts_info), GFP_KERNEL);
 	if (!info) {
@@ -3381,10 +3379,11 @@ int __devinit mms_ts_probe(struct i2c_client *client,
 		info->max_x = 720;
 		info->max_y = 1280;
 	}
-
+	i2c_set_clientdata(client, info);
 	melfas_vdd_on(info, 1);
 	msleep(100);
-	i2c_set_clientdata(client, info);
+	melfas_request_gpio(pdata);
+
 
 	info->callbacks.inform_charger = melfas_ta_cb;
 	if (info->register_cb)
@@ -3410,8 +3409,6 @@ int __devinit mms_ts_probe(struct i2c_client *client,
 				0, MAX_PRESSURE, 0, 0);
 	input_set_abs_params(info->input_dev, ABS_MT_TOUCH_MINOR,
 				0, MAX_PRESSURE, 0, 0);
-	input_set_abs_params(input_dev, ABS_MT_ANGLE,
-				MIN_ANGLE, MAX_ANGLE, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_PALM,
 				0, 1, 0, 0);
 	input_set_drvdata(input_dev, info);

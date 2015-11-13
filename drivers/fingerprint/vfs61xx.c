@@ -63,6 +63,7 @@ struct vfsspi_devData {
 	unsigned int drdyPin;	/* DRDY GPIO pin number */
 	unsigned int sleepPin;	/* Sleep GPIO pin number */
 	unsigned int ldo_pin;	/* Ldo GPIO pin number */
+	unsigned int ldo_pin2;	/* Ldo2 GPIO pin number */
 	/* User process ID,
 	 * to which the kernel signal indicating DRDY event is to be sent */
 	int userPID;
@@ -81,6 +82,11 @@ struct vfsspi_devData {
 	unsigned int clkpin;
 	bool isGpio_cfgDone;
 	bool enabled_clk;
+	unsigned int set_altfunc;
+	unsigned int mosi_alt;
+	unsigned int miso_alt;
+	unsigned int cs_alt;
+	unsigned int clk_alt;
 #ifdef FEATURE_SPI_WAKELOCK
 	struct wake_lock fp_spi_lock;
 #endif
@@ -99,7 +105,16 @@ struct vfsspi_devData {
 	struct workqueue_struct *wq_dbg;
 	struct timer_list dbg_timer;
 	bool tz_mode;
+	unsigned int sensortype;
 };
+
+enum {
+	SENSOR_VIPER = 0,
+	SENSOR_RAPTOR,
+	SENSOR_FAILED,
+};
+
+char sensor_status[3][7] = {"viper", "raptor", "failed"};
 
 struct vfsspi_devData *g_data;
 
@@ -495,7 +510,15 @@ void vfsspi_regulator_onoff(struct vfsspi_devData *vfsSpiDev, bool onoff)
 					usleep_range(2950, 3000);
 				}
 				gpio_set_value(vfsSpiDev->ldo_pin, 1);
+				if (vfsSpiDev->ldo_pin2) {
+					mdelay(1);
+					gpio_set_value(vfsSpiDev->ldo_pin2, 1);
+				}
 			} else {
+				if (vfsSpiDev->ldo_pin2) {
+					gpio_set_value(vfsSpiDev->ldo_pin2, 0);
+					mdelay(1);
+				}
 				gpio_set_value(vfsSpiDev->ldo_pin, 0);
 				if (vfsSpiDev->ocp_en)
 					gpio_set_value(vfsSpiDev->ocp_en, 0);
@@ -543,33 +566,65 @@ void vfsspi_hardReset(struct vfsspi_devData *vfsSpiDev)
 static void vfsspi_gpio_config(struct vfsspi_devData *data, int onoff)
 {
 	if (onoff) {
-		if (data->mosipin)
-			gpio_tlmm_config(GPIO_CFG(data->mosipin, 2,
-				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
-				GPIO_CFG_2MA), 1);
-		else
-			pr_err("%s: can't get mosipin\n", __func__);
+		if (data->set_altfunc) {
+			pr_info("%s: set_altfunc\n", __func__);
+			if (data->mosipin)
+				gpio_tlmm_config(GPIO_CFG(data->mosipin,
+					data->mosi_alt, GPIO_CFG_INPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get mosipin\n", __func__);
 
-		if (data->misopin)
-			gpio_tlmm_config(GPIO_CFG(data->misopin, 2,
-				GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
-				GPIO_CFG_2MA), 1);
-		else
-			pr_err("%s: can't get misopin\n", __func__);
+			if (data->misopin)
+				gpio_tlmm_config(GPIO_CFG(data->misopin,
+					data->miso_alt, GPIO_CFG_INPUT,
+					GPIO_CFG_PULL_UP, GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get misopin\n", __func__);
 
-		if (data->cspin)
-			gpio_tlmm_config(GPIO_CFG(data->cspin, 2,
-				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
-				GPIO_CFG_2MA), 1);
-		else
-			pr_err("%s: can't get cspin\n", __func__);
+			if (data->cspin)
+				gpio_tlmm_config(GPIO_CFG(data->cspin,
+					data->cs_alt, GPIO_CFG_INPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get cspin\n", __func__);
 
-		if (data->clkpin)
-			gpio_tlmm_config(GPIO_CFG(data->clkpin, 3,
-				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
-				GPIO_CFG_2MA), 1);
-		else
-			pr_err("%s: can't get clkpin\n", __func__);
+			if (data->clkpin)
+				gpio_tlmm_config(GPIO_CFG(data->clkpin,
+					data->clk_alt, GPIO_CFG_INPUT,
+					GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get clkpin\n", __func__);
+
+		} else { /* initial code for K project*/
+			if (data->mosipin)
+				gpio_tlmm_config(GPIO_CFG(data->mosipin, 2,
+					GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get mosipin\n", __func__);
+
+			if (data->misopin)
+				gpio_tlmm_config(GPIO_CFG(data->misopin, 2,
+					GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+					GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get misopin\n", __func__);
+
+			if (data->cspin)
+				gpio_tlmm_config(GPIO_CFG(data->cspin, 2,
+					GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get cspin\n", __func__);
+
+			if (data->clkpin)
+				gpio_tlmm_config(GPIO_CFG(data->clkpin, 3,
+					GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA), 1);
+			else
+				pr_err("%s: can't get clkpin\n", __func__);
+		}
 	} else {
 		if (data->mosipin)
 			gpio_tlmm_config(GPIO_CFG(data->mosipin, 0,
@@ -1127,6 +1182,10 @@ static void vfsspi_ocp_work_func(struct work_struct *work)
 			struct vfsspi_devData, ocp_work);
 	if (!gpio_get_value(vfsSpiDev->ocp_pin)) {
 		pr_info("%s ldo off!!!\n", __func__);
+		if (vfsSpiDev->ldo_pin2) {
+			gpio_set_value(vfsSpiDev->ldo_pin2, 0);
+			mdelay(1);
+		}
 		gpio_set_value(vfsSpiDev->ldo_pin, 0);
 		vfsSpiDev->ocp_state = 1;
 		disable_irq_wake(vfsSpiDev->ocp_irq);
@@ -1163,10 +1222,26 @@ int vfsspi_platformInit(struct vfsspi_devData *vfsSpiDev)
 				__func__);
 			goto done;
 		}
+		if (vfsSpiDev->ldo_pin2) {
+			status = gpio_request(vfsSpiDev->ldo_pin2, "vfsspi_ldo_en2");
+			if (status < 0) {
+				pr_err("%s gpio_request vfsspi_ldo_en2 failed\n",
+					__func__);
+				goto done;
+			}
+		}
 		if (vfsSpiDev->ldocontrol) {
 			gpio_direction_output(vfsSpiDev->ldo_pin, 0);
+			if (vfsSpiDev->ldo_pin2) {
+				mdelay(1);
+				gpio_direction_output(vfsSpiDev->ldo_pin2, 0);
+			}
 			pr_info("%s ldo off\n", __func__);
 		} else {
+			if (vfsSpiDev->ldo_pin2) {
+				gpio_direction_output(vfsSpiDev->ldo_pin2, 1);
+				mdelay(1);
+			}
 			gpio_direction_output(vfsSpiDev->ldo_pin, 1);
 			pr_info("%s ldo on\n", __func__);
 		}
@@ -1272,6 +1347,10 @@ int vfsspi_platformInit(struct vfsspi_devData *vfsSpiDev)
 			__func__, gpio_get_value(vfsSpiDev->drdyPin),
 			 __func__, gpio_get_value(vfsSpiDev->sleepPin),
 			 __func__, gpio_get_value(vfsSpiDev->ldo_pin));
+		if (vfsSpiDev->ldo_pin2) {
+			pr_info("%s ldo en2 value =%d\n",
+				__func__, gpio_get_value(vfsSpiDev->ldo_pin2));
+		}
 #ifndef ENABLE_SENSORS_FPRINT_SECURE
 		vfsSpiDev->freqTable = freqTable;
 		vfsSpiDev->freqTableSize = sizeof(freqTable);
@@ -1303,6 +1382,8 @@ void vfsspi_platformUninit(struct vfsspi_devData *vfsSpiDev)
 		vfsSpiDev->drdy_irq_flag = DRDY_IRQ_DISABLE;
 		if (vfsSpiDev->ldo_pin)
 			gpio_free(vfsSpiDev->ldo_pin);
+		if (vfsSpiDev->ldo_pin2)
+			gpio_free(vfsSpiDev->ldo_pin2);
 		gpio_free(vfsSpiDev->sleepPin);
 		gpio_free(vfsSpiDev->drdyPin);
 		if (vfsSpiDev->ocp_en)
@@ -1331,7 +1412,7 @@ static int vfsspi_parse_dt(struct device *dev,
 	gpio = of_get_named_gpio_flags(np, "vfsspi-drdyPin",
 		0, &flags);
 	if (gpio < 0) {
-		gpio = errorno;
+		errorno = gpio;
 		goto dt_exit;
 	} else {
 		data->drdyPin = gpio;
@@ -1376,6 +1457,19 @@ static int vfsspi_parse_dt(struct device *dev,
 		pr_info("%s: ldo_pin=%d\n",
 			__func__, data->ldo_pin);
 	}
+	if (!of_find_property(np, "vfsspi-ldoPin2", NULL)) {
+		pr_err("%s: not set ldo2 in dts\n", __func__);
+	} else {
+		gpio = of_get_named_gpio(np, "vfsspi-ldoPin2", 0);
+		if (gpio < 0) {
+			data->ldo_pin2 = 0;
+			pr_err("%s: fail to get ldo_pin2\n", __func__);
+		} else {
+			data->ldo_pin2 = gpio;
+			pr_info("%s: ldo_pin2=%d\n",
+				__func__, data->ldo_pin2);
+		}
+	}
 
 	if (of_property_read_u32(np, "vfsspi-ldocontrol",
 		&data->ldocontrol))
@@ -1392,6 +1486,18 @@ static int vfsspi_parse_dt(struct device *dev,
 		data->cspin = 0;
 	if (of_property_read_u32(np, "vfsspi-clkpin", &data->clkpin))
 		data->clkpin = 0;
+
+	if (of_property_read_u32(np, "vfsspi-set_altfunc", &data->set_altfunc))
+		data->set_altfunc = 0;
+	if (of_property_read_u32(np, "vfsspi-mosi_alt", &data->mosi_alt))
+		data->mosi_alt = 0;
+	if (of_property_read_u32(np, "vfsspi-miso_alt", &data->miso_alt))
+		data->miso_alt = 0;
+	if (of_property_read_u32(np, "vfsspi-cs_alt", &data->cs_alt))
+		data->cs_alt = 0;
+	if (of_property_read_u32(np, "vfsspi-clk_alt", &data->clk_alt))
+		data->clk_alt = 0;
+
 	data->tz_mode = true;
 #endif
 	if (of_property_read_u32(np, "vfsspi-orient",
@@ -1406,66 +1512,58 @@ dt_exit:
 }
 
 #ifdef CONFIG_SENSORS_FINGERPRINT_SYSFS
-static ssize_t vfsspi_ocp_check_show(struct device *dev,
+
+static ssize_t vfsspi_type_check_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	struct vfsspi_devData *data = dev_get_drvdata(dev);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n", data->ocp_state);
+	return snprintf(buf, PAGE_SIZE, "%u\n", data->sensortype);
 }
 
-static ssize_t vfsspi_ocp_check_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct vfsspi_devData *data = dev_get_drvdata(dev);
-
-	if (sysfs_streq(buf, "1"))
-		data->ocp_state = 1;
-	else if (sysfs_streq(buf, "0"))
-		data->ocp_state = 0;
-	pr_info("%s: data->ocp_state = %d\n",
-		__func__, data->ocp_state);
-	if (data->ocp_state)
-		vfsspi_regulator_onoff(data, false);
-
-	return size;
-}
-
-static DEVICE_ATTR(ocp_check, S_IRUGO | S_IWUSR | S_IWGRP,
-	vfsspi_ocp_check_show, vfsspi_ocp_check_store);
+static DEVICE_ATTR(type_check, S_IRUGO,
+	vfsspi_type_check_show, NULL);
 
 static struct device_attribute *fp_attrs[] = {
-	&dev_attr_ocp_check,
+	&dev_attr_type_check,
 	NULL,
 };
 #endif
 
 static void vfsspi_work_func_debug(struct work_struct *work)
 {
+	u8 ldo_value = 0;
+	if (g_data->ldo_pin2 == 0) {
+		ldo_value = gpio_get_value(g_data->ldo_pin);
+	} else {
+		ldo_value = (gpio_get_value(g_data->ldo_pin2) << 1 )
+					| gpio_get_value(g_data->ldo_pin);
+	}
+
 	if (g_data->ocp_pin)
-		pr_info("%s ocp state: %d, ocp pin: %d,"
-			" ldo pin: %d, sleep pin: %d, tz_mode: %d\n",
+		pr_info("%s ocpstate: %d, ocppin: %d,"
+			" ldo: %d, sleep: %d, tz: %d, type: %s\n",
 			__func__, g_data->ocp_state,
-			gpio_get_value(g_data->ocp_pin),
-			gpio_get_value(g_data->ldo_pin),
+			gpio_get_value(g_data->ocp_pin), ldo_value,
 			gpio_get_value(g_data->sleepPin),
-			g_data->tz_mode);
+			g_data->tz_mode,
+			sensor_status[g_data->sensortype]);
 	else {
 		if (g_data->ocp_en)
-			pr_info("%s ocp state: %d, ocp en: %d"
-				" ldo pin: %d, sleep pin: %d, tz_mode: %d\n",
+			pr_info("%s ocpstate: %d, ocpen: %d"
+				" ldo: %d, sleep: %d, tz: %d, type: %s\n",
 				__func__, g_data->ocp_state,
-				gpio_get_value(g_data->ocp_en),
-				gpio_get_value(g_data->ldo_pin),
+				gpio_get_value(g_data->ocp_en), ldo_value,
 				gpio_get_value(g_data->sleepPin),
-				g_data->tz_mode);
+				g_data->tz_mode,
+				sensor_status[g_data->sensortype]);
 		else
-			pr_info("%s ocp state: %d,"
-				" ldo pin: %d, sleep pin: %d, tz_mode: %d\n",
+			pr_info("%s ocpstate: %d,"
+				" ldo: %d, sleep: %d, tz: %d, type: %s\n",
 				__func__, g_data->ocp_state,
-				gpio_get_value(g_data->ldo_pin),
-				gpio_get_value(g_data->sleepPin),
-				g_data->tz_mode);
+				ldo_value, gpio_get_value(g_data->sleepPin),
+				g_data->tz_mode,
+				sensor_status[g_data->sensortype]);
 	}
 }
 
@@ -1488,7 +1586,7 @@ static void vfsspi_timer_func(unsigned long ptr)
 		round_jiffies_up(jiffies + VFSSPI_DEBUG_TIMER_SEC));
 }
 
-#undef TEST_DEBUG
+#define TEST_DEBUG
 
 int vfsspi_probe(struct spi_device *spi)
 {
@@ -1500,14 +1598,13 @@ int vfsspi_probe(struct spi_device *spi)
 	char rx_buf[64] = {0};
 	struct spi_transfer t;
 	struct spi_message m;
-	int i;
 #endif
 	pr_info("%s\n", __func__);
 
 	vfsSpiDev = kzalloc(sizeof(*vfsSpiDev), GFP_KERNEL);
 
 	if (vfsSpiDev == NULL)
-		goto probe_failed;
+		return -ENOMEM;
 
 	if (spi->dev.of_node) {
 		status = vfsspi_parse_dt(&spi->dev, vfsSpiDev);
@@ -1574,10 +1671,15 @@ int vfsspi_probe(struct spi_device *spi)
 
 #ifdef TEST_DEBUG
 	vfsspi_regulator_onoff(vfsSpiDev, true);
+
+	/* check sensor if it is raptor */
+	vfsspi_hardReset(vfsSpiDev);
 	msleep(20);
-	/* Test the SPI driver reply quick */
+
+	tx_buf[0] = 5;
+	tx_buf[1] = 0;
+
 	spi->bits_per_word = 16;
-	spi->max_speed_hz = SLOW_BAUD_RATE;
 	spi->mode = SPI_MODE_0;
 	memset(&t, 0, sizeof(t));
 	t.tx_buf = tx_buf;
@@ -1588,9 +1690,49 @@ int vfsspi_probe(struct spi_device *spi)
 	spi_message_add_tail(&t, &m);
 	pr_info("ValiditySensor: spi_sync returned %d\n",
 		spi_sync(spi, &m));
-	for (i = 0; i < 64; i++)
-		pr_info("%s: %0x\n", __func__, rx_buf[i]);
+
+	if (((rx_buf[0] == 0x98) || (rx_buf[0] == 0xBA))
+		&& ((rx_buf[1] == 0x98) || (rx_buf[1] == 0xBA))) {
+		vfsSpiDev->sensortype = SENSOR_RAPTOR;
+		pr_info("%s sensor type is RAPTOR\n", __func__);
+		goto spi_setup;
+	}
+
+	/* check sensor if it is viper */
+	gpio_set_value(vfsSpiDev->sleepPin, 1);
+	msleep(20);
+
+	tx_buf[0] = 1; /* EP0 Read */
+	tx_buf[1] = 0;
+	spi->bits_per_word = 8;
+	spi->mode = SPI_MODE_0;
+	memset(&t, 0, sizeof(t));
+	t.tx_buf = tx_buf;
+	t.rx_buf = rx_buf;
+	t.len = 6;
+	spi_setup(spi);
+	spi_message_init(&m);
+	spi_message_add_tail(&t, &m);
+	pr_info("%s ValiditySensor: spi_sync returned %d\n",
+		__func__, spi_sync(spi, &m));
+
+	if (((rx_buf[2] == 0x01) || (rx_buf[2] == 0x41))
+		&& (rx_buf[5] == 0x68)) {
+		vfsSpiDev->sensortype = SENSOR_VIPER;
+		pr_info("%s sensor type is VIPER\n", __func__);
+	} else {
+		vfsSpiDev->sensortype = SENSOR_FAILED;
+		pr_info("%s sensor type is FAILED\n", __func__);
+	}
+
+spi_setup:
+	spi->bits_per_word = BITS_PER_WORD;
+	spi->max_speed_hz = SLOW_BAUD_RATE;
+	spi->mode = SPI_MODE_0;
+	status = spi_setup(spi);
 	vfsspi_regulator_onoff(vfsSpiDev, false);
+	gpio_set_value(vfsSpiDev->sleepPin, 0);
+
 #endif
 
 #ifdef CONFIG_SENSORS_FINGERPRINT_SYSFS
@@ -1623,7 +1765,6 @@ int vfsspi_probe(struct spi_device *spi)
 err_create_workqueue:
 parse_dt_failed:
 	kfree(vfsSpiDev);
-probe_failed:
 	return status;
 }
 

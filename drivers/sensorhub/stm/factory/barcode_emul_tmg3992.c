@@ -195,14 +195,14 @@ static ssize_t barcode_led_status_show(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	return snprintf(buf, sizeof(buf), "%u\n", Is_beaming);
+	return snprintf(buf, PAGE_SIZE, "%u\n", Is_beaming);
 }
 
 static ssize_t barcode_ver_check_show(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
 {
-	return snprintf(buf, sizeof(buf), "%u\n", 15);
+	return snprintf(buf, PAGE_SIZE, "%u\n", 15);
 }
 
 static ssize_t barcode_emul_test_store(struct device *dev,

@@ -126,7 +126,7 @@
 		qcom,L2-spm-is-apcs-master;
 	};
 
-	qcom,lpm-levels {
+	lpm_levels: qcom,lpm-levels {
 		compatible = "qcom,lpm-levels";
 		qcom,allow-synced-levels;
 		qcom,default-l2-state = "l2_cache_retention";
@@ -174,11 +174,11 @@
 
 			qcom,system-mode@0 {
 				qcom,l2 = "l2_cache_gdhs";
-				qcom,latency-us = <20000>;
+				qcom,latency-us = <500>;
 				qcom,ss-power = <163>;
-				qcom,energy-overhead = <1577736>;
-				qcom,time-overhead = <5067>;
-				qcom,min-cpu-mode= "pc";
+				qcom,energy-overhead = <577736>;
+				qcom,time-overhead = <1000>;
+				qcom,min-cpu-mode= "standalone_pc";
 				qcom,sync-cpus;
 			};
 
@@ -190,6 +190,7 @@
 				qcom,time-overhead = <6605>;
 				qcom,min-cpu-mode = "pc";
 				qcom,sync-cpus;
+				qcom,send-rpm-sleep-set;
 			};
 		};
 	};
@@ -217,7 +218,7 @@
 			<0xff 18>,  /* APCx_qgicQTmrSecPhysIrptReq */
 			<0xff 19>,  /* APCx_qgicQTmrSecPhysIrptReq */
 			<0xff 25>,  /* APCx_qgicExtFaultIrptReq */
-			<0xff 33>, /*l2_perf_mon*/
+			<0xff 33>,  /* APCC_qgicL2PerfMonIrptReq */
 			<0xff 34>,  /* APCC_qgicL2ErrorIrptReq */
 			<0xff 35>,  /* WDT_barkInt */
 			<0xff 40>,  /* qtimer_phy_irq */
@@ -333,6 +334,7 @@
 		reg = <0xfe805664 0x40>;
 		qcom,pc-mode = "tz_l2_int";
 		qcom,cpus-as-clocks;
+		qcom,lpm-levels = <&lpm_levels>;
 
 		qcom,pm-snoc-client {
 			compatible = "qcom,pm-snoc-client";
@@ -375,5 +377,13 @@
 		compatible = "qcom,rpmrbcpr-stats";
 		reg = <0xfc000000 0x1a0000>;
 		qcom,start-offset = <0x190010>;
+	};
+
+	qcom,rpm-master-stats@fc428150 {
+		compatible = "qcom,rpm-master-stats";
+		reg = <0xfc428150 0x3200>;
+		qcom,masters = "APSS", "MPSS", "LPSS", "PRONTO";
+		qcom,master-stats-version = <2>;
+		qcom,master-offset = <2560>;
 	};
 };

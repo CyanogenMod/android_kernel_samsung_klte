@@ -3368,7 +3368,6 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		break;
 	case V4L2_CID_AUDIO_MUTE:
 		radio->mute_mode.hard_mute = ctrl->value;
-		radio->mute_mode.soft_mute = IOC_SFT_MUTE;
 		retval = hci_set_fm_mute_mode(
 				&radio->mute_mode,
 				radio->fm_hdev);
@@ -3405,7 +3404,7 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			} else {
 				retval = initialise_recv(radio);
 				if (retval < 0) {
-					FMDERR("Error while initialising"
+					FMDERR("Error while initialising"\
 						"radio %d\n", retval);
 					hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 							radio->fm_hdev);
@@ -3434,13 +3433,13 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			} else {
 				retval = initialise_trans(radio);
 				if (retval < 0) {
-					FMDERR("Error while initialising"
+					FMDERR("Error while initialising"\
 							"radio %d\n", retval);
 					hci_cmd(HCI_FM_DISABLE_TRANS_CMD,
 								radio->fm_hdev);
 					radio->mode = FM_OFF;
 					goto END;
-                                 }
+				}
 			}
 			if (radio->mode == FM_TRANS_TURNING_ON) {
 				radio->mode = FM_TRANS;
@@ -4153,7 +4152,7 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		wrd.length = RDS_PS0_LEN;
 		memcpy(&wrd.data, &radio->default_data.data,
 				radio->default_data.ret_data_len);
-		wrd.data[RX_REPEATE_BYTE_OFFSET] = ctrl->value;
+		wrd.data[RX_REPEATE_BYTE_OFFSET] = 1;
 
 		retval = hci_def_data_write(&wrd, radio->fm_hdev);
 		if (retval < 0)
@@ -4702,6 +4701,7 @@ static int __init iris_probe(struct platform_device *pdev)
 			memcpy(priv_videodev, radio->videodev,
 				sizeof(struct video_device));
 		} else {
+			mutex_destroy(&radio->lock);
 			video_unregister_device(radio->videodev);
 			video_device_release(radio->videodev);
 			for (; i > -1; i--)

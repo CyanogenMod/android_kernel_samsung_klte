@@ -51,6 +51,10 @@ __stringify(CY_DRIVER_NAME)		    \
 /* abs settings */
 #define CY_IGNORE_VALUE             0xFFFF
 
+/* FW VERSION */
+#define CY_HW_VERSION 0x02
+#define CY_FW_VERSION 0x1900
+
 enum cyttsp5_core_platform_flags {
 	CY_CORE_FLAG_NONE,
 	CY_CORE_FLAG_WAKE_ON_GESTURE,

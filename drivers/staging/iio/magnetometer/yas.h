@@ -25,7 +25,7 @@
 
 #include "yas_cfg.h"
 
-#define YAS_VERSION	"10.0.0e"	/*!< MS-x Driver Version */
+#define YAS_VERSION	"10.2.0c"	/*!< MS-x Driver Version */
 
 /* ----------------------------------------------------------------------------
  *                             Typedef definition
@@ -119,12 +119,12 @@
 #define YLOGE(args)	/*!< Debug log (WARNING) */
 #endif /* DEBUG */
 
-#define YAS_TYPE_ACC_NONE		(0x00000000) /*!< No Acceleration */
-#define YAS_TYPE_MAG_NONE		(0x00000000) /*!< No Magnetometer */
-#define YAS_TYPE_GYRO_NONE		(0x00000000) /*!< No Gyroscope */
-#define YAS_TYPE_A_ACC			(0x00000001) /*!< 3-axis Acceleration */
-#define YAS_TYPE_M_MAG			(0x00000002) /*!< 3-axis Magnetometer */
-#define YAS_TYPE_G_GYRO			(0x00000004) /*!< 3-axis Gyroscope */
+#define YAS_TYPE_ACC_NONE		(0x00000001) /*!< No Acceleration */
+#define YAS_TYPE_MAG_NONE		(0x00000002) /*!< No Magnetometer */
+#define YAS_TYPE_GYRO_NONE		(0x00000004) /*!< No Gyroscope */
+#define YAS_TYPE_A_ACC			(0x00000008) /*!< 3-axis Acceleration */
+#define YAS_TYPE_M_MAG			(0x00000010) /*!< 3-axis Magnetometer */
+#define YAS_TYPE_G_GYRO			(0x00000020) /*!< 3-axis Gyroscope */
 #define YAS_TYPE_AM_ACC			(0x00100000) /*!< 6-axis (Acc+Mag)
 						       Acceleration */
 #define YAS_TYPE_AM_MAG			(0x00200000) /*!< 6-axis (Acc+Mag)
@@ -157,6 +157,8 @@
 #elif YAS_ACC_DRIVER == YAS_ACC_DRIVER_BMA250E
 #define YAS_TYPE_ACC YAS_TYPE_A_ACC
 #elif YAS_ACC_DRIVER == YAS_ACC_DRIVER_BMA254
+#define YAS_TYPE_ACC YAS_TYPE_A_ACC
+#elif YAS_ACC_DRIVER == YAS_ACC_DRIVER_BMA255
 #define YAS_TYPE_ACC YAS_TYPE_A_ACC
 #elif YAS_ACC_DRIVER == YAS_ACC_DRIVER_BMI055
 #define YAS_TYPE_ACC YAS_TYPE_A_ACC
@@ -212,12 +214,16 @@
 #define YAS_TYPE_MAG YAS_TYPE_AM_MAG
 #elif YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS536 /* MS-3W */
 #define YAS_TYPE_MAG YAS_TYPE_M_MAG
+#elif YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS537 /* MS-3T */
+#define YAS_TYPE_MAG YAS_TYPE_M_MAG
 #elif YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS53x
 #define YAS_TYPE_MAG YAS_TYPE_AMG_MAG
 #endif
 
 #if YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_NONE
 #define YAS_TYPE_GYRO YAS_TYPE_GYRO_NONE
+#elif YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_BMG160
+#define YAS_TYPE_GYRO YAS_TYPE_G_GYRO
 #elif YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_BMI055
 #define YAS_TYPE_GYRO YAS_TYPE_G_GYRO
 #elif YAS_GYRO_DRIVER == YAS_GYRO_DRIVER_BMI058
@@ -269,6 +275,27 @@
 /*! YAS532 extension command: obtains last raw data (x, y1, y2, t) */
 #define YAS532_GET_LAST_RAWDATA		(0x00000006)
 
+/*! YAS535 extension command: obtains last raw data (xy1y2[3] t xyz[3]) */
+#define YAS535_GET_LAST_RAWDATA		(0x00000001)
+/*! YAS535 extension command: self test for magnetometer */
+#define YAS535_MAG_SELF_TEST		(0x00000002)
+/*! YAS535 extension command: self test noise for magnetometer */
+#define YAS535_MAG_SELF_TEST_NOISE	(0x00000003)
+/*! YAS535 extension command: obtains the hardware offset */
+#define YAS535_MAG_GET_HW_OFFSET	(0x00000004)
+/*! YAS535 extension command: sets the hardware offset */
+#define YAS535_MAG_SET_HW_OFFSET	(0x00000005)
+/*! YAS535 extension command: obtains the average samples for magnetometer */
+#define YAS535_MAG_GET_AVERAGE_SAMPLE	(0x00000006)
+/*! YAS535 extension command: sets the average samples for magnetometer */
+#define YAS535_MAG_SET_AVERAGE_SAMPLE	(0x00000007)
+/*! YAS535 extension command: self test for accelerometer */
+#define YAS535_ACC_SELF_TEST		(0x00010000)
+/*! YAS535 extension command: obtains the average samples for accelerometer */
+#define YAS535_ACC_GET_AVERAGE_SAMPLE	(0x00020000)
+/*! YAS535 extension command: sets the average samples for accelerometer */
+#define YAS535_ACC_SET_AVERAGE_SAMPLE	(0x00040000)
+
 /*! YAS536 extension command: self test */
 #define YAS536_SELF_TEST		(0x00000001)
 /*! YAS536 extension command: obtains the hardware offset */
@@ -279,6 +306,19 @@
 #define YAS536_SET_AVERAGE_LEN		(0x00000005)
 /*! YAS536 extension command: obtains last raw data (x, y1, y2, t) */
 #define YAS536_GET_LAST_RAWDATA		(0x00000006)
+
+/*! YAS537 extension command: self test */
+#define YAS537_SELF_TEST		(0x00000001)
+/*! YAS537 extension command: self test noise */
+#define YAS537_SELF_TEST_NOISE		(0x00000002)
+/*! YAS537 extension command: obtains last raw data (x, y1, y2, t) */
+#define YAS537_GET_LAST_RAWDATA		(0x00000003)
+/*! YAS537 extension command: obtains the average samples */
+#define YAS537_GET_AVERAGE_SAMPLE	(0x00000004)
+/*! YAS537 extension command: sets the average samples */
+#define YAS537_SET_AVERAGE_SAMPLE	(0x00000005)
+/*! YAS537 extension command: obtains the hardware offset */
+#define YAS537_GET_HW_OFFSET		(0x00000006)
 
 /* ----------------------------------------------------------------------------
  *                            Structure definition
@@ -676,13 +716,12 @@ struct yas_acc_mag_driver {
 	int (*measure)(int32_t type, struct yas_data *raw, int num);
 	/**
 	 * Extension command execution specific to the part number
-	 * @param[in] type Sensor type
 	 * @param[in] cmd Extension command id
 	 * @param[out] result Extension command result
 	 * @retval #YAS_NO_ERROR Success
 	 * @retval Negative Failure
 	 */
-	int (*ext)(int32_t type, int32_t cmd, void *result);
+	int (*ext)(int32_t cmd, void *result);
 	struct yas_driver_callback callback; /*!< Callback functions */
 };
 
@@ -760,13 +799,12 @@ struct yas_acc_gyro_driver {
 	int (*measure)(int32_t type, struct yas_data *raw, int num);
 	/**
 	 * Extension command execution specific to the part number
-	 * @param[in] type Sensor type
 	 * @param[in] cmd Extension command id
 	 * @param[out] result Extension command result
 	 * @retval #YAS_NO_ERROR Success
 	 * @retval Negative Failure
 	 */
-	int (*ext)(int32_t type, int32_t cmd, void *result);
+	int (*ext)(int32_t cmd, void *result);
 	struct yas_driver_callback callback; /*!< Callback functions */
 };
 
@@ -844,13 +882,12 @@ struct yas_acc_mag_gyro_driver {
 	int (*measure)(int32_t type, struct yas_data *raw, int num);
 	/**
 	 * Extension command execution specific to the part number
-	 * @param[in] type Sensor type
 	 * @param[in] cmd Extension command id
 	 * @param[out] result Extension command result
 	 * @retval #YAS_NO_ERROR Success
 	 * @retval Negative Failure
 	 */
-	int (*ext)(int32_t type, int32_t cmd, void *result);
+	int (*ext)(int32_t cmd, void *result);
 	struct yas_driver_callback callback; /*!< Callback functions */
 };
 
@@ -923,23 +960,17 @@ struct yas_mag_calib_config {
 		    #YAS_MAG_CALIB_MODE_ELLIPSOID,
 		    #YAS_MAG_CALIB_MODE_SPHERE_WITH_GYRO,
 		    #YAS_MAG_CALIB_MODE_ELLIPSOID_WITH_GYRO */
-#if YAS_MAG_CALIB_MINI_ENABLE || YAS_MAG_CALIB_FLOAT_ENABLE
 	uint16_t spread[3]; /*!< Spread threshold for accuracy 1-3 */
 	uint16_t variation[3]; /*!< Variation threshold for accuracy 1-3 */
-#else
-	int32_t cwm_threshold[9]; /*!< Threshold for calibration (mag-only).
-				    Order is {second_range,
-				     second_distortion, traditional_distortion}
-				     for accuracy 1, 2, and 3. */
-	int32_t cwg_threshold[12]; /*!< Threshold for calibration with gyro.
+#if !YAS_MAG_CALIB_MINI_ENABLE && !YAS_MAG_CALIB_FLOAT_ENABLE
+	uint16_t trad_variation[3]; /*!< Traditional variation for accuracy 1-3
+				     */
+	uint16_t cwg_threshold[12]; /*!< Threshold for calibration with gyro.
 				     Order is {eval_th_for_narrow,
 				      diff_angle_th_for_narrow,
 				      eval_th_for_wide, eval_th_for_wide }
 				      for accuracy 1, 2, and 3. */
 #endif
-	struct yas_matrix *static_matrix; /*!< Static ellipsoid correction
-					   matrix.  If NULL, no ellipsoid
-					   correction is applied */
 };
 
 /**
@@ -947,17 +978,19 @@ struct yas_mag_calib_config {
  * @brief Magnetic calibration result
  */
 struct yas_mag_calib_result {
-#if !YAS_MAG_CALIB_MINI_ENABLE
-	int success_mode; /*!< Success mode. 1:cwm, 2:cwg. */
-#endif
 	struct yas_vector offset; /*!< Calibration offset [nT] */
-	struct yas_vector uncalibrated; /*!< Uncalibrated value [nT] */
 	uint16_t spread; /*!< Spread value */
 	uint16_t variation; /*!< Variation value */
 	uint16_t radius; /*!< Magnetic radius [nT] */
 	uint8_t axis; /*!< Update axis */
 	uint8_t accuracy; /*!< Accuracy [0-3] */
 	uint8_t level; /*!< The number of sample */
+#if !YAS_MAG_CALIB_MINI_ENABLE && !YAS_MAG_CALIB_FLOAT_ENABLE
+	uint16_t trad_variation; /*!< Traditional variation value */
+	uint16_t cwg_spread;
+	uint16_t cwg_variation;
+	int success_mode; /*!< Success mode. 1:cwm, 2:cwg. */
+#endif
 #if YAS_MAG_CALIB_ELLIPSOID_ENABLE
 	struct yas_matrix dynamic_matrix;
 #endif
@@ -1072,7 +1105,6 @@ struct yas_gyro_calib_config {
  */
 struct yas_gyro_calib_result {
 	struct yas_vector offset; /*!< Calibration offset [mdps] */
-	struct yas_vector uncalibrated; /*!< Uncalibrated value [mdps] */
 	uint8_t accuracy; /*!< Accuracy [0-3] */
 };
 
@@ -1332,6 +1364,13 @@ struct yas_fusion {
 	 */
 	int (*reset)(void);
 	/**
+	 * Notifies the square of offset change.
+	 * @param[in] square of offset change in [nT].
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*notify_offset_change)(int32_t square_offset_change);
+	/**
 	 * Updates the sensor fusion
 	 * @param[in] raw Measured sensor data
 	 * @param[in] num The number of the measured sensor data
@@ -1354,32 +1393,169 @@ struct yas_fusion {
 	 */
 	int (*set_config)(struct yas_fusion_config *config);
 	/**
-	 * Obtains the calibration offset
-	 * @param[in] type Sensor type
-	 * @param[out] offset Calibration offset
-	 * @param[out] accuracy Calibration offset accuracy
-	 * @retval #YAS_NO_ERROR Success
-	 * @retval Negative Failure
-	 */
-	int (*get_offset)(int32_t type, struct yas_vector *offset,
-			uint8_t *accuracy);
-	/**
-	 * Sets the calibration offset
-	 * @param[in] type Sensor type
-	 * @param[in] offset Calibration offset
-	 * @param[in] accuracy Calibration offset accuracy
-	 * @retval #YAS_NO_ERROR Success
-	 * @retval Negative Failure
-	 */
-	int (*set_offset)(int32_t type, struct yas_vector *offset,
-			uint8_t accuracy);
-	/**
 	 * Obtains the detail of the last fusion result
 	 * @param[out] r Last fusion result
 	 * @retval #YAS_NO_ERROR Success
 	 * @retval Negative Failure
 	 */
 	int (*get_result)(struct yas_fusion_result *r);
+};
+#endif
+
+#if YAS_STEPCOUNTER_ENABLE
+/**
+ * @struct yas_stepcounter_config
+ * @brief Stepcounter configuration
+ */
+struct yas_stepcounter_config {
+	int8_t interval; /*!< Step counter calculate interval (ms)
+					0 to 20 */
+	int8_t noisecancel; /*!< Noise cancel setting
+					0: off
+					1: on */
+};
+
+/**
+ * @struct yas_stepcounter_result
+ * @brief Stepcounter result
+ */
+struct yas_stepcounter_result {
+	int32_t walk_and_run_count[2];
+	int32_t walk_and_run_time[2];
+	int32_t totalcount; /*!< Total (walk and run) count */
+	int32_t totaltime; /*!<  Total (walk and run) time */
+};
+
+/**
+ * @struct yas_stepcounter
+ * @brief Step counter function
+ */
+struct yas_stepcounter {
+	/**
+	 * Initializes the stepcounter
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*init)(void);
+	/**
+	 * Terminates the stepcounter
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*term)(void);
+	/**
+	 * Resets the stepcounter
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*reset)(void);
+	/**
+	 * Updates the stepcounter
+	 * @param[in] Measured sensor data (accelerometer)
+	 * @param[in] num The number of the measured sensor data
+	 * @retval 0 Walk count and run count are NOT changed
+	 * @retval 1 Walk count or run count is changed
+	 * @retval Negative Failure
+	 */
+	int (*update)(struct yas_data *ydata, int num);
+	/**
+	 * Obtains the stepcounter configuration
+	 * @param[out] config stepcounter configuration
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*get_config)(struct yas_stepcounter_config *config);
+	/**
+	 * Sets the stepcounter configuration
+	 * @param[in] config stepcounter configuration
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*set_config)(struct yas_stepcounter_config *config);
+	/**
+	 * Obtains the detail of the last stepcounter result
+	 * @param[out] Last stepcounter result
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*get_result)(struct yas_stepcounter_result *r);
+};
+#endif
+
+#if YAS_SIGNIFICANT_MOTION_ENABLE
+/**
+ * @struct yas_sfm_config
+ * @brief Significant motion configuration
+ */
+struct yas_sfm_config {
+	int dummy;
+};
+
+/**
+ * @struct yas_sfm_result
+ * @brief Significant Motion result
+ */
+struct yas_sfm_result {
+	int edge_state;
+	int edge_type;
+	int acc_count;
+	int var_count;
+	int err_count;
+};
+
+/**
+ * @struct yas_sfm
+ * @brief Significant motion function
+ */
+struct yas_sfm {
+	/**
+	 * Initializes the significant motion
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*init)(void);
+	/**
+	 * Terminates the significant motion
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*term)(void);
+	/**
+	 * Resets the significant motion
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*reset)(void);
+	/**
+	 * Updates the significant motion
+	 * @param[in] Measured sensor data (accelerometer)
+	 * @param[in] num The number of the measured sensor data
+	 * @retval 0 Walk count and run count are NOT changed
+	 * @retval 1 Walk count or run count is changed
+	 * @retval Negative Failure
+	 */
+	int (*update)(struct yas_data *ydata, int num);
+	/**
+	 * Obtains the significant motion configuration
+	 * @param[out] config significant motion configuration
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*get_config)(struct yas_sfm_config *config);
+	/**
+	 * Sets the significant motion configuration
+	 * @param[in] config significant motion configuration
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*set_config)(struct yas_sfm_config *config);
+	/**
+	 * Obtains the detail of the last significant motion result
+	 * @param[out] Last significant motion result
+	 * @retval #YAS_NO_ERROR Success
+	 * @retval Negative Failure
+	 */
+	int (*get_result)(struct yas_sfm_result *r);
 };
 #endif
 
@@ -1487,6 +1663,28 @@ struct yas_log {
 
 #if YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS532
 struct yas532_self_test_result {
+	int32_t id;
+	int8_t xy1y2[3];
+	int32_t dir;
+	int32_t sx, sy;
+	int32_t xyz[3];
+};
+#endif
+
+#if YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS537
+struct yas537_self_test_result {
+	int32_t id;
+	int32_t sx, sy;
+	int32_t dir;
+	int32_t xyz[3];
+};
+#endif
+
+#if YAS_MAG_DRIVER == YAS_MAG_DRIVER_YAS535
+struct yas535_acc_self_test_result {
+	int dummy; /* TBD */
+};
+struct yas535_mag_self_test_result {
 	int32_t id;
 	int8_t xy1y2[3];
 	int32_t dir;
@@ -1605,6 +1803,26 @@ int yas_mag_avg_init(struct yas_mag_avg *f);
  * @retval Negative Number Error
  */
 int yas_fusion_init(struct yas_fusion *f);
+#endif
+
+#if YAS_STEPCOUNTER_ENABLE
+/**
+ * Initializes the stepcounter module.
+ * @param[in,out] f Pointer to yas_stepcounter struct
+ * @retval #YAS_NO_ERROR Success
+ * @retval Negative Number Error
+ */
+int yas_stepcounter_init(struct yas_stepcounter *f);
+#endif
+
+#if YAS_SIGNIFICANT_MOTION_ENABLE
+/**
+ * Initializes the significant motion module.
+ * @param[in,out] f Pointer to yas_sfm struct
+ * @retval #YAS_NO_ERROR Success
+ * @retval Negative Number Error
+ */
+int yas_sfm_init(struct yas_sfm *f);
 #endif
 
 #if YAS_SOFTWARE_GYROSCOPE_ENABLE

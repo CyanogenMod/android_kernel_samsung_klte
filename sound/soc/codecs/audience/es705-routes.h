@@ -626,7 +626,8 @@ static const u32 route_1Mic_WHS_NB_SWBypass[] = {
 	0xffffffff	/* terminate */
 };
 
-#if defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 route_2Mic_SPK_NB_FO_NSOn[] = {
 	0x9031041b,	/* Route, #1051 */
 	0x90310395,	/* Algo, #917 */
@@ -646,7 +647,8 @@ static const u32 route_2Mic_HS_NB_NSOn[] = {
 	0xffffffff	/* terminate */
 };
 
-#if defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 route_2Mic_SPK_NB_FO_NSOff[] = {
 	0x9031041b,	/* Route, #1051 */
 	0x90310395,	/* Algo, #917 */
@@ -703,7 +705,8 @@ static const u32 route_TTYVCO[] = {
 	0xffffffff	/* terminate */
 };
 
-#if defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 route_TTYHCO[] = {
 	0x903103e9,	/* Route, #1001 */
 	0x9031024e,	/* Algo, #590  */
@@ -755,7 +758,8 @@ static const u32 route_1Mic_WHS_WB_SWBypass[] = {
 	0xffffffff	/* terminate */
 };
 
-#if defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 route_2Mic_SPK_WB_FO_NSOn[] = {
 	0x9031041b,	/* Route, #1051 */
 	0x90310396,	/* Algo, #918 */
@@ -775,7 +779,8 @@ static const u32 route_2Mic_HS_WB_NSOn[] = {
 	0xffffffff	/* terminate */
 };
 
-#if defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 route_2Mic_SPK_WB_FO_NSOff[] = {
 	0x9031041b,	/* Route, #1051 */
 	0x90310396,	/* Algo, #918 */
@@ -841,38 +846,8 @@ static const u32 route_3Mic_SPK_WB_FO_NSOff[] = {
 	0xffffffff	/* terminate */
 };
 
-#if !defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_MACH_KACTIVELTE_CAN)
-static const u32 *es705_route_configs[] = {
-	route_1Mic_WHS_NB_SWBypass,			/*  0 */
-	route_3Mic_SPK_NB_FO_NSOn,			/*  1 */
-	route_2Mic_HS_NB_NSOn,				/*  2*/
-	route_3Mic_SPK_NB_FO_NSOff,			/*  3 */
-	route_2Mic_HS_NB_NSOff,				/*  4 */
-	route_1Ch_AudioPB,					/*  5 */
-	route_2Ch_AudioPB,					/*  6 */
-	route_2Mic_AudioZoomInterview,		/*  7 */
-	route_2Mic_AudioZoomConversation,		/*  8 */
-	route_dummy,						/*  9 */
-	route_dummy,						/* 10 */
-	route_TTYVCO,						/* 11 */
-	route_TTYHCO,						/* 12 */
-	route_3Mic_ASR_AO,					/* 13 */
-	route_dummy,						/* 14 */
-	route_dummy,						/* 15 */
-	route_dummy,						/* 16 */
-	route_1Mic_HS_LB_SWBypass,			/* 17 */
-	route_1Mic_SPK_LB_SWBypass,			/* 18 */
-	route_1Mic_WHS_LB_SWBypass,			/* 19 */
-	route_dummy,						/* 20 */
-	route_1Mic_WHS_WB_SWBypass,			/* 21 */
-	route_3Mic_SPK_WB_FO_NSOn,			/* 22 */
-	route_2Mic_HS_WB_NSOn,				/* 23 */
-	route_3Mic_SPK_WB_FO_NSOff,			/* 24 */
-	route_2Mic_HS_WB_NSOff,				/* 25 */
-	route_voicesense_pdm,				/* 26 */
-	route_sensory_pdm,				/* 27 */
-};
-#else
+#if  defined(CONFIG_MACH_KACTIVELTE_EUR) || defined(CONFIG_MACH_KACTIVELTE_ATT) || defined(CONFIG_MACH_KACTIVELTE_SKT) || defined(CONFIG_SEC_S_PROJECT) || defined(CONFIG_MACH_KACTIVELTE_CAN) \
+	|| defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_HESTIALTE_EUR)
 static const u32 *es705_route_configs[] = {
 	route_1Mic_WHS_NB_SWBypass,			/*  0 */
 	route_2Mic_SPK_NB_FO_NSOn,			/*  1 */
@@ -899,6 +874,37 @@ static const u32 *es705_route_configs[] = {
 	route_2Mic_SPK_WB_FO_NSOn,			/* 22 */
 	route_2Mic_HS_WB_NSOn,				/* 23 */
 	route_2Mic_SPK_WB_FO_NSOff,			/* 24 */
+	route_2Mic_HS_WB_NSOff,				/* 25 */
+	route_voicesense_pdm,				/* 26 */
+	route_sensory_pdm,				/* 27 */
+};
+#else
+static const u32 *es705_route_configs[] = {
+	route_1Mic_WHS_NB_SWBypass,			/*  0 */
+	route_3Mic_SPK_NB_FO_NSOn,			/*  1 */
+	route_2Mic_HS_NB_NSOn,				/*  2*/
+	route_3Mic_SPK_NB_FO_NSOff,			/*  3 */
+	route_2Mic_HS_NB_NSOff,				/*  4 */
+	route_1Ch_AudioPB,					/*  5 */
+	route_2Ch_AudioPB,					/*  6 */
+	route_2Mic_AudioZoomInterview,		/*  7 */
+	route_2Mic_AudioZoomConversation,		/*  8 */
+	route_dummy,						/*  9 */
+	route_dummy,						/* 10 */
+	route_TTYVCO,						/* 11 */
+	route_TTYHCO,						/* 12 */
+	route_3Mic_ASR_AO,					/* 13 */
+	route_dummy,						/* 14 */
+	route_dummy,						/* 15 */
+	route_dummy,						/* 16 */
+	route_1Mic_HS_LB_SWBypass,			/* 17 */
+	route_1Mic_SPK_LB_SWBypass,			/* 18 */
+	route_1Mic_WHS_LB_SWBypass,			/* 19 */
+	route_dummy,						/* 20 */
+	route_1Mic_WHS_WB_SWBypass,			/* 21 */
+	route_3Mic_SPK_WB_FO_NSOn,			/* 22 */
+	route_2Mic_HS_WB_NSOn,				/* 23 */
+	route_3Mic_SPK_WB_FO_NSOff,			/* 24 */
 	route_2Mic_HS_WB_NSOff,				/* 25 */
 	route_voicesense_pdm,				/* 26 */
 	route_sensory_pdm,				/* 27 */

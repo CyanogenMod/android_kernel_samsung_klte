@@ -291,6 +291,7 @@ int dwc3_gadget_ep0_set_halt(struct usb_ep *ep, int value)
 	struct dwc3_ep			*dep = to_dwc3_ep(ep);
 	struct dwc3			*dwc = dep->dwc;
 
+	dbg_event(dep->number, "EP0STAL", value);
 	dwc3_ep0_stall_and_restart(dwc);
 
 	return 0;
@@ -554,6 +555,28 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 	return ret;
 }
 
+static int dwc3_ep0_set_interface(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
+{
+	u32 alt_setting;
+	int ret;
+
+	alt_setting = le16_to_cpu(ctrl->wValue);
+        ret = dwc3_ep0_delegate_req(dwc, ctrl);
+
+	switch (dwc->dev_state) {
+        case DWC3_CONFIGURED_STATE:
+                /* if the alt_setting matches and the alt_setting is non zero */
+		if (alt_setting && (!ret || (ret == USB_GADGET_DELAYED_STATUS))) {
+			dwc->resize_fifos = true;
+			dev_dbg(dwc->dev, "resize fifos flag SET\n");
+		}
+		break;
+	default:
+		dev_err(dwc->dev, "default case\n");
+	}
+	return ret;
+}
+
 static void dwc3_ep0_set_sel_cmpl(struct usb_ep *ep, struct usb_request *req)
 {
 	struct dwc3_ep	*dep = to_dwc3_ep(ep);
@@ -688,6 +711,10 @@ static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 		dev_vdbg(dwc->dev, "USB_REQ_SET_ISOCH_DELAY\n");
 		ret = dwc3_ep0_set_isoch_delay(dwc, ctrl);
 		break;
+        case USB_REQ_SET_INTERFACE:
+		dev_vdbg(dwc->dev, "USB_REQ_SET_INTERFACE\n");
+                ret = dwc3_ep0_set_interface(dwc, ctrl);
+                break;
 	default:
 		dev_vdbg(dwc->dev, "Forwarding to gadget driver\n");
 		ret = dwc3_ep0_delegate_req(dwc, ctrl);
@@ -728,8 +755,10 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 		dwc->delayed_status = true;
 
 out:
-	if (ret < 0)
+	if (ret < 0) {
+		dbg_event(0x0, "ERRSTAL", ret);
 		dwc3_ep0_stall_and_restart(dwc);
+	}
 }
 
 bool zlp_required;
@@ -795,7 +824,7 @@ static void dwc3_ep0_complete_data(struct dwc3 *dwc,
 
 	if ((epnum & 1) && ur->actual < ur->length) {
 		/* for some reason we did not get everything out */
-
+		dbg_event(epnum, "INDATSTAL", 0);
 		dwc3_ep0_stall_and_restart(dwc);
 	} else {
 		/*
@@ -831,6 +860,7 @@ static void dwc3_ep0_complete_status(struct dwc3 *dwc,
 		if (ret < 0) {
 			dev_dbg(dwc->dev, "Invalid Test #%d\n",
 					dwc->test_mode_nr);
+			dbg_event(0x00, "INVALTEST", ret);
 			dwc3_ep0_stall_and_restart(dwc);
 			return;
 		}
@@ -1010,6 +1040,7 @@ static void dwc3_ep0_xfernotready(struct dwc3 *dwc,
 
 			dev_vdbg(dwc->dev, "Wrong direction for Data phase\n");
 			dwc3_ep0_end_control_data(dwc, dep);
+			dbg_event(epnum, "WRONGDR", 0);
 			dwc3_ep0_stall_and_restart(dwc);
 			return;
 		}

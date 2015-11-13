@@ -57,7 +57,7 @@ struct irda_ice40_platform_data {
 #define IRDA_I2C_RX_ADDR	0x6C
 #define IRDA_TEST_CODE_SIZE	144
 #define IRDA_TEST_CODE_ADDR	0x00
-#define MAX_SIZE		2048
+#define MAX_SIZE		4096
 #define READ_LENGTH		8
 
 #define POWER_ON		1

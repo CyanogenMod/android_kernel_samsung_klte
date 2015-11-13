@@ -155,7 +155,8 @@ static struct usb_cdc_acm_descriptor rndis_acm_descriptor = {
 };
 
 #if defined(CONFIG_MACH_MILLETLTE_VZW) || defined(CONFIG_MACH_MATISSELTE_VZW) \
-|| defined(CONFIG_MACH_KLTE_VZW)
+|| defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_SLTE_VZW) \
+|| defined(CONFIG_MACH_CHAGALL_VZW) || defined(CONFIG_MACH_KLIMT_VZW)
 /* In VZW Models size of MTU is fixed using Devguru AVD Descriptor */
 
 struct usb_rndis_mtu_avd_descriptor {
@@ -268,7 +269,8 @@ static struct usb_descriptor_header *eth_fs_function[] = {
 	(struct usb_descriptor_header *) &fs_in_desc,
 	(struct usb_descriptor_header *) &fs_out_desc,
 #if defined(CONFIG_MACH_MILLETLTE_VZW) || defined(CONFIG_MACH_MATISSELTE_VZW) \
-|| defined(CONFIG_MACH_KLTE_VZW)
+|| defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_SLTE_VZW) \
+|| defined(CONFIG_MACH_CHAGALL_VZW) || defined(CONFIG_MACH_KLIMT_VZW)
 	(struct usb_descriptor_header *) &rndis_avd_descriptor,
 #endif
 	NULL,
@@ -320,7 +322,8 @@ static struct usb_descriptor_header *eth_hs_function[] = {
 	(struct usb_descriptor_header *) &hs_in_desc,
 	(struct usb_descriptor_header *) &hs_out_desc,
 #if defined(CONFIG_MACH_MILLETLTE_VZW) || defined(CONFIG_MACH_MATISSELTE_VZW) \
-|| defined(CONFIG_MACH_KLTE_VZW)
+|| defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_SLTE_VZW) \
+|| defined(CONFIG_MACH_CHAGALL_VZW) || defined(CONFIG_MACH_KLIMT_VZW)
 	(struct usb_descriptor_header *) &rndis_avd_descriptor,
 #endif
 	NULL,
@@ -394,7 +397,8 @@ static struct usb_descriptor_header *eth_ss_function[] = {
 	(struct usb_descriptor_header *) &ss_out_desc,
 	(struct usb_descriptor_header *) &ss_bulk_comp_desc,
 #if defined(CONFIG_MACH_MILLETLTE_VZW) || defined(CONFIG_MACH_MATISSELTE_VZW) \
-|| defined(CONFIG_MACH_KLTE_VZW)
+|| defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_SLTE_VZW) \
+|| defined(CONFIG_MACH_CHAGALL_VZW) || defined(CONFIG_MACH_KLIMT_VZW)
 	(struct usb_descriptor_header *) &rndis_avd_descriptor,
 #endif
 	NULL,

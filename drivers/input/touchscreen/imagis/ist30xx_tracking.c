@@ -74,7 +74,7 @@ int ist30xx_get_track(u32 *track, int cnt)
 	return IST30XX_RINGBUF_NO_ERR;
 }
 
-int ist30xx_get_track_cnt(void)
+u32 ist30xx_get_track_cnt(void)
 {
 	return pTrackBuf->RingBufCtr;
 }
@@ -159,7 +159,7 @@ ssize_t ist30xx_track_frame_show(struct device *dev, struct device_attribute *at
 				 char *buf)
 {
 	int i, buf_cnt = 0;
-	int track_cnt = MAX_TRACKING_COUNT;
+	u32 track_cnt = MAX_TRACKING_COUNT;
 	u32 track;
 	char msg[10];
 

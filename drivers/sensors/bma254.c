@@ -45,6 +45,8 @@
 #define CHIP_DEV_NAME	"BMA254"
 #define CHIP_DEV_VENDOR	"BOSCH"
 #define CAL_PATH		"/efs/calibration_data"
+#define CALIBRATION_DATA_AMOUNT         20
+#define MAX_ACCEL_1G			1024
 
 #ifdef CONFIG_BMA254_SMART_ALERT
 extern unsigned int system_rev;
@@ -162,20 +164,20 @@ static void bma254_activate(struct bma254_data *bma254, bool enable)
 
 		bma254_i2c_write(bma254, BMA254_REG0F, BMA2X2_RANGE_SET);
 		bma254_i2c_write(bma254, BMA254_REG10, BANDWIDTH_31_25);
-		bma254_i2c_write(bma254, BMA254_REG11, BMA2X2_MODE_NORMAL);
+		bma254_i2c_write(bma254, BMA254_REG11, BMA254_MODE_NORMAL);
 	}
 #ifndef CONFIG_BMA254_SMART_ALERT
 	else {
-		bma254_i2c_write(bma254, BMA254_REG11, BMA2X2_MODE_SUSPEND);
+		bma254_i2c_write(bma254, BMA254_REG11, BMA254_MODE_SUSPEND);
 	}
 #else
 	if(bma254->accsns_activate_flag && enable != true){
 		pr_info("%s: low power mode\n", __func__);
 		bma254_i2c_write(bma254, BMA254_REG0F, BMA2X2_RANGE_SET);
 		bma254_i2c_write(bma254, BMA254_REG10, BANDWIDTH_07_81);
-		bma254_i2c_write(bma254, BMA254_REG11, BMA2X2_MODE_LOWPOWER1);
+		bma254_i2c_write(bma254, BMA254_REG11, BMA254_MODE_LOWPOWER1);
 	}else if(enable != true){
-		bma254_i2c_write(bma254, BMA254_REG11, BMA2X2_MODE_SUSPEND);
+		bma254_i2c_write(bma254, BMA254_REG11, BMA254_MODE_SUSPEND);
 	}
 #endif
 }
@@ -433,7 +435,7 @@ static int bma254_do_calibrate(struct bma254_data *bma254, int enable)
 	if (enable) {
                 int data[3] = { 0, };
                 int i;
-		for (i = 0; i < 100; i++) {
+		for (i = 0; i < CALIBRATION_DATA_AMOUNT; i++) {
 			err = bma254_get_data(bma254, data, false);
 			if (err < 0) {
 				pr_err("%s : failed in the %dth loop\n", __func__, i);
@@ -445,9 +447,15 @@ static int bma254_do_calibrate(struct bma254_data *bma254, int enable)
 			sum[2] += data[2];
 		}
 
-		bma254->cal_data[0] = (sum[0] / 100);
-		bma254->cal_data[1] = (sum[1] / 100);
-		bma254->cal_data[2] = ((sum[2] / 100) - 1024);
+		bma254->cal_data[0] = (sum[0] / CALIBRATION_DATA_AMOUNT);
+		bma254->cal_data[1] = (sum[1] / CALIBRATION_DATA_AMOUNT);
+		bma254->cal_data[2] = (sum[2] / CALIBRATION_DATA_AMOUNT);
+
+		if(bma254->cal_data[2] > 0)
+			bma254->cal_data[2] -= MAX_ACCEL_1G;
+		else if(bma254->cal_data[2] < 0)
+			bma254->cal_data[2] += MAX_ACCEL_1G;
+
 	} else {
 		bma254->cal_data[0] = 0;
 		bma254->cal_data[1] = 0;
@@ -505,6 +513,11 @@ static ssize_t bma254_raw_data_show(struct device *dev,
 
 	if (!bma254->enable) {
 		bma254_activate(bma254, true);
+#if defined(CONFIG_MACH_KANAS3G_CTC)||defined(CONFIG_MACH_KANAS3G_CMCC)
+		msleep(300);
+#elif defined (CONFIG_MACH_VICTORLTE_CTC)
+		msleep(50);
+#endif
 		schedule_delayed_work(&bma254->work, msecs_to_jiffies(bma254->delay));
 	}
 
@@ -512,7 +525,6 @@ static ssize_t bma254_raw_data_show(struct device *dev,
 	if (ret < 0) {
 		pr_err("%s, data error(%d)\n", __func__, ret);
 	}
-	pr_info("bma254_raw_data_show %d %d %d\n", xyz[0], xyz[1], xyz[2]);
 	if (!bma254->enable) {
 		cancel_delayed_work_sync(&bma254->work);
 		bma254_activate(bma254, false);
@@ -887,7 +899,9 @@ static int bma254_probe(struct i2c_client *client,
 	}
 	dev->name = "accelerometer";
 	dev->id.bustype = BUS_I2C;
-        dev->dev.parent = &client->dev;
+#if !defined(CONFIG_MACH_VICTORLTE) && !defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)
+	dev->dev.parent = &client->dev;
+#endif
 #ifdef REPORT_ABS
 	input_set_capability(dev, EV_ABS, ABS_MISC);
 	input_set_abs_params(dev, ABS_X, ABSMIN, ABSMAX, 0, 0);

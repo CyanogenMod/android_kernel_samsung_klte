@@ -45,6 +45,7 @@ void drop_slab(void)
 	};
 
 	do {
+		shrink.priority = DEF_PRIORITY;
 		nr_objects = shrink_slab(&shrink, 1000, 1000);
 	} while (nr_objects > 10);
 }

@@ -4402,9 +4402,17 @@ char AUTO_EMAIL_2[] = {
 	0xff, //scr Bb Rr
 	0xff, //scr Wr Wb
 	0x00, //scr Kr Kb
+#if defined(CONFIG_MACH_JSGLTE_CHN_CMCC)
+	0xfa, //scr Wg Wg
+#else
 	0xf0, //scr Wg Wg
+#endif
 	0x00, //scr Kg Kg
+#if defined(CONFIG_MACH_JSGLTE_CHN_CMCC)
+	0xf2,
+#else
 	0xeb, //scr Wb Wr
+#endif
 	0x00, //scr Kb Kr
 	0x00, //curve 1 b
 	0x20, //curve 1 a

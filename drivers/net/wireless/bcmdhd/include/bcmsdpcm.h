@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdpcm.h 364353 2012-10-23 20:31:46Z $
+ * $Id: bcmsdpcm.h 414378 2013-07-24 15:58:50Z $
  */
 
 #ifndef	_bcmsdpcm_h_
@@ -270,7 +270,7 @@ typedef struct {
 	uint32  assert_line;
 	uint32	console_addr;		/* Address of hndrte_cons_t */
 	uint32  msgtrace_addr;
-	uint32  brpt_addr;
+	uint32  fwid;
 } sdpcm_shared_t;
 
 extern sdpcm_shared_t sdpcm_shared;

@@ -16,9 +16,8 @@
 #include    "sec_filter.h"
 #include    "tcp_track.h"
 
-static  int notifyID    = 1;
-extern  char                *errorMsg;
-extern  int                 errMsgSize;
+static  int     notifyID    = 1;
+
 tcp_TrackInfo   * make_tcp_TrackInfo ( struct sk_buff *skb)
 {
     tcp_TrackInfo   *result = NULL;

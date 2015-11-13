@@ -15,7 +15,7 @@
 #include "../ssp.h"
 
 #if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01KTT)\
-	|| defined(CONFIG_MACH_KS01LGT)
+	|| defined(CONFIG_MACH_KS01LGT) || defined(CONFIG_MACH_JACTIVESKT)
 #define LPS25H_REV	4
 #endif
 

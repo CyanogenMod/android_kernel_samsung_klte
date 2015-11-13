@@ -109,6 +109,10 @@ enum pageflags {
 	PG_compound_lock,
 #endif
 	PG_readahead,		/* page in a readahead window */
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+	PG_scfslower,
+	PG_nocache,
+#endif
 #ifdef CONFIG_SDP
 	PG_sensitive,
 #endif
@@ -281,12 +285,16 @@ PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
 #endif
 
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+PAGEFLAG(Scfslower, scfslower)
+PAGEFLAG(Nocache, nocache)
+#endif
+
 #if defined(CONFIG_CMA_PAGE_COUNTING)
 PAGEFLAG(CMA, cma)
 #endif
 
 u64 stable_page_flags(struct page *page);
-
 #ifdef CONFIG_SDP
 static inline int PageSensitive(struct page *page)
 {

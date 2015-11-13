@@ -462,6 +462,9 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 	for (i = 0; i < mi->nr_banks; i++)
 		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
+#ifdef CONFIG_TIMA_RKP_30
+	memblock_reserve(__pa(_text), PAGE_SIZE);
+#endif /*CONFIG_TIMA_RKP_30*/
 	/* Register the kernel text, kernel data and initrd with memblock. */
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);

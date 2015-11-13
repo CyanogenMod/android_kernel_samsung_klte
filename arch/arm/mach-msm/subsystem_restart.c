@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -166,6 +166,10 @@ struct subsys_device {
 	char miscdevice_name[32];
 	struct completion err_ready;
 	bool crashed;
+
+#if defined(CONFIG_MACH_BAFFIN2_SGLTE)
+	bool flag_skip_ramdump;
+#endif
 };
 
 static struct subsys_device *to_subsys(struct device *d)
@@ -217,6 +221,14 @@ int subsys_get_restart_level(struct subsys_device *dev)
 	return dev->restart_level;
 }
 EXPORT_SYMBOL(subsys_get_restart_level);
+
+#if defined(CONFIG_MACH_BAFFIN2_SGLTE)
+int subsys_set_flag_skip_ramdump(struct subsys_device *dev, bool flag)
+{
+	return dev->flag_skip_ramdump = flag;
+}
+EXPORT_SYMBOL(subsys_set_flag_skip_ramdump);
+#endif
 
 static void subsys_set_state(struct subsys_device *subsys,
 			     enum subsys_state state)
@@ -472,13 +484,17 @@ static void subsystem_powerup(struct subsys_device *dev, void *data)
 
 	pr_info("[%p]: Powering up %s\n", current, name);
 	init_completion(&dev->err_ready);
+
         if (dev->desc->powerup(dev->desc) < 0) {
-                notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE, NULL);
+		notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
+								NULL);
 		panic("[%p]: Powerup error: %s!", current, name);
         }
+
 	ret = wait_for_err_ready(dev);
 	if (ret) {
-                notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,NULL);
+		notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
+								NULL);
 		panic("[%p]: Timed out waiting for error ready: %s!",
 			current, name);
         }
@@ -510,7 +526,8 @@ static int subsys_start(struct subsys_device *subsys)
 	init_completion(&subsys->err_ready);
 	ret = subsys->desc->start(subsys->desc);
 	if (ret) {
-                notify_each_subsys_device(&subsys, 1, SUBSYS_POWERUP_FAILURE,NULL);
+		notify_each_subsys_device(&subsys, 1, SUBSYS_POWERUP_FAILURE,
+									NULL);
 		return ret;
         }
 
@@ -524,10 +541,10 @@ static int subsys_start(struct subsys_device *subsys)
 		/* pil-boot succeeded but we need to shutdown
 		 * the device because error ready timed out.
 		 */
-                notify_each_subsys_device(&subsys, 1, SUBSYS_POWERUP_FAILURE, NULL);
+		notify_each_subsys_device(&subsys, 1, SUBSYS_POWERUP_FAILURE,
+									NULL);
 		subsys->desc->stop(subsys->desc);
-        }
-	else
+	} else
 		subsys_set_state(subsys, SUBSYS_ONLINE);
 
 	return ret;
@@ -775,25 +792,12 @@ int subsystem_restart_dev(struct subsys_device *dev)
 	name = dev->desc->name;
 
 #ifdef CONFIG_SEC_DEBUG
-#ifdef CONFIG_SEC_SSR_DEBUG_LEVEL_CHK
+#if 0 //def CONFIG_SEC_SSR_DEBUG_LEVEL_CHK /* Temporarily blocking until requested by cp or pl team */
 	if (!sec_debug_is_enabled_for_ssr())
 #else
 	if (!sec_debug_is_enabled())
 #endif
-	{
-		/* ADSP cannot work properly after ADSP SSR. So restart SOC. */
-		if (!strcmp("adsp", name)) {
-			pr_info("Restart sequence requested for %s, restart_level = %s.\n",
-				name, restart_levels[dev->restart_level]);
-			dev->restart_level = RESET_SOC;
-		}
-		else {
-			pr_info("Restart sequence requested for %s, restart_level = %s.\n",
-				name, restart_levels[dev->restart_level]);
-
-			dev->restart_level = RESET_SUBSYS_COUPLED; //Why is it delete the RESET_SUBSYS_INDEPENDENT on MSM8974 ?
-		}
-	}
+		dev->restart_level = RESET_SUBSYS_COUPLED; //Why is it delete the RESET_SUBSYS_INDEPENDENT on MSM8974 ?
 	else
 		dev->restart_level = RESET_SOC;
 #endif
@@ -808,6 +812,25 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		pr_err("%s crashed during a system poweroff/shutdown.\n", name);
 		return -EBUSY;
 	}
+
+#if defined(CONFIG_MACH_BAFFIN2_SGLTE)
+	if (strncmp(name, _order_8x60_all[0], 14) == 0) {
+		if (dev->flag_skip_ramdump) {		// to skip ramdump if status pin did go to HIGH.
+			enable_ramdumps = 0;
+			dev->flag_skip_ramdump = false;
+		} else
+			enable_ramdumps = sec_debug_is_enabled()? 1 : 0;
+		dev->restart_level = RESET_SUBSYS_COUPLED;
+		pr_info("Restart sequence requested for %s, restart_level = %s, enable_ramdumps = %d. \n",
+				name, restart_levels[dev->restart_level], enable_ramdumps);
+	}
+	if (strncmp(name, _order_8x60_all[1], 5) == 0) {
+		enable_ramdumps = sec_debug_is_enabled()? 1 : 0;
+		dev->restart_level = RESET_SUBSYS_COUPLED;
+		pr_info("Restart sequence requested for %s, restart_level = %s, enable_ramdumps = %d. \n",
+				name, restart_levels[dev->restart_level], enable_ramdumps);
+	}
+#endif
 
 	pr_info("Restart sequence requested for %s, restart_level = %s.\n",
 		name, restart_levels[dev->restart_level]);
@@ -1322,10 +1345,15 @@ static int __init ssr_init_soc_restart_orders(void)
 		n_restart_orders = ARRAY_SIZE(orders_8x60_all);
 	}
 
+#if defined(CONFIG_MACH_BAFFIN2_SGLTE)
+		restart_orders = restart_orders_8960_sglte;
+		n_restart_orders = ARRAY_SIZE(restart_orders_8960_sglte);
+#else
 	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
 		restart_orders = restart_orders_8960_sglte;
 		n_restart_orders = ARRAY_SIZE(restart_orders_8960_sglte);
 	}
+#endif
 
 	for (i = 0; i < n_restart_orders; i++) {
 		mutex_init(&restart_orders[i]->track.lock);

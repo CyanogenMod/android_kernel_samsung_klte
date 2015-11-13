@@ -18,8 +18,11 @@
 
 #include "ist30xx_tsp.h"
 
-
+#if (IMAGIS_TSP_IC == IMAGIS_IST3038)
+#define IST30XXB_RAW_ADDR           (0x401002D4)
+#else
 #define IST30XXB_RAW_ADDR           (0x40100200)
+#endif
 #define IST30XXB_FILTER_ADDR        (0x40101000)
 
 #define IST30XX_RX_CNT_ADDR         (0x20000038)
@@ -30,6 +33,7 @@
 #define NODE_FLAG_FILTER            (1 << 2)
 #define NODE_FLAG_DIFF              (1 << 3)
 #define NODE_FLAG_ALL               (0xF)
+#define NODE_FLAG_NO_CCP            (1 << 7)
 
 struct TSP_CH_NUM {
 	u8	tx;

@@ -73,7 +73,7 @@ config ADC_ONESHOT
 	bool "MAX77804K ADC ONESHOT MODE Support"
 	depends on EXTCON_MAX77804K
 	depends on !SEC_FACTORY
-	default y
+	default n
 	help
 		Say Y here to enable ADC Oneshot mode when detecting ID value
 
@@ -95,11 +95,38 @@ config MUIC_SUPPORT_SMART_DOCK
 	help
 	  If you say yes here you will get support for the smart dock.
 
+config MUIC_SUPPORT_MMD_CTL
+	bool "MUIC_SUPPORT_MMD_CTL"
+	default n
+	help
+	  If you say yes here you will get support for the smart dock enable func by keystring.
+
 config MUIC_SUPPORT_INCOMPATIBLE_CHARGER
 	bool "MUIC_SUPPORT_INCOMPATIBLE_CHARGER"
 	default n
 	help
 	  If you say yes here you will get support for the incompatible charger.
+
+config MUIC_MAX77804K_SUPPORT_LANHUB
+	bool "MUIC_MAX77804K_SUPPORT_LANHUB"
+	depends on !SEC_FACTORY
+	default n
+	help
+	  If you say yes here, you will get support for the LANHUB cable.
+
+config MUIC_SUPPORT_RUSTPROOF
+	bool "MUIC Disable UART"
+	depends on !SEC_FACTORY
+	default n
+	help
+	 This option will disable the UART to prevent the rusting of the
+	 IF Connector in the case of Kmini Devices.
+
+config USBID_STANDARD
+	bool "USBID_STANDARD"
+	default n
+	help
+	  If you say yes here you will get support for usbid standard.
 
 config EXTCON_ARIZONA
 	tristate "Wolfson Arizona EXTCON support"

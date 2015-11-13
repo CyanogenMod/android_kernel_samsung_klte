@@ -1130,8 +1130,10 @@ static int fig1_ext0_decoder(u8 *fibBuffer, int figLength)
 		if (ensemble_info[0].label[i] == 0x20)
 			ensemble_info[0].label[i] = 0;
 		else {
+#ifdef FEATURE_END_CHAR
 			if (i == 16-1)
 				ensemble_info[0].label[i] = 0;
+#endif
 			break;
 		}
 	}
@@ -1175,8 +1177,10 @@ static int fig1_ext1_decoder(u8 *fibBuffer, int figLength)
 		if (svc_info->label[i] == 0x20)
 			svc_info->label[i] = 0;
 		else {
+#ifdef FEATURE_END_CHAR
 			if (i == 16-1)
 				svc_info->label[i] = 0;
+#endif
 			break;
 		}
 	}
@@ -1240,8 +1244,10 @@ static int fig1_ext4_decoder(u8 *fibBuffer, int figLength)
 		if (pScInfo->label[i] == 0x20)
 			pScInfo->label[i] = 0;
 		else {
+#ifdef FEATURE_END_CHAR
 			if (i == 16-1)
 				pScInfo->label[i] = 0;
+#endif
 			break;
 		}
 	}
@@ -1293,8 +1299,10 @@ static int fig1_ext5_decoder(u8 *fibBuffer, int figLength)
 		if (svc_info->label[i] == 0x20)
 			svc_info->label[i] = 0;
 		else {
+#ifdef FEATURE_END_CHAR
 			if (i == 16-1)
 				svc_info->label[i] = 0;
+#endif
 			break;
 		}
 	}

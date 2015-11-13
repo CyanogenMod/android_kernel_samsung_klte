@@ -698,7 +698,7 @@ RAM Load, FLASHBlock Program, and Target Checksum Verification.*/
 
 	/*INTLOCK(); */
 	/* issp_test_20100709 unblock */
-	fVerifySiliconID();
+	// fVerifySiliconID();
 #if 0
 	fIsError = fVerifySiliconID();
 	if (fIsError) {

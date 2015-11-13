@@ -35,11 +35,17 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/input.h>
 #include <linux/switch.h>
-//#include <linux/sii9234.h>
 #if defined (CONFIG_OF)
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #endif
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+#include <linux/sec_param.h>
+#endif
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include <linux/host_notify.h>
+#endif
+
 
 /* spmi control */
 extern int spmi_ext_register_writel_extra(u8 sid, u16 ad, u8 *buf, int len);
@@ -47,67 +53,69 @@ extern int spmi_ext_register_readl_extra(u8 sid, u16 ad, u8 *buf, int len);
 
 extern int system_rev;
 
-#define INT_MASK1					0x5C
-#define INT_MASK2					0xA0
+#define INT_MASK1		0x5C
+#define INT_MASK2		0x20
 
 /* DEVICE ID */
-#define TSU6721_DEV_ID				0x0A
-#define TSU6721_DEV_ID_REV			0x12
+#define TSU6721_DEV_ID		0x0A
+#define TSU6721_DEV_ID_REV	0x12
 
 /* TSU6721 I2C registers */
-#define REG_DEVICE_ID				0x01
-#define REG_CONTROL					0x02
-#define REG_INT1					0x03
-#define REG_INT2					0x04
-#define REG_INT_MASK1				0x05
-#define REG_INT_MASK2				0x06
-#define REG_ADC						0x07
-#define REG_TIMING_SET1				0x08
-#define REG_TIMING_SET2				0x09
-#define REG_DEVICE_TYPE1			0x0a
-#define REG_DEVICE_TYPE2			0x0b
-#define REG_BUTTON1					0x0c
-#define REG_BUTTON2					0x0d
-#define REG_MANUAL_SW1				0x13
-#define REG_MANUAL_SW2				0x14
-#define REG_DEVICE_TYPE3			0x15
-#define REG_RESET					0x1B
-#define REG_TIMER_SET				0x20
-#define REG_OCL_OCP_SET1			0x21
-#define REG_OCL_OCP_SET2			0x22
-#define REG_DEVICE_TYPE4			0x23
+#define REG_DEVICE_ID		0x01
+#define REG_CONTROL		0x02
+#define REG_INT1		0x03
+#define REG_INT2		0x04
+#define REG_INT_MASK1		0x05
+#define REG_INT_MASK2		0x06
+#define REG_ADC			0x07
+#define REG_TIMING_SET1		0x08
+#define REG_TIMING_SET2		0x09
+#define REG_DEVICE_TYPE1	0x0a
+#define REG_DEVICE_TYPE2	0x0b
+#define REG_BUTTON1		0x0c
+#define REG_BUTTON2		0x0d
+#define REG_MANUAL_SW1		0x13
+#define REG_MANUAL_SW2		0x14
+#define REG_DEVICE_TYPE3	0x15
+#define REG_RESET		0x1B
+#define REG_TIMER_SET		0x20
+#define REG_OCL_OCP_SET1	0x21
+#define REG_OCL_OCP_SET2	0x22
+#define REG_DEVICE_TYPE4	0x23
 
-#define DATA_NONE					0x00
+#define DATA_NONE		0x00
 
 /* Control */
 #define CON_SWITCH_OPEN		(1 << 4)
 #define CON_RAW_DATA		(1 << 3)
 #define CON_MANUAL_SW		(1 << 2)
-#define CON_WAIT			(1 << 1)
+#define CON_WAIT		(1 << 1)
 #define CON_INT_MASK		(1 << 0)
 #define CON_MASK		(CON_SWITCH_OPEN | CON_RAW_DATA | \
 				CON_MANUAL_SW | CON_WAIT)
 
 /* Device Type 1 */
-#define DEV_USB_OTG			(1 << 7)
+#define DEV_USB_OTG		(1 << 7)
 #define DEV_DEDICATED_CHG	(1 << 6)
-#define DEV_USB_CHG			(1 << 5)
-#define DEV_CAR_KIT			(1 << 4)
-#define DEV_UART			(1 << 3)
-#define DEV_USB				(1 << 2)
-#define DEV_AUDIO_2			(1 << 1)
-#define DEV_AUDIO_1			(1 << 0)
+#define DEV_USB_CHG		(1 << 5)
+#define DEV_CAR_KIT		(1 << 4)
+#define DEV_UART		(1 << 3)
+#define DEV_USB			(1 << 2)
+#define DEV_AUDIO_2		(1 << 1)
+#define DEV_AUDIO_1		(1 << 0)
 
 #define DEV_T1_USB_MASK		(DEV_USB_OTG | DEV_USB_CHG | DEV_USB)
 #define DEV_T1_UART_MASK	(DEV_UART)
 #define DEV_T1_CHARGER_MASK	(DEV_DEDICATED_CHG | DEV_CAR_KIT)
+#define MANSW1_OPEN_RUSTPROOF	((0x0 << 5)| (0x3 << 2) |(1 << 0))
 
 /* Device Type 2 */
+#define DEV_LG_CABLE		(1 << 9)
 #define DEV_AUDIO_DOCK		(1 << 8)
 #define DEV_SMARTDOCK		(1 << 7)
-#define DEV_AV				(1 << 6)
-#define DEV_TTY				(1 << 5)
-#define DEV_PPD				(1 << 4)
+#define DEV_AV			(1 << 6)
+#define DEV_TTY			(1 << 5)
+#define DEV_PPD			(1 << 4)
 #define DEV_JIG_UART_OFF	(1 << 3)
 #define DEV_JIG_UART_ON		(1 << 2)
 #define DEV_JIG_USB_OFF		(1 << 1)
@@ -121,10 +129,10 @@ extern int system_rev;
 				DEV_JIG_UART_OFF | DEV_JIG_UART_ON)
 
 /* Device Type 3 */
-#define DEV_MHL				(1 << 0)
+#define DEV_MHL			(1 << 0)
 #define DEV_VBUS_DEBOUNCE	(1 << 1)
 #define DEV_NON_STANDARD	(1 << 2)
-#define DEV_AV_VBUS			(1 << 4)
+#define DEV_AV_VBUS		(1 << 4)
 #define DEV_APPLE_CHARGER	(1 << 5)
 #define DEV_U200_CHARGER	(1 << 6)
 
@@ -143,38 +151,40 @@ extern int system_rev;
 #define SW_AUTO			((0 << 5) | (0 << 2))
 #define SW_USB_OPEN		(1 << 0)
 #define SW_ALL_OPEN		(0)
+#define SW_ALL_OPEN_WITH_VBUS	((0 << 5) | (0 << 2) | (1 << 0))
 
 /* Interrupt 1 */
-#define INT_OXP_DISABLE			(1 << 7)
-#define INT_OCP_ENABLE			(1 << 6)
-#define INT_OVP_ENABLE			(1 << 5)
+#define INT_OXP_DISABLE		(1 << 7)
+#define INT_OCP_ENABLE		(1 << 6)
+#define INT_OVP_ENABLE		(1 << 5)
 #define INT_LONG_KEY_RELEASE	(1 << 4)
-#define INT_LONG_KEY_PRESS		(1 << 3)
-#define INT_KEY_PRESS			(1 << 2)
-#define INT_DETACH				(1 << 1)
-#define INT_ATTACH				(1 << 0)
+#define INT_LONG_KEY_PRESS	(1 << 3)
+#define INT_KEY_PRESS		(1 << 2)
+#define INT_DETACH		(1 << 1)
+#define INT_ATTACH		(1 << 0)
 
 /* Interrupt 2 */
-#define INT_VBUS				(1 << 7)
-#define INT_OTP_ENABLE			(1 << 6)
-#define INT_CONNECT				(1 << 5)
-#define INT_STUCK_KEY_RCV		(1 << 4)
-#define INT_STUCK_KEY			(1 << 3)
-#define INT_ADC_CHANGE			(1 << 2)
-#define INT_RESERVED_ATTACH		(1 << 1)
-#define INT_AV_CHANGE			(1 << 0)
+#define INT_VBUS		(1 << 7)
+#define INT_OTP_ENABLE		(1 << 6)
+#define INT_CONNECT		(1 << 5)
+#define INT_STUCK_KEY_RCV	(1 << 4)
+#define INT_STUCK_KEY		(1 << 3)
+#define INT_ADC_CHANGE		(1 << 2)
+#define INT_RESERVED_ATTACH	(1 << 1)
+#define INT_AV_CHANGE		(1 << 0)
 /* ADC VALUE */
-#define	ADC_OTG					0x00
-#define	ADC_MHL					0x01
-#define ADC_SMART_DOCK			0x10
-#define ADC_AUDIO_DOCK			0x12
-#define	ADC_JIG_USB_OFF			0x18
-#define	ADC_JIG_USB_ON			0x19
-#define	ADC_DESKDOCK			0x1a
-#define	ADC_JIG_UART_OFF		0x1c
-#define	ADC_JIG_UART_ON			0x1d
-#define	ADC_CARDOCK				0x1d
-#define	ADC_OPEN				0x1f
+#define	ADC_OTG			0x00
+#define	ADC_MHL			0x01
+#define ADC_SMART_DOCK		0x10
+#define ADC_AUDIO_DOCK		0x12
+#define ADC_LG_CABLE		0x17
+#define	ADC_JIG_USB_OFF		0x18
+#define	ADC_JIG_USB_ON		0x19
+#define	ADC_DESKDOCK		0x1a
+#define	ADC_JIG_UART_OFF	0x1c
+#define	ADC_JIG_UART_ON		0x1d
+#define	ADC_CARDOCK		0x1d
+#define	ADC_OPEN		0x1f
 
 int uart_connecting;
 EXPORT_SYMBOL(uart_connecting);
@@ -191,13 +201,23 @@ struct tsu6721_usbsw {
 	int				mansw;
 	int				dock_attached;
 	int				dev_id;
-
-	struct delayed_work	init_work;
-	struct mutex		mutex;
+	struct delayed_work		init_work;
+	struct mutex			mutex;
 	int				adc;
+	/* muic current attached device */
+	enum muic_attached_dev		attached_dev;
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+	bool	is_factory_start;
+#endif
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+	bool				is_rustproof;
+#endif
 };
 
 static struct tsu6721_usbsw *local_usbsw;
+
+static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw);
+static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw);
 
 static int tsu6721_write_reg(struct i2c_client *client, int reg, int val)
 {
@@ -262,6 +282,8 @@ static void tsu6721_dock_control(struct tsu6721_usbsw *usbsw,
 	if (state) {
 		usbsw->mansw = path;
 		pdata->callback(dock_type, state);
+		if (dock_type == CABLE_TYPE_DESK_DOCK_NO_VB)
+			switch_set_state(&switch_dock, state);
 		ret = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1, path);
 		if (ret < 0)
 			dev_err(&client->dev, "%s: err %d\n", __func__, ret);
@@ -276,6 +298,8 @@ static void tsu6721_dock_control(struct tsu6721_usbsw *usbsw,
 			dev_err(&client->dev, "%s: err %x\n", __func__, ret);
 	} else {
 		pdata->callback(dock_type, state);
+		if (dock_type == CABLE_TYPE_DESK_DOCK_NO_VB)
+			switch_set_state(&switch_dock, state);
 		ret = i2c_smbus_read_byte_data(client, REG_CONTROL);
 		if (ret < 0)
 			dev_err(&client->dev, "%s: err %d\n", __func__, ret);
@@ -337,6 +361,47 @@ static void tsu6721_reg_init(struct tsu6721_usbsw *usbsw)
                 dev_err(&client->dev, "%s: err %d\n", __func__, ret);
 
 
+}
+
+static ssize_t tsu6721_muic_show_attached_dev(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+
+	pr_info("[MUIC] TSU6721:%s attached_dev:%d\n",
+					__func__,usbsw->attached_dev);
+
+	switch(usbsw->attached_dev) {
+	case ATTACHED_DEV_NONE_MUIC:
+		return sprintf(buf, "No VPS\n");
+	case ATTACHED_DEV_USB_MUIC:
+		return sprintf(buf, "USB\n");
+	case ATTACHED_DEV_CDP_MUIC:
+		return sprintf(buf, "CDP\n");
+	case ATTACHED_DEV_OTG_MUIC:
+		return sprintf(buf, "OTG\n");
+	case ATTACHED_DEV_TA_MUIC:
+		return sprintf(buf, "TA\n");
+	case ATTACHED_DEV_JIG_UART_OFF_MUIC:
+		return sprintf(buf, "JIG UART OFF\n");
+	case ATTACHED_DEV_JIG_UART_OFF_VB_MUIC:
+		return sprintf(buf, "JIG UART OFF/VB\n");
+	case ATTACHED_DEV_JIG_UART_ON_MUIC:
+		return sprintf(buf, "JIG UART ON\n");
+	case ATTACHED_DEV_JIG_USB_OFF_MUIC:
+		return sprintf(buf, "JIG USB OFF\n");
+	case ATTACHED_DEV_JIG_USB_ON_MUIC:
+		return sprintf(buf, "JIG USB ON\n");
+	case ATTACHED_DEV_DESKDOCK_MUIC:
+		return sprintf(buf, "DESKDOCK\n");
+	case ATTACHED_DEV_AUDIODOCK_MUIC:
+		return sprintf(buf, "AUDIODOCK\n");
+	default:
+		break;
+	}
+
+	return sprintf(buf, "UNKNOWN\n");
 }
 
 static ssize_t tsu6721_show_control(struct device *dev,
@@ -504,12 +569,144 @@ static ssize_t tsu6721_reset(struct device *dev,
 			"tsu6721_reset_control, but not reset_value!\n");
 	}
 
+#ifdef CONFIG_MUIC_SUPPORT_RUSTPROOF
+	usbsw->is_rustproof = false;
+#endif
+	usbsw->attached_dev = ATTACHED_DEV_NONE_MUIC;
+
 	tsu6721_reg_init(usbsw);
 
 	return count;
 }
 
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+static ssize_t tsu6721_show_apo_factory(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	const char *mode;
 
+	/* true: Factory mode, false: not Factory mode */
+	if (usbsw->is_factory_start)
+		mode = "FACTORY_MODE";
+	else
+		mode = "NOT_FACTORY_MODE";
+
+	pr_info("%s apo factory=%s\n", __func__, mode);
+
+	return sprintf(buf, "%s\n", mode);
+}
+
+static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw);
+static ssize_t tsu6721_set_apo_factory(struct device *dev,
+					  struct device_attribute *attr,
+					  const char *buf, size_t count)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+
+	pr_info("%s buf:%s\n", __func__, buf);
+
+	/* "FACTORY_START": factory mode */
+	if (!strncmp(buf, "FACTORY_START", 13)) {
+		usbsw->is_factory_start = true;
+		pr_info("%s FACTORY_MODE\n", __func__);
+		tsu6721_attach_dev(usbsw);
+	} else {
+		pr_warn("%s Wrong command\n", __func__);
+		return count;
+	}
+
+	return count;
+}
+#endif
+
+#ifdef CONFIG_MUIC_SUPPORT_RUSTPROOF
+static void muic_rustproof_feature(struct i2c_client *client, int state);
+/* Keystring "*#0*#" sysfs implementation */
+static ssize_t uart_en_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	/*is_rustproof is false then UART can be enabled*/
+	return snprintf(buf, 4, "%d\n", !(usbsw->is_rustproof));
+}
+
+static ssize_t uart_en_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t size)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	struct i2c_client *client = usbsw->client;
+	if (!strncmp(buf, "1", 1)) {
+		dev_info(&client->dev,
+			"[MUIC]Runtime enabling the UART.\n");
+		usbsw->is_rustproof = false;
+		muic_rustproof_feature(client,TSU6721_DETACHED);
+
+	} else {
+		dev_info(&client->dev,
+			"[MUIC]Runtime disabling the UART.\n");
+		usbsw->is_rustproof = true;
+	}
+	/* reinvoke the attach detection function to set proper paths */
+	tsu6721_attach_dev(usbsw);
+
+	return size;
+}
+
+static DEVICE_ATTR(uart_en, S_IRUGO | S_IWUSR ,
+				uart_en_show, uart_en_store);
+
+static ssize_t uart_sel_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	/*for sm5502 paths are always switch to AP*/
+	if(usbsw->attached_dev != ATTACHED_DEV_NONE_MUIC)
+		return snprintf(buf, 4, "AP\n");
+	else
+		return snprintf(buf, 9, "UNKNOWN\n");
+}
+
+static ssize_t uart_sel_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t size)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	struct i2c_client *client = usbsw->client;
+	dev_info(&client->dev,"[MUIC]Enabling AP UART Path, dummy Call\n");
+	return size;
+}
+
+static DEVICE_ATTR(uart_sel, S_IRUGO | S_IWUSR ,
+				uart_sel_show, uart_sel_store);
+
+static ssize_t usbsel_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, 4, "PDA\n");
+}
+
+static ssize_t usbsel_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t size)
+{
+	struct tsu6721_usbsw *usbsw = dev_get_drvdata(dev);
+	struct i2c_client *client = usbsw->client;
+	dev_info(&client->dev,"[MUIC]Enabling AP UART Path, dummy Call\n");
+	return size;
+}
+
+static DEVICE_ATTR(usb_sel, S_IRUGO | S_IWUSR ,
+				usbsel_show, usbsel_store);
+
+#endif
+
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+static DEVICE_ATTR(apo_factory, 0664, tsu6721_show_apo_factory,
+		tsu6721_set_apo_factory);
+#endif
 static DEVICE_ATTR(control, S_IRUGO, tsu6721_show_control, NULL);
 static DEVICE_ATTR(device_type, S_IRUGO, tsu6721_show_device_type, NULL);
 static DEVICE_ATTR(switch, S_IRUGO | S_IWUSR,
@@ -517,11 +714,15 @@ static DEVICE_ATTR(switch, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(usb_state, S_IRUGO, tsu6721_show_usb_state, NULL);
 static DEVICE_ATTR(adc, S_IRUGO, tsu6721_show_adc, NULL);
 static DEVICE_ATTR(reset_switch, S_IWUSR | S_IWGRP, NULL, tsu6721_reset);
+static DEVICE_ATTR(attached_dev, S_IRUGO, tsu6721_muic_show_attached_dev, NULL);
 
 static struct attribute *tsu6721_attributes[] = {
 	&dev_attr_control.attr,
 	&dev_attr_device_type.attr,
 	&dev_attr_switch.attr,
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+	&dev_attr_apo_factory.attr,
+#endif
 	NULL
 };
 
@@ -597,6 +798,56 @@ EXPORT_SYMBOL(check_jig_state);
 extern void tsp_charger_infom(bool en);
 #endif
 
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+static void muic_rustproof_feature(struct i2c_client *client, int state)
+{
+	int val;
+	if(state) {
+		val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1,
+							SW_ALL_OPEN_WITH_VBUS);
+		if(val < 0)
+			dev_info(&client->dev, "%s:MANUAL SW1,err %d\n",__func__,val);
+		val = i2c_smbus_read_byte_data(client,REG_CONTROL);
+		if(val < 0)
+			dev_info(&client->dev, "%s:CTRL REG,err %d\n",__func__,val);
+		val &= 0xFB;
+		val = i2c_smbus_write_byte_data(client,REG_CONTROL,val);
+		if(val < 0)
+			dev_info(&client->dev, "%s:CTRL REG,err %d\n",__func__,val);
+	} else
+	{
+		val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW2, 0x00);
+		if (val < 0)
+			dev_info(&client->dev, "%s: MANUAL SW2,err %d\n", __func__,val);
+                val = i2c_smbus_write_byte_data(client, REG_MANUAL_SW1,SW_ALL_OPEN);
+                if (val < 0)
+                        dev_info(&client->dev, "%s: MANUAL SW1,err %d\n", __func__,val);
+		val = i2c_smbus_read_byte_data(client, REG_CONTROL);
+		if (val < 0)
+			dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__,val);
+		val = val | 0x04; /*Automatic Connection S/W enable*/
+                val = i2c_smbus_write_byte_data(client, REG_CONTROL, val);
+                if (val < 0)
+                        dev_info(&client->dev, "%s: CTRL REG,err %d\n", __func__,val);
+
+	}
+}
+#endif
+
+static void muic_update_jig_state(struct tsu6721_usbsw *usbsw, int dev_type2, int vbus)
+{
+	if(dev_type2 & DEV_JIG_UART_OFF && !vbus)
+		usbsw->attached_dev = ATTACHED_DEV_JIG_UART_OFF_MUIC;
+	else if(dev_type2 & DEV_JIG_UART_OFF && vbus)
+		usbsw->attached_dev = ATTACHED_DEV_JIG_UART_OFF_VB_MUIC;
+	else if(dev_type2 & DEV_JIG_UART_ON)
+		usbsw->attached_dev = ATTACHED_DEV_JIG_UART_ON_MUIC;
+	else if(dev_type2 & DEV_JIG_USB_OFF)
+		usbsw->attached_dev = ATTACHED_DEV_JIG_USB_OFF_MUIC;
+	else if(dev_type2 & DEV_JIG_USB_ON)
+		usbsw->attached_dev = ATTACHED_DEV_JIG_USB_ON_MUIC;
+}
+
 static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw)
 {
 	int adc;
@@ -639,51 +890,81 @@ static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw)
 		val1 = 0;
 	}
 #endif
+	if (adc == ADC_LG_CABLE) {
+		val2 = DEV_LG_CABLE;
+		val1 = 0;
+	}
 	dev_err(&client->dev,
 			"dev1: 0x%x, dev2: 0x%x, dev3: 0x%x, ADC: 0x%x Jig:%s\n",
 			val1, val2, val3, adc,
 			(check_jig_state() ? "ON" : "OFF"));
 
 	/* USB */
-	if (val1 & DEV_USB || val2 & DEV_T2_USB_MASK) {
+	if (val1 & DEV_USB) {
 		pr_info("[MUIC] USB Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_USB_MUIC;
 		pdata->callback(CABLE_TYPE_USB, TSU6721_ATTACHED);
 	/* USB_CDP */
 	} else if (val1 & DEV_USB_CHG) {
 		pr_info("[MUIC] CDP Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_CDP_MUIC;
 		pdata->callback(CABLE_TYPE_CDP, TSU6721_ATTACHED);
-	/* UART */
+	/* UART FACTORY JIG CASE*/
 	} else if (val1 & DEV_T1_UART_MASK || val2 & DEV_T2_UART_MASK) {
 		uart_connecting = 1;
+		muic_update_jig_state(usbsw,val2,(val3 & DEV_VBUS_DEBOUNCE));
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+		if(usbsw->is_rustproof) {
+			pr_info("[MUIC] RustProof mode, close UART Path\n");
+			muic_rustproof_feature(client,TSU6721_ATTACHED);
+		} else 
+#endif
+		{
 		pr_info("[MUIC] UART Connected\n");
-		pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_ATTACHED);
+		if((adc == ADC_JIG_UART_OFF) && (val3 & DEV_VBUS_DEBOUNCE))
+			pdata->callback(CABLE_TYPE_JIG_UART_OFF_VB, TSU6721_ATTACHED);
+		else
+			pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_ATTACHED);
 #if (!defined(CONFIG_MACH_CT01) && !defined(CONFIG_MACH_CT01_CHN_CU))
 		flash_control(true);
 #endif
+		}
 	/* CHARGER */
 	} else if ((val1 & DEV_T1_CHARGER_MASK) ||
 			(val3 & DEV_T3_CHARGER_MASK)) {
 		pr_info("[MUIC] Charger Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_TA_MUIC;
 		pdata->callback(CABLE_TYPE_AC, TSU6721_ATTACHED);
 #if defined(CONFIG_USB_HOST_NOTIFY)
 	/* for SAMSUNG OTG */
 	} else if (val1 & DEV_USB_OTG) {
 		pr_info("[MUIC] OTG Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_OTG_MUIC;
 		tsu6721_set_otg(usbsw, TSU6721_ATTACHED);
+		pdata->callback(CABLE_TYPE_OTG, TSU6721_ATTACHED);
 #endif
 	/* JIG */
-	} else if (val2 & DEV_T2_JIG_MASK) {
-		pr_info("[MUIC] JIG Connected\n");
-		pdata->callback(CABLE_TYPE_JIG, TSU6721_ATTACHED);
+	} else if (val2 & DEV_T2_USB_MASK) {
+		pr_info("[MUIC] JIG USB Connected\n");
+		muic_update_jig_state(usbsw,val2,(val3 & DEV_VBUS_DEBOUNCE));
+		if(val3 & DEV_VBUS_DEBOUNCE)
+			pdata->callback(CABLE_TYPE_USB, TSU6721_ATTACHED);
+		else
+			pdata->callback(CABLE_TYPE_JIG, TSU6721_ATTACHED);
 #if (!defined(CONFIG_MACH_CT01) && !defined(CONFIG_MACH_CT01_CHN_CU))
 		flash_control(true);
 #endif
 	/* Desk Dock */
 	} else if ((val2 & DEV_AV) || (val3 & DEV_AV_VBUS)) {
 		pr_info("[MUIC] Deskdock Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_DESKDOCK_MUIC;
 		local_usbsw->dock_attached = TSU6721_ATTACHED;
-		tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
-			TSU6721_ATTACHED, SW_AUDIO);
+		if(val3 & DEV_VBUS_DEBOUNCE)
+			tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
+				TSU6721_ATTACHED, SW_AUDIO);
+		else
+			tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK_NO_VB,
+				TSU6721_ATTACHED, SW_AUDIO);
 #if defined(CONFIG_VIDEO_MHL_V2)
 	/* MHL */
 	} else if (val3 & DEV_MHL) {
@@ -697,10 +978,29 @@ static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw)
 #endif
 	/* Car Dock */
 	} else if (val2 & DEV_JIG_UART_ON) {
-		pr_info("[MUIC] Cardock Connected\n");
-		local_usbsw->dock_attached = TSU6721_ATTACHED;
-		tsu6721_dock_control(usbsw, CABLE_TYPE_CARDOCK,
-			TSU6721_ATTACHED, SW_AUDIO);
+		muic_update_jig_state(usbsw,val2,(val3 & DEV_VBUS_DEBOUNCE));
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+		if (usbsw->is_factory_start) {
+#endif
+			pr_info("[MUIC] Cardock Connected\n");
+			local_usbsw->dock_attached = TSU6721_ATTACHED;
+			tsu6721_dock_control(usbsw, CABLE_TYPE_CARDOCK,
+				TSU6721_ATTACHED, SW_AUDIO);
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+		} else {
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+			if(usbsw->is_rustproof) {
+				pr_info("[MUIC] RustProof mode, close UART Path\n");
+				muic_rustproof_feature(client,TSU6721_ATTACHED);
+			} else
+#endif
+			{
+				uart_connecting = 1;
+				pr_info("[MUIC] UART Connected\n");
+				pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_ATTACHED);
+			}
+		}
+#endif
 	/* SmartDock */
 	} else if (val2 & DEV_SMARTDOCK) {
 		pr_info("[MUIC] Smartdock Connected\n");
@@ -713,12 +1013,19 @@ static int tsu6721_attach_dev(struct tsu6721_usbsw *usbsw)
 	/* Audio Dock */
 	} else if (val2 & DEV_AUDIO_DOCK) {
 		pr_info("[MUIC] Audiodock Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_AUDIODOCK_MUIC;
 		tsu6721_dock_control(usbsw, CABLE_TYPE_AUDIO_DOCK,
 			TSU6721_ATTACHED, SW_DHOST);
 #endif
+	/*LG cable support*/
+	} else if (val2 & DEV_LG_CABLE) {
+		pr_info("[MUIC] LG Data Cable connected \n");
+		usbsw->attached_dev = ATTACHED_DEV_USB_MUIC;
+		pdata->callback(CABLE_TYPE_USB, TSU6721_ATTACHED);
 	/* Incompatible */
 	} else if (val3 & DEV_VBUS_DEBOUNCE) {
 		pr_info("[MUIC] Incompatible Charger Connected\n");
+		usbsw->attached_dev = ATTACHED_DEV_UNKNOWN_MUIC;
 		pdata->callback(CABLE_TYPE_INCOMPATIBLE,
 				TSU6721_ATTACHED);
 	}
@@ -746,8 +1053,7 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 #endif
 
 	/* USB */
-	if (usbsw->dev1 & DEV_USB ||
-			usbsw->dev2 & DEV_T2_USB_MASK) {
+	if (usbsw->dev1 & DEV_USB) {
 		pr_info("[MUIC] USB Disonnected\n");
 		pdata->callback(CABLE_TYPE_USB, TSU6721_DETACHED);
 	} else if (usbsw->dev1 & DEV_USB_CHG) {
@@ -756,12 +1062,23 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 	/* UART */
 	} else if (usbsw->dev1 & DEV_T1_UART_MASK ||
 			usbsw->dev2 & DEV_T2_UART_MASK) {
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+		if(usbsw->is_rustproof) {
+                        pr_info("[MUIC] RustProof mode Disconnected Event\n");
+			muic_rustproof_feature(usbsw->client,TSU6721_DETACHED);
+                } else
+#endif
+		{
 		pr_info("[MUIC] UART Disonnected\n");
-		pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_DETACHED);
+		if((usbsw->adc == ADC_JIG_UART_OFF) && (usbsw->dev3 & DEV_VBUS_DEBOUNCE))
+			pdata->callback(CABLE_TYPE_JIG_UART_OFF_VB, TSU6721_DETACHED);
+		else
+			pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_DETACHED);
 		uart_connecting = 0;
 #if (!defined(CONFIG_MACH_CT01) && !defined(CONFIG_MACH_CT01_CHN_CU))
 		flash_control(false);
 #endif
+		}
 	/* CHARGER */
 	} else if ((usbsw->dev1 & DEV_T1_CHARGER_MASK) ||
 			(usbsw->dev3 & DEV_T3_CHARGER_MASK)) {
@@ -772,11 +1089,15 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 	} else if (usbsw->dev1 & DEV_USB_OTG) {
 		pr_info("[MUIC] OTG Disonnected\n");
 		tsu6721_set_otg(usbsw, TSU6721_DETACHED);
+		pdata->callback(CABLE_TYPE_OTG, TSU6721_DETACHED);
 #endif
 	/* JIG */
-	} else if (usbsw->dev2 & DEV_T2_JIG_MASK) {
-		pr_info("[MUIC] JIG Disonnected\n");
-		pdata->callback(CABLE_TYPE_JIG, TSU6721_DETACHED);
+	} else if (usbsw->dev2 & DEV_T2_USB_MASK) {
+		pr_info("[MUIC] JIG USB Disonnected\n");
+		if(usbsw->dev3 & DEV_VBUS_DEBOUNCE)
+			pdata->callback(CABLE_TYPE_USB, TSU6721_DETACHED);
+		else
+			pdata->callback(CABLE_TYPE_JIG, TSU6721_DETACHED);
 #if (!defined(CONFIG_MACH_CT01) && !defined(CONFIG_MACH_CT01_CHN_CU))
 		flash_control(false);
 #endif
@@ -785,8 +1106,13 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 	(usbsw->dev3 & DEV_AV_VBUS)) {
 		pr_info("[MUIC] Deskdock Disonnected\n");
 		local_usbsw->dock_attached = TSU6721_DETACHED;
-		tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
-			TSU6721_DETACHED, SW_ALL_OPEN);
+		if(usbsw->dev3 & DEV_VBUS_DEBOUNCE)
+			tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK,
+				TSU6721_DETACHED, SW_ALL_OPEN);
+		else
+			tsu6721_dock_control(usbsw, CABLE_TYPE_DESK_DOCK_NO_VB,
+				TSU6721_DETACHED, SW_ALL_OPEN);
+
 #if defined(CONFIG_MHL_D3_SUPPORT)
 	/* MHL */
 	} else if (usbsw->dev3 & DEV_MHL) {
@@ -796,10 +1122,28 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 #endif
 	/* Car Dock */
 	} else if (usbsw->dev2 & DEV_JIG_UART_ON) {
-		pr_info("[MUIC] Cardock Disonnected\n");
-		local_usbsw->dock_attached = TSU6721_DETACHED;
-		tsu6721_dock_control(usbsw, CABLE_TYPE_CARDOCK,
-			TSU6721_DETACHED, SW_ALL_OPEN);
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+		if (usbsw->is_factory_start) {
+#endif
+			pr_info("[MUIC] Cardock Disonnected\n");
+			local_usbsw->dock_attached = TSU6721_DETACHED;
+			tsu6721_dock_control(usbsw, CABLE_TYPE_CARDOCK,
+				TSU6721_DETACHED, SW_ALL_OPEN);
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+		} else {
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+                        if(usbsw->is_rustproof) {
+                                pr_info("[MUIC] RustProof mode, disconnected Event\n");
+				muic_rustproof_feature(usbsw->client,TSU6721_DETACHED);
+                        } else
+#endif
+			{
+				pr_info("[MUIC] UART Disonnected\n");
+				pdata->callback(CABLE_TYPE_UARTOFF, TSU6721_DETACHED);
+				uart_connecting = 0;
+			}
+		}
+#endif
 	/* Smart Dock */
 	} else if (usbsw->dev2 == DEV_SMARTDOCK) {
 		pr_info("[MUIC] Smartdock Disonnected\n");
@@ -815,6 +1159,10 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 		tsu6721_dock_control(usbsw, CABLE_TYPE_AUDIO_DOCK,
 			TSU6721_DETACHED, SW_ALL_OPEN);
 #endif
+	/*LG cable support*/
+	} else if (usbsw->dev2 == DEV_LG_CABLE) {
+		pr_info("[MUIC] LG Data Cable Disconnected \n");
+		pdata->callback(CABLE_TYPE_USB, TSU6721_DETACHED);
 	/* Incompatible */
 	} else if (usbsw->dev3 & DEV_VBUS_DEBOUNCE) {
 		pr_info("[MUIC] Incompatible Charger Disonnected\n");
@@ -833,6 +1181,7 @@ static int tsu6721_detach_dev(struct tsu6721_usbsw *usbsw)
 	usbsw->dev2 = 0;
 	usbsw->dev3 = 0;
 	usbsw->adc = 0;
+	usbsw->attached_dev = ATTACHED_DEV_NONE_MUIC;
 
 	return 0;
 
@@ -851,9 +1200,11 @@ static irqreturn_t tsu6721_irq_thread(int irq, void *data)
 	intr1 = i2c_smbus_read_byte_data(client, REG_INT1);
 	intr2 = i2c_smbus_read_byte_data(client, REG_INT2);
 	tsu6721_enable_interrupt();
-	dev_info(&client->dev, "%s: intr : 0x%x intr2 : 0x%x\n",
-		__func__, intr1, intr2);
 
+	adc = i2c_smbus_read_byte_data(client, REG_ADC);
+
+	dev_info(&client->dev, "%s: intr1: 0x%x, intr2: 0x%x, adc: 0x%x",
+						__func__, intr1, intr2, adc);
 	/* MUIC OVP Check */
 	if (intr1 & INT_OVP_ENABLE)
 		usbsw->pdata->oxp_callback(ENABLE);
@@ -865,7 +1216,6 @@ static irqreturn_t tsu6721_irq_thread(int irq, void *data)
 	if (intr1 == (INT_ATTACH + INT_DETACH)) {
 		val1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
 		val3 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE3);
-		adc = i2c_smbus_read_byte_data(client, REG_ADC);
 		if ((adc == ADC_OPEN) && (val1 == DATA_NONE) &&
 				((val3 == DATA_NONE) ||
 				 (val3 == DEV_VBUS_DEBOUNCE)))
@@ -874,13 +1224,56 @@ static irqreturn_t tsu6721_irq_thread(int irq, void *data)
 			tsu6721_attach_dev(usbsw);
         }
 	/* interrupt attach */
-	 else if (intr1 & INT_ATTACH || intr2 &
-			(INT_AV_CHANGE | INT_RESERVED_ATTACH))
+	 else if (intr1 & INT_ATTACH || (intr2 & INT_RESERVED_ATTACH))
 		tsu6721_attach_dev(usbsw);
 
 	/* interrupt detach */
 	else if (intr1 & INT_DETACH)
 		tsu6721_detach_dev(usbsw);
+	else if (intr2 & INT_VBUS) {
+		dev_info(&client->dev,"[MUIC]: VBUSOUT_ON\n");
+#ifdef CONFIG_USB_HOST_NOTIFY
+		sec_otg_notify(HNOTIFY_OTG_POWER_ON);
+		if(sec_get_notification(HNOTIFY_MODE) == NOTIFY_TEST_MODE)
+			goto exit_irq_handler;
+#endif
+			/*Jig UART Boot-Off Or Deskdock VBUS Attached*/
+		if (adc == ADC_JIG_UART_OFF) {
+				tsu6721_attach_dev(usbsw);
+			} else if (adc == ADC_DESKDOCK) {
+#if defined(DEBUG)
+				val1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
+				val3 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE3);
+				printk("%s, dev1 0x%x dev3 0x%x \n", __func__, val1, val3);
+#endif
+				/*When VBUS is changing only, no need to switch paths again*/
+				usbsw->pdata->callback(CABLE_TYPE_DESK_DOCK, TSU6721_ATTACHED);
+			}
+	}
+	else if (intr2 & INT_AV_CHANGE) {
+		dev_info(&client->dev,"[MUIC]: VBUSOUT_OFF\n");
+#ifdef CONFIG_USB_HOST_NOTIFY
+                sec_otg_notify(HNOTIFY_OTG_POWER_OFF);
+		if(sec_get_notification(HNOTIFY_MODE) == NOTIFY_TEST_MODE)
+			goto exit_irq_handler;
+#endif
+			/*Jig UART Boot-Off Or Deskdock VBUS Detached*/
+			if (adc == ADC_JIG_UART_OFF) {
+				tsu6721_detach_dev(usbsw);
+			} else if (adc == ADC_DESKDOCK) {
+#if defined(DEBUG)
+				val1 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE1);
+				val3 = i2c_smbus_read_byte_data(client, REG_DEVICE_TYPE3);
+				printk("%s, dev1 0x%x dev3 0x%x \n", __func__, val1, val3);
+#endif
+				/*When VBUS is changing only, no need to switch paths again*/
+				usbsw->pdata->callback(CABLE_TYPE_DESK_DOCK_NO_VB, TSU6721_DETACHED);
+			}
+	}
+
+#ifdef CONFIG_USB_HOST_NOTIFY
+exit_irq_handler:
+#endif
 	mutex_unlock(&usbsw->mutex);
 	pr_info("tsu6721_irq_thread,end\n");
 	return IRQ_HANDLED;
@@ -911,6 +1304,7 @@ static void tsu6721_init_detect(struct work_struct *work)
 			struct tsu6721_usbsw, init_work.work);
 	int ret;
 	int int_reg1, int_reg2;
+	int val1, val3, adc;
 
 	dev_info(&usbsw->client->dev, "%s\n", __func__);
 
@@ -930,6 +1324,21 @@ static void tsu6721_init_detect(struct work_struct *work)
 	int_reg2 = i2c_smbus_read_byte_data(usbsw->client, REG_INT2);
 	dev_info(&usbsw->client->dev, "%s: intr2 : 0x%x\n",
 		__func__, int_reg2);
+
+	/* device detection */
+	/* interrupt detach */
+	adc = i2c_smbus_read_byte_data(usbsw->client, REG_ADC);
+	if (int_reg1 == (INT_ATTACH)) {
+		val1 = i2c_smbus_read_byte_data(usbsw->client, REG_DEVICE_TYPE1);
+		val3 = i2c_smbus_read_byte_data(usbsw->client, REG_DEVICE_TYPE3);
+		if ((adc == ADC_OPEN) && (val1 == DATA_NONE) &&
+				((val3 == DATA_NONE) ||
+				 (val3 == (DEV_VBUS_DEBOUNCE | DEV_NON_STANDARD)))){
+					dev_info(&usbsw->client->dev, "%s: val1 : 0x%x val3 : 0x%x\n",
+		__func__, val1, val3);
+			tsu6721_detach_dev(usbsw);
+		}
+	}
 }
 
 #ifdef CONFIG_OF
@@ -974,36 +1383,59 @@ static int __devinit tsu6721_probe(struct i2c_client *client,
 				return -ENOMEM;
 		}
 		ret = tsu6721_parse_dt(&client->dev, pdata);
-		if (ret < 0)
-			return ret;
+		if (ret < 0) {
+			dev_err(&client->dev, "sm5502_parse_dt failed\n");
+			goto fail;
+		}
 
 		pdata->callback = tsu6721_callback;
 		pdata->dock_init = tsu6721_dock_init;
 		pdata->oxp_callback = tsu6721_oxp_callback;
 		pdata->mhl_sel = NULL;
+
 		gpio_tlmm_config(GPIO_CFG(pdata->gpio_sda,  0, GPIO_CFG_INPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 		gpio_tlmm_config(GPIO_CFG(pdata->gpio_scl,  0, GPIO_CFG_INPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+#if defined(CONFIG_SEC_HESTIA_PROJECT)
+		if (system_rev == 6) {
+			gpio_tlmm_config(GPIO_CFG(pdata->gpio_sda,  0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_4MA), GPIO_CFG_ENABLE);
+			gpio_tlmm_config(GPIO_CFG(pdata->gpio_scl,  0, GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_UP, GPIO_CFG_4MA), GPIO_CFG_ENABLE);
+		}
+#endif
+
+#if defined(CONFIG_SEC_BERLUTI_PROJECT) || defined(CONFIG_SEC_GNOTE_PROJECT)
+		gpio_tlmm_config(GPIO_CFG(pdata->gpio_int,  0, GPIO_CFG_INPUT,
+			GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
+		gpio_tlmm_config(GPIO_CFG(pdata->gpio_uart_on,  0, GPIO_CFG_INPUT,
+			GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
+#else
 		gpio_tlmm_config(GPIO_CFG(pdata->gpio_int,  0, GPIO_CFG_INPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 		gpio_tlmm_config(GPIO_CFG(pdata->gpio_uart_on,  0, GPIO_CFG_INPUT,
 			GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
+#endif
 		client->irq = gpio_to_irq(pdata->gpio_int);
-	} else
+	} else {
 		pdata = client->dev.platform_data;
+		if (!pdata)
+			return -EINVAL;
+	}
 
-	if (!pdata)
-		return -EINVAL;
-
-	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
-		return -EIO;
+	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+		dev_err(&client->dev, "i2c functionality check failed...!\n");
+		ret = -EIO;
+		goto fail;
+	}
 
 	usbsw = kzalloc(sizeof(struct tsu6721_usbsw), GFP_KERNEL);
 	if (!usbsw) {
 		dev_err(&client->dev, "failed to allocate driver data\n");
-		kfree(usbsw);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto fail;
 	}
 
 	usbsw->client = client;
@@ -1014,12 +1446,29 @@ static int __devinit tsu6721_probe(struct i2c_client *client,
 	if (!usbsw->pdata)
 		goto fail1;
 
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+	usbsw->is_factory_start = false;
+#endif
+
 	i2c_set_clientdata(client, usbsw);
 
 	mutex_init(&usbsw->mutex);
 
 	local_usbsw = usbsw;
 
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+	ret = tsu6721_read_reg(client,REG_MANUAL_SW1);
+	if(ret<0) {
+		dev_err(&client->dev, "failed to read MANUAL SW1 Reg, err:%d\n",ret);
+	}
+	/* Keep the feature disabled by default */
+	usbsw->is_rustproof = false;
+
+	/* RUSTPROOF: disable UART connection if MANSW1 from BL is OPEN_RUSTPROOF*/
+	if(ret == MANSW1_OPEN_RUSTPROOF)
+		usbsw->is_rustproof = true;
+
+#endif
 	/* tsu6721 soft reset*/
 	ret = i2c_smbus_write_byte_data(client,REG_RESET, 0x01);
 	if (ret < 0)
@@ -1034,7 +1483,7 @@ static int __devinit tsu6721_probe(struct i2c_client *client,
 		goto fail2;
 	}
 
-	/* make sysfs node /sys/class/sec/switch/usb_state */
+	/* make sysfs node /sys/class/sec/switch/ */
 	switch_dev = device_create(sec_class, NULL, 0, NULL, "switch");
 	if (IS_ERR(switch_dev)) {
 		pr_err("[TSU6721] Failed to create device (switch_dev)!\n");
@@ -1060,6 +1509,40 @@ static int __devinit tsu6721_probe(struct i2c_client *client,
 		goto err_create_file_reset_switch;
 	}
 
+	ret = device_create_file(switch_dev, &dev_attr_attached_dev);
+	if (ret < 0) {
+		pr_err("[TSU6721] Failed to create file (attached_dev)!\n");
+		goto err_create_file_attached_dev;
+	}
+
+	local_usbsw->attached_dev = ATTACHED_DEV_NONE_MUIC;
+
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+	ret = device_create_file(switch_dev, &dev_attr_uart_en);
+	if (ret < 0) {
+		pr_err("[TSU6721] Failed to create file (uart_en)!\n");
+		goto err_create_file_uart_en;
+	}
+	ret = device_create_file(switch_dev, &dev_attr_uart_sel);
+	if (ret < 0) {
+		pr_err("[TSU6721] Failed to create file (uart_sel)!\n");
+		goto err_create_file_uart_sel;
+	}
+	ret = device_create_file(switch_dev, &dev_attr_usb_sel);
+	if (ret < 0) {
+		pr_err("[TSU6721] Failed to create file (usb_sel)!\n");
+		goto err_create_file_usb_sel;
+	}
+#endif
+
+#if !defined(CONFIG_MUIC_SUPPORT_CAR_DOCK)
+	ret = device_create_file(switch_dev, &dev_attr_apo_factory);
+	if (ret < 0) {
+		pr_err("[TSU6721] Failed to create file (apo_factory)!\n");
+		goto err_create_file_reset_switch;
+	}
+#endif
+
 	dev_set_drvdata(switch_dev, usbsw);
 	/* tsu6721 dock init*/
 	if (usbsw->pdata->dock_init)
@@ -1071,6 +1554,16 @@ static int __devinit tsu6721_probe(struct i2c_client *client,
 
 	return 0;
 
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+err_create_file_usb_sel:
+	device_remove_file(switch_dev, &dev_attr_usb_sel);
+err_create_file_uart_sel:
+	device_remove_file(switch_dev, &dev_attr_uart_sel);
+err_create_file_uart_en:
+	device_remove_file(switch_dev, &dev_attr_uart_en);
+#endif
+err_create_file_attached_dev:
+	device_remove_file(switch_dev, &dev_attr_attached_dev);
 err_create_file_reset_switch:
 	device_remove_file(switch_dev, &dev_attr_reset_switch);
 err_create_file_adc:
@@ -1080,10 +1573,12 @@ err_create_file_state:
 fail2:
 	if (client->irq)
 		free_irq(client->irq, usbsw);
-fail1:
 	mutex_destroy(&usbsw->mutex);
 	i2c_set_clientdata(client, NULL);
+fail1:
 	kfree(usbsw);
+fail:
+	kfree(pdata);
 	return ret;
 }
 

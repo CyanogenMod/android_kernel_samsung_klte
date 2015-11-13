@@ -160,7 +160,8 @@ ip_selector_match_debug_log_endpoint_list(
 
       DEBUG_LOW(
               dump,
-              "Selector %p: ip_version %d, ip_protocol %d, %pI6c - %pI6c, %d - %d.",
+              "Selector %p: "
+              "ip_version %d, ip_protocol %d, %pI6c - %pI6c, %d - %d.",
               base,
               endpoint->ip_version,
               endpoint->ip_protocol,
@@ -433,7 +434,7 @@ debug_str_ip_selector_fields(
                    fields->destination_port);
     }
 
-  DEBUG_STRBUF_BUFFER_COMMIT(buf, p_len);
+  DEBUG_STRBUF_BUFFER_COMMIT(buf, offset + 1);
 
   return p;
 }
@@ -982,12 +983,20 @@ ip_selector_match_fields_to_group(
       if (ip_selector_match_selector_match(selector, fields))
         {
           match = true;
-          DEBUG_LOW(lookup, "Fields %p on selector %p: match.", fields, selector);
+          DEBUG_LOW(
+                  lookup,
+                  "Fields %p on selector %p: match.",
+                  fields,
+                  selector);
           break;
         }
       else
         {
-          DEBUG_LOW(lookup, "Fields %p on selector %p: no match.", fields, selector);
+          DEBUG_LOW(
+                  lookup,
+                  "Fields %p on selector %p: no match.",
+                  fields,
+                  selector);
         }
 
       offset += selector->bytecount;

@@ -59,6 +59,7 @@ struct sec_battery_info {
 	struct power_supply psy_ac;
 	struct power_supply psy_wireless;
 	struct power_supply psy_ps;
+	struct power_supply psy_pogo;
 	unsigned int irq;
 
 #if defined(CONFIG_EXTCON)
@@ -78,6 +79,7 @@ struct sec_battery_info {
 	int current_adc;
 
 	unsigned int capacity;			/* SOC (%) */
+	int prev_reported_soc;
 
 	struct mutex adclock;
 	struct adc_sample_info	adc_sample[ADC_CH_COUNT];
@@ -118,12 +120,17 @@ struct sec_battery_info {
 	unsigned long charging_next_time;
 	unsigned long charging_fullcharged_time;
 
+	/* chg temperature check */
+	bool chg_limit;
+
 	/* temperature check */
 	int temperature;	/* battery temperature */
 	int temper_amb;		/* target temperature */
+	int chg_temp;		/* charger temperature */
 
 	int temp_adc;
 	int temp_ambient_adc;
+	int chg_temp_adc;
 
 	int temp_highlimit_threshold;
 	int temp_highlimit_recovery;
@@ -141,6 +148,7 @@ struct sec_battery_info {
 	unsigned int charging_mode;
 	bool is_recharging;
 	int cable_type;
+	int muic_cable_type;
 	int extended_cable_type;
 	struct wake_lock cable_wake_lock;
 	struct delayed_work cable_work;
@@ -164,11 +172,22 @@ struct sec_battery_info {
 	/* test mode */
 	int test_mode;
 	bool factory_mode;
+	bool store_mode;
 	bool slate_mode;
+
+	/* MTBF test for CMCC */
+	bool is_hc_usb;
 
 	int siop_level;
 	int stability_test;
 	int eng_not_full_status;
+#if defined(CONFIG_BATTERY_SWELLING)
+	bool swelling_mode;
+	bool swelling_block;
+	unsigned long swelling_block_start;
+	unsigned long swelling_block_passed;
+	int swelling_full_check_cnt;
+#endif
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -220,6 +239,8 @@ enum {
 	BATT_TEMP_ADC,
 	BATT_TEMP_AVER,
 	BATT_TEMP_ADC_AVER,
+	BATT_CHG_TEMP,
+	BATT_CHG_TEMP_ADC,
 	BATT_VF_ADC,
 	BATT_SLATE_MODE,
 
@@ -230,12 +251,16 @@ enum {
 	FG_REG_DUMP,
 	FG_RESET_CAP,
 	FG_CAPACITY,
+	FG_ASOC,
 	AUTH,
 	CHG_CURRENT_ADC,
 	WC_ADC,
 	WC_STATUS,
 	WC_ENABLE,
+	HV_CHARGER_STATUS,
+	HV_CHARGER_SET,
 	FACTORY_MODE,
+	STORE_MODE,
 	UPDATE,
 	TEST_MODE,
 
@@ -257,10 +282,19 @@ enum {
 	BATT_EVENT_LCD,
 	BATT_EVENT_GPS,
 	BATT_EVENT,
+	BATT_TEMP_TABLE,
+	BATT_HIGH_CURRENT_USB,
 #if defined(CONFIG_SAMSUNG_BATTERY_ENG_TEST)
 	BATT_TEST_CHARGE_CURRENT,
 #endif
 	BATT_STABILITY_TEST,
+	BATT_INBAT_VOLTAGE,
+};
+
+enum {
+	BATT_TYPE_ATL = 0,
+	BATT_TYPE_SDI,
+	BATT_TYPE_BYD,
 };
 
 #ifdef CONFIG_OF
@@ -270,7 +304,7 @@ extern void cable_initial_check(struct sec_battery_info *battery);
 extern bool sec_bat_check_jig_status(void);
 extern void adc_exit(struct sec_battery_info *battery);
 extern int sec_bat_check_cable_callback(struct sec_battery_info *battery);
-extern bool sec_bat_check_cable_result_callback(int cable_type);
+extern void sec_bat_check_cable_result_callback(struct device *dev, int cable_type);
 extern bool sec_bat_check_callback(struct sec_battery_info *battery);
 #endif
 

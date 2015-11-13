@@ -97,6 +97,7 @@ config SEC_OOM_KILLER
 
 config SEC_DEBUG_LMK_MEMINFO
 	bool "Show Meminfo when lmk invoked"
+	depends on !SAMSUNG_PRODUCT_SHIP
 	default n
 	help
 	  Show memory information when lmk kills process
@@ -140,6 +141,12 @@ config KSWAPD_NOSWAP
 	default n
 	help
 	  This option controls swap action in kswapd
+
+config SAMP_HOTNESS
+	bool "Kill hidden process by hotness"
+	default n
+	help
+	  This option change kill hidden process policy in LMK
 
 endif # if ANDROID
 

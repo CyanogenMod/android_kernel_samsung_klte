@@ -24,8 +24,32 @@
 #include <linux/leds-ktd2026.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
-
 #undef AN3029_COMPATIBLE
+
+#if defined(CONFIG_SEC_FACTORY)
+#if defined (CONFIG_SEC_ATLANTIC_PROJECT)
+static int batt_id_value;
+static int jig_power_on_value;
+#if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
+extern int get_lcd_attached(void);
+#endif
+
+static int __init get_batt_id_value_cmdline(char *mode)
+{
+	batt_id_value = mode[0]-48;		// Converting Char to Int
+	return 0;
+}
+
+static int __init jig_power_on_value_cmdline(char *mode)
+{
+	jig_power_on_value = mode[0]-48;
+	return 0;
+}
+
+__setup( "jig_power_on=0x", jig_power_on_value_cmdline );
+__setup( "batt_id_value=0x", get_batt_id_value_cmdline );
+#endif
+#endif
 
 /* KTD2026 register map */
 #define KTD2026_REG_EN_RST		0x00
@@ -56,9 +80,9 @@
 
 #define KTD2026_RESET		0x07
 
-#define LED_MAX_CURRENT		0x20
-#define LED_DEFAULT_CURRENT	0x10
-#define LED_LOW_CURRENT		0x02
+#define LED_MAX_CURRENT		0x30
+#define LED_DEFAULT_CURRENT	0x20
+#define LED_LOW_CURRENT		0x07
 #define LED_OFF			0x00
 
 #define	MAX_NUM_LEDS		3
@@ -145,22 +169,31 @@ static inline struct ktd2026_led *cdev_to_led(struct led_classdev *cdev)
 static int leds_i2c_write_all(struct i2c_client *client)
 {
 	struct ktd2026_data *data = i2c_get_clientdata(client);
-	int ret;
+	int ret = 0;
+	int retry = 0;
 
 	mutex_lock(&data->mutex);
-	ret = i2c_smbus_write_i2c_block_data(client,
-			KTD2026_REG_EN_RST, KTD2026_REG_MAX,
-			&data->shadow_reg[KTD2026_REG_EN_RST]);
-	if (ret < 0) {
-		dev_err(&client->adapter->dev,
-			"%s: failure on i2c block write\n",
-			__func__);
-		goto exit;
-	}
-	mutex_unlock(&data->mutex);
-	return 0;
+	do
+	{
+		ret = i2c_smbus_write_i2c_block_data(client,
+				KTD2026_REG_EN_RST, KTD2026_REG_MAX,
+				&data->shadow_reg[KTD2026_REG_EN_RST]);
+		if (ret < 0) {
+			dev_err(&client->adapter->dev,
+				"%s: failure on i2c block write\n",
+				__func__);
+			retry++;
+			if(retry > 10) 
+			{
+				dev_err(&client->adapter->dev,
+					"%s: retry > 10 : Fatal i2c error\n",
+					__func__);
+				break;
+			}
+			msleep(100);
+		}
+	} while(ret < 0);
 
-exit:
 	mutex_unlock(&data->mutex);
 	return ret;
 }
@@ -292,8 +325,23 @@ void ktd2026_set_trise_tfall(int trise, int tfall, int tscale)
 	data->shadow_reg[KTD2026_REG_EN_RST]
 			|= tscale << CNT_RISEFALL_TSCALE_SHIFT;
 }
+
+void ktd2026_set_sleep(int sleep)
+{
+	struct ktd2026_data *data = i2c_get_clientdata(b_client);
+
+	if (sleep)
+	{
+		int val;
+		val = 0x1 << CNT_ENABLE_SHIFT;
+		data->shadow_reg[KTD2026_REG_EN_RST] |= val;
+	}
+	else
+		data->shadow_reg[KTD2026_REG_EN_RST] &= ~CNT_ENABLE_MASK;
+}
+
 #ifdef SEC_LED_SPECIFIC
-static void ktd2026_reset_register_work(struct work_struct *work)
+static void ktd2026_reset(void)
 {
 	int retval;
 	struct i2c_client *client;
@@ -304,7 +352,7 @@ static void ktd2026_reset_register_work(struct work_struct *work)
 	ktd2026_leds_on(LED_B, LED_EN_OFF, 0);
 	retval = leds_i2c_write_all(client);
 	if (retval)
-		printk(KERN_WARNING "leds_i2c_write_all failed\n");
+		pr_err("%s:leds_i2c_write_all failed\n", __func__);
 
 	ktd2026_set_timerslot_control(0); /* Tslot1 */
 	ktd2026_set_period(0);
@@ -312,9 +360,16 @@ static void ktd2026_reset_register_work(struct work_struct *work)
 	ktd2026_set_pwm_duty(PWM2, 0);
 	ktd2026_set_trise_tfall(0, 0, 0);
 
+	/* get into sleep mode after turing off all the leds */
+	ktd2026_set_sleep(1);
+
 	retval = leds_i2c_write_all(client);
 	if (retval)
-		printk(KERN_WARNING "leds_i2c_write_all failed\n");
+		pr_err("%s:leds_i2c_write_all failed\n", __func__);
+
+	/* reset sleep mode, so that next i2c command
+		would not make the driver IC go into sleep mode */
+	ktd2026_set_sleep(0);
 }
 
 void ktd2026_start_led_pattern(enum ktd2026_pattern mode)
@@ -322,13 +377,12 @@ void ktd2026_start_led_pattern(enum ktd2026_pattern mode)
 	int retval;
 
 	struct i2c_client *client;
-	struct work_struct *reset = 0;
 	client = b_client;
 
 	if (mode > POWERING)
 		return;
 	/* Set all LEDs Off */
-	ktd2026_reset_register_work(reset);
+	ktd2026_reset();
 	if (mode == LED_OFF)
 		return;
 
@@ -389,7 +443,7 @@ void ktd2026_start_led_pattern(enum ktd2026_pattern mode)
 	}
 	retval = leds_i2c_write_all(client);
 	if (retval)
-		printk(KERN_WARNING "leds_i2c_write_all failed\n");
+		pr_err("%s:leds_i2c_write_all failed\n", __func__);
 }
 EXPORT_SYMBOL(ktd2026_start_led_pattern);
 
@@ -420,8 +474,8 @@ static void ktd2026_set_led_blink(enum ktd2026_led_enum led,
 	ktd2026_set_period((on_time+off_time) * 4 + 2);
 	ktd2026_set_pwm_duty(PWM1, on_time*255 / (on_time + off_time));
 	ktd2026_set_trise_tfall(0, 0, 0);
-	printk(KERN_CRIT "on_time=%d, off_time=%d, period=%d, duty=%d\n" ,
-		on_time, off_time, (on_time+off_time) * 4 + 2,
+	pr_info("%s:on_time=%d, off_time=%d, period=%d, duty=%d\n" ,
+		__func__, on_time, off_time, (on_time+off_time) * 4 + 2,
 		on_time * 255 / (on_time + off_time) );
 }
 
@@ -441,7 +495,7 @@ static ssize_t store_ktd2026_led_lowpower(struct device *dev,
 
 	led_lowpower_mode = led_lowpower;
 
-	printk(KERN_DEBUG "led_lowpower mode set to %i\n", led_lowpower);
+	pr_info("%s:led_lowpower mode set to %i\n", __func__, led_lowpower);
 
 	return count;
 }
@@ -465,7 +519,7 @@ static ssize_t store_ktd2026_led_brightness(struct device *dev,
 
 	led_dynamic_current = brightness;
 
-	printk(KERN_DEBUG "led brightness set to %i\n", brightness);
+	pr_info("%s:led brightness set to %i\n", __func__, brightness);
 
 	return count;
 }
@@ -503,8 +557,8 @@ static ssize_t store_ktd2026_led_pattern(struct device *dev,
 	}
 
 	ktd2026_start_led_pattern(mode);
-	printk(KERN_DEBUG "led pattern : %d is activated(Type:%d)\n",
-		mode, led_lowpower_mode);
+	pr_info("%s:led pattern : %d is activated(Type:%d)\n",
+		__func__, mode, led_lowpower_mode);
 	return count;
 }
 
@@ -549,8 +603,8 @@ static ssize_t store_ktd2026_led_blink(struct device *dev,
 
 	leds_i2c_write_all(data->client);
 
-	printk(KERN_DEBUG "led_blink is called, Color:0x%X Brightness:%i\n",
-			led_brightness, led_dynamic_current);
+	pr_info("%s:led_blink is called, Color:0x%X Brightness:%i\n",
+			__func__, led_brightness, led_dynamic_current);
 
 	return count;
 }
@@ -582,8 +636,8 @@ void ktd2026_led_blink(int rgb, int on, int off)
 
 	leds_i2c_write_all(b_client);
 
-	printk(KERN_DEBUG "led_blink is called, Color:0x%X Brightness:%i\n",
-		led_brightness, led_dynamic_current);
+	pr_info("%s:led_blink is called, Color:0x%X Brightness:%i\n",
+		__func__, led_brightness, led_dynamic_current);
 }
 EXPORT_SYMBOL(ktd2026_led_blink);
 
@@ -839,15 +893,13 @@ static int __devinit ktd2026_probe(struct i2c_client *client,
 	struct ktd2026_data *data;
 	int ret, i;
 
-	printk(KERN_CRIT  "%s\n", __func__);
-	dev_dbg(&client->adapter->dev, "%s\n", __func__);
+	pr_info("%s\n", __func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "need I2C_FUNC_I2C.\n");
 		return -ENODEV;
 	}
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
-		pr_err("%s: i2c functionality check error\n", __func__);
 		dev_err(&client->dev, "need I2C_FUNC_SMBUS_BYTE_DATA.\n");
 		return -EIO;
 	}
@@ -871,6 +923,23 @@ static int __devinit ktd2026_probe(struct i2c_client *client,
 	/* initialize LED */
 	/* turn off all leds */
 	ktd2026_leds_on(LED_R, LED_EN_OFF, 0);
+#if defined(CONFIG_SEC_FACTORY)
+#if defined (CONFIG_SEC_ATLANTIC_PROJECT)
+	if(batt_id_value == 0)
+		ret = 1;
+	else
+		ret = 0;
+#if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
+	if(get_lcd_attached() == 0)     // When LCD Not connected turning RED LED on
+		ret++;;
+#endif
+
+	if(jig_power_on_value == 0)
+		ret++;
+	if(ret == 3)	// case when LCD not connected,battery power on and jig off
+		ktd2026_leds_on(LED_R, LED_EN_ON, 30);
+#endif		//ATLANTIC FLAG
+#endif
 	ktd2026_leds_on(LED_G, LED_EN_OFF, 0);
 	ktd2026_leds_on(LED_B, LED_EN_OFF, 0);
 
@@ -921,6 +990,8 @@ static int __devexit ktd2026_remove(struct i2c_client *client)
 	struct ktd2026_data *data = i2c_get_clientdata(client);
 	int i;
 	dev_dbg(&client->adapter->dev, "%s\n", __func__);
+	pr_info("%s\n", __func__);
+	ktd2026_reset();
 #ifdef SEC_LED_SPECIFIC
 	sysfs_remove_group(&led_dev->kobj, &sec_led_attr_group);
 #endif
@@ -933,6 +1004,12 @@ static int __devexit ktd2026_remove(struct i2c_client *client)
 	mutex_destroy(&data->mutex);
 	kfree(data);
 	return 0;
+}
+
+static void ktd2026_shutdown(struct i2c_client *i2c)
+{
+	pr_info("%s: turn off leds\n", __func__);
+	ktd2026_reset();
 }
 
 static struct i2c_device_id ktd2026_id[] = {
@@ -961,6 +1038,7 @@ static struct i2c_driver ktd2026_i2c_driver = {
 	.id_table = ktd2026_id,
 	.probe = ktd2026_probe,
 	.remove = __devexit_p(ktd2026_remove),
+	.shutdown = ktd2026_shutdown,
 };
 
 static int __init ktd2026_init(void)
@@ -973,7 +1051,7 @@ static void __exit ktd2026_exit(void)
 	i2c_del_driver(&ktd2026_i2c_driver);
 }
 
-module_init(ktd2026_init);
+late_initcall(ktd2026_init);
 module_exit(ktd2026_exit);
 
 MODULE_DESCRIPTION("KTD2026 LED driver");

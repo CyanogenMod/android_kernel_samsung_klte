@@ -12,6 +12,13 @@
 #define TK_INFORM_CHARGER
 #endif
 
+#if defined(CONFIG_SEC_S_PROJECT)
+#define TK_USE_MAX_SUBPM_CONTROL
+#define TK_USE_LDO_CONTROL
+#define TK_LED_DIRECT_CONTORL		// 0x08 firmware over..
+#endif
+
+
 #ifdef TK_INFORM_CHARGER
 struct touchkey_callbacks {
 	void (*inform_charger)(struct touchkey_callbacks *, bool);
@@ -39,6 +46,9 @@ struct touchkey_platform_data {
 #endif
 #ifdef TKEY_GRIP_MODE
 	int gpio_grip;
+#endif
+#if defined(TK_USE_MAX_SUBPM_CONTROL)
+	const char **name_of_supply;
 #endif
 };
 

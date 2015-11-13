@@ -1319,11 +1319,15 @@ static int wacom_parse_dt(struct device *dev,
 		"wacom,pen_pdct-gpio", 0, &pdata->pen_pdct_gpio_flags);
 	pdata->gpio_pen_insert = of_get_named_gpio(np, "wacom,sense-gpio", 0);
 
+#if defined(CONFIG_MACH_HLTECHNTWU)
+	pdata->basic_model = "N900U";
+#else
 	rc = of_property_read_string(np, "wacom,basic_model", &pdata->basic_model);
 	if (rc < 0) {
 		dev_info(dev, "%s: Unable to read wacom,basic_model\n", __func__);
 		pdata->basic_model = "NULL";
 	}
+#endif
 
 	rc = of_property_read_u32(np, "wacom,ic_mpu_ver", &pdata->ic_mpu_ver);
 	if (rc < 0)

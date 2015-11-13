@@ -10,9 +10,6 @@
 #ifdef CONFIG_SEC_DEBUG_TSP_LOG
 #include <mach/sec_debug.h>
 #endif
-#ifdef CONFIG_INPUT_BOOSTER
-#include <linux/input/input_booster.h>
-#endif
 
 #ifdef CONFIG_SEC_DEBUG_TSP_LOG
 #define tsp_debug_dbg(mode, dev, fmt, ...)	\
@@ -45,29 +42,35 @@
 		dev_err(dev, fmt, ## __VA_ARGS__); \
 })
 #else
-//#define tsp_debug_dbg(mode, dev, fmt, ...)	dev_dbg(dev, fmt, ## __VA_ARGS__)
-//#define tsp_debug_info(mode, dev, fmt, ...)	dev_info(dev, fmt, ## __VA_ARGS__)
-//#define tsp_debug_err(mode, dev, fmt, ...)	dev_err(dev, fmt, ## __VA_ARGS__)
-#define tsp_debug_dbg(mode, dev, fmt, ...)	pr_err(fmt, ## __VA_ARGS__)
-#define tsp_debug_info(mode, dev, fmt, ...)	pr_err(fmt, ## __VA_ARGS__)
-#define tsp_debug_err(mode, dev, fmt, ...)	pr_err(fmt, ## __VA_ARGS__)
+#define tsp_debug_dbg(mode, dev, fmt, ...)	dev_dbg(dev, fmt, ## __VA_ARGS__)
+#define tsp_debug_info(mode, dev, fmt, ...)	dev_info(dev, fmt, ## __VA_ARGS__)
+#define tsp_debug_err(mode, dev, fmt, ...)	dev_err(dev, fmt, ## __VA_ARGS__)
 #endif
 
 #define USE_OPEN_CLOSE
 
-#ifdef CONFIG_SEC_DVFS
+//#ifdef CONFIG_SEC_DVFS
 #include <linux/cpufreq.h>
 #define TOUCH_BOOSTER_DVFS
 
+#ifdef CONFIG_SEC_S_PROJECT
+#define DVFS_STAGE_NINTH	9
+#define DVFS_STAGE_PENTA	5
+#endif
 #define DVFS_STAGE_TRIPLE       3
 #define DVFS_STAGE_DUAL         2
 #define DVFS_STAGE_SINGLE       1
 #define DVFS_STAGE_NONE         0
-#endif
+//#endif
 
 #ifdef TOUCH_BOOSTER_DVFS
 #define TOUCH_BOOSTER_OFF_TIME	500
 #define TOUCH_BOOSTER_CHG_TIME	300//130
+
+#ifdef CONFIG_SEC_S_PROJECT
+#define INPUT_BOOSTER_HIGH_OFF_TIME_TSP		1000
+#define INPUT_BOOSTER_HIGH_CHG_TIME_TSP		500
+#endif
 #endif
 
 #ifdef USE_OPEN_DWORK
@@ -105,6 +108,7 @@
 #define EVENTID_HOVER_MOTION_POINTER		0x09
 #define EVENTID_PROXIMITY_IN				0x0B
 #define EVENTID_PROXIMITY_OUT				0x0C
+#define EVENTID_MSKEY						0x0E
 
 #define EVENTID_ERROR						0x0F
 #define EVENTID_CONTROLLER_READY			0x10
@@ -133,8 +137,22 @@
 #define FTS_CMD_HOVER_OFF           0x94
 #define FTS_CMD_HOVER_ON            0x95
 
+#if defined(CONFIG_SEC_S_PROJECT)
+#define FTS_CMD_FAST_SCAN           0x98
+#define FTS_CMD_SLOW_SCAN           0x99
+
+#define FTS_CMD_FLIPCOVER_OFF		0x9C
+#define FTS_CMD_FLIPCOVER_ON		0x9D
+#define FTS_RETRY_COUNT		10
+
+#else
 #define FTS_CMD_FLIPCOVER_OFF		0x96
 #define FTS_CMD_FLIPCOVER_ON		0x97
+#define FTS_RETRY_COUNT		30
+
+#endif
+
+#define FTS_CMD_KEY_SENSE_ON		0x9B
 
 
 #define FTS_CMD_SET_FAST_GLOVE_MODE	0x9D
@@ -147,6 +165,7 @@
 #define FORCECALIBRATION			0xA2
 #define CX_TUNNING					0xA3
 #define SELF_AUTO_TUNE				0xA4
+#define KEY_CX_TUNNING				0x96
 
 #define FTS_CMD_CHARGER_PLUGGED     0xA8
 #define FTS_CMD_CHARGER_UNPLUGGED	0xAB
@@ -165,18 +184,18 @@
 
 #define TSP_BUF_SIZE 1024
 #define CMD_STR_LEN 32
-#define CMD_RESULT_STR_LEN 512
 #define CMD_PARAM_NUM 8
 
 #define RAW_MAX	3750
 
-#if !defined(CONFIG_SEC_LOCALE_KOR_FRESCO) && !defined(CONFIG_MACH_FRESCONEOLTE_CTC)
-#define TSP_INIT_COMPLETE
-#endif
+// all #if !defined(CONFIG_SEC_LOCALE_KOR_FRESCO) && !defined(CONFIG_MACH_FRESCONEOLTE_CTC) && !defined(CONFIG_SEC_T10_PROJECT)
+#undef TSP_INIT_COMPLETE
+//#endif
 
-#if defined(CONFIG_SEC_LOCALE_KOR_FRESCO)
+#if defined(CONFIG_SEC_LOCALE_KOR_FRESCO) ||defined(CONFIG_SEC_T10_PROJECT)
 #define READ_LCD_ID
 #endif
+
 /**
  * struct fts_finger - Represents fingers.
  * @ state: finger status (Event ID).
@@ -192,6 +211,16 @@ struct fts_ts_platform_data {
 	u32		gpio_ldo_en;
 #if defined(CONFIG_SEC_LOCALE_KOR_FRESCO)
 	u32		oled_id;
+#endif
+#if defined(CONFIG_SEC_T10_PROJECT)
+	int tsp_vendor1;
+	int tsp_vendor2;
+#endif
+#if defined(CONFIG_SEC_S_PROJECT)
+	int scl_gpio;
+	int sda_gpio;
+	int tsp_id;
+	const char *name_of_supply;
 #endif
 };
 
@@ -224,7 +253,8 @@ struct fts_ts_info {
 	u8 cmd_state;
 	char cmd[CMD_STR_LEN];
 	int cmd_param[CMD_PARAM_NUM];
-	char cmd_result[CMD_RESULT_STR_LEN];
+	char *cmd_result;
+	int cmd_buffer_size;
 	struct mutex cmd_lock;
 	bool cmd_is_running;
 	int SenseChannelLength;
@@ -281,9 +311,20 @@ struct fts_ts_info {
 	int (*fts_get_noise_param_address) (struct fts_ts_info *info);
 #endif
 
+	struct mutex i2c_mutex;
 	struct mutex device_mutex;
 	bool touch_stopped;
 	bool reinit_done;
+
+#ifdef FTS_SUPPORT_TOUCH_KEY
+	unsigned char tsp_keystatus;
+	bool report_dummy_key;
+	bool ignore_menu_key;
+	bool ignore_back_key;
+	bool ignore_menu_key_by_back;
+	bool ignore_back_key_by_menu;
+	int touchkey_threshold;
+#endif // FTS_SUPPORT_TOUCH_KEY
 
 	unsigned char data[FTS_EVENT_SIZE * FTS_FIFO_MAX];
 

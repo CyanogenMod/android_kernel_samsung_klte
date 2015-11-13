@@ -27,14 +27,20 @@
 #define SYNAPTICS_DEVICE_NAME	"GT-I95XX"
 /* DVFS feature : TOUCH BOOSTER */
 #define TSP_BOOSTER
+#define DVFS_STAGE_TRIPLE	3
 #ifdef TSP_BOOSTER
 #define DVFS_STAGE_DUAL		2
 #define DVFS_STAGE_SINGLE	1
 #define DVFS_STAGE_NONE		0
 #include <linux/cpufreq.h>
 
+#if defined(CONFIG_SEC_JS_PROJECT)
+#define TOUCH_BOOSTER_OFF_TIME	500
+#define TOUCH_BOOSTER_CHG_TIME	130
+#else
 #define TOUCH_BOOSTER_OFF_TIME	300
 #define TOUCH_BOOSTER_CHG_TIME	200
+#endif
 #endif
 
 #define OCTA_PANEL_REVISION_51	0x08
@@ -49,7 +55,7 @@
 //#define SECURE_TSP
 
 /* To support suface touch, firmware should support data
- * which is required related app ex) MT_ANGLE, MT_PALM ...
+ * which is required related app ex) MT_PALM ...
  * Synpatics IC report those data through F51's edge swipe
  * fucntionality.
  */
@@ -79,20 +85,6 @@
 
 #if defined(TSP_PATTERN_TRACKING_METHOD)
 #define TSP_PT_MAX_GHOSTCHECK_FINGER	10
-#define TSP_PT_MAX_GHOSTTOUCH_COUNT	5
-#define TSP_PT_MAX_COUNT_TOUCHSYSREBOOT	4
-#define TSP_PT_MAX_GHOSTTOUCH_BY_PATTERNTRACKING	3
-#define TSP_PT_PATTERN_TRACKING_DISTANCE	4
-#define TSP_PT_REBOOT_PENDING_TIME	50
-#define TSP_PT_MOVE_COUNT_TH	100
-
-/* Each project has different edge config,
- * so check this value before applying pattern tracking.
- */
-#define TSP_PT_MIN_X_EDGE	17
-#define TSP_PT_MAX_X_EDGE	1060
-#define TSP_PT_MIN_Y_EDGE	17
-#define TSP_PT_MAX_Y_EDGE	1900
 #endif
 
 #define SYNAPTICS_HW_RESET_TIME	80
@@ -111,12 +103,24 @@
 #else
 #define FW_IMAGE_NAME_B0_4_3	"tsp_synaptics/synaptics_b0_4_3.fw"
 #endif
+#if defined(CONFIG_SEC_JS_PROJECT)
+#define FW_IMAGE_NAME_B0_5_1	"tsp_synaptics/synaptics_js_b0_5_1.fw"
+#else
 #define FW_IMAGE_NAME_B0_5_1	"tsp_synaptics/synaptics_b0_5_1.fw"
+#endif
 
 /* Factory firmware */
 #define FAC_FWIMAGE_NAME_B0		"tsp_synaptics/synaptics_b0_fac.fw"
+#if defined(CONFIG_SEC_JS_PROJECT)
+#define FAC_FWIMAGE_NAME_B0_5_1		"tsp_synaptics/synaptics_js_b0_5_1_fac.fw"
+#else
 #define FAC_FWIMAGE_NAME_B0_5_1		"tsp_synaptics/synaptics_b0_5_1_fac.fw"
+#endif
 
+#ifdef CONFIG_MACH_JACTIVESKT
+#define FW_IMAGE_NAME_B0_HSYNC04	"tsp_synaptics/jactive/synaptics_b0_hsync04.fw"
+#define FW_IMAGE_NAME_B0_HSYNC04_FAC	"tsp_synaptics/jactive/synaptics_b0_hsync04_fac.fw"
+#endif
 
 //#ifdef SEC_PRODUCT_SHIP
 //#define	CONFIG_SAMSUNG_PRODUCT_SHIP

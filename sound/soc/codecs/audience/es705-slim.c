@@ -76,7 +76,12 @@
 
 #if defined(SAMSUNG_ES705_FEATURE)
 static int es705_slim_rx_port_to_ch[ES705_SLIM_RX_PORTS] = {
+#ifdef CONFIG_WCD9306_CODEC
+		152, 153, 154, 155, 128, 129,
+#else
 	152, 153, 154, 155, 134, 135, 136, 137
+#endif /* CONFIG_WCD9306_CODEC */
+
 };
 #else
 static int es705_slim_rx_port_to_ch[ES705_SLIM_RX_PORTS] = {
@@ -106,6 +111,11 @@ static int es705_slim_be_id[ES705_NUM_CODEC_SLIM_DAIS] = {
 #ifdef CONFIG_SND_SOC_ES704_TEMP
 static int dev_selected;
 #endif
+
+#ifdef CONFIG_ARCH_MSM8226
+static struct regulator* es705_ldo;
+#endif /* CONFIG_ARCH_MSM8226 */
+
 static void es705_alloc_slim_rx_chan(struct slim_device *sbdev);
 static void es705_alloc_slim_tx_chan(struct slim_device *sbdev);
 static int es705_cfg_slim_rx(struct slim_device *sbdev, unsigned int *ch_num,
@@ -847,10 +857,15 @@ void es705_slim_map_channels(struct es705_priv *es705)
 	es705->dai[DAI_INDEX(ES705_SLIM_1_CAP)].ch_num[0] = 156;
 	es705->dai[DAI_INDEX(ES705_SLIM_1_CAP)].ch_num[1] = 157;
 	/* back end for TX1 */
+#ifdef CONFIG_WCD9306_CODEC
+		es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[0] = 128;
+		es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[1] = 129;
+#else
 	es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[0] = 134;
 	es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[1] = 135;
 	es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[2] = 136;
 	es705->dai[DAI_INDEX(ES705_SLIM_3_PB)].ch_num[3] = 137;
+#endif /* CONFIG_WCD9306_CODEC */
 
 	/* front end for RX2 */
 	es705->dai[DAI_INDEX(ES705_SLIM_2_PB)].ch_num[0] = 154;
@@ -1239,6 +1254,56 @@ int es705_slim_wakeup_bus(struct es705_priv *es705)
 	return rc;
 }
 
+#ifdef CONFIG_ARCH_MSM8226
+static int es705_regulator_init(struct device *dev)
+{
+	int ret;
+	struct device_node *reg_node = NULL;
+
+	reg_node = of_parse_phandle(dev->of_node, "vdd-2mic-core-supply", 0);
+	if(reg_node)
+	{
+		es705_ldo = regulator_get(dev, "vdd-2mic-core");
+		if (IS_ERR(es705_ldo)) {
+				pr_err("[%s] could not get earjack_ldo, %ld\n", __func__, PTR_ERR(es705_ldo));
+		}
+		else
+		{
+			ret = regulator_enable(es705_ldo);
+			if(ret < 0) {
+				pr_err("%s():Failed to enable regulator.\n",
+					__func__);
+				goto err_reg_enable;
+			} else
+				regulator_set_mode(es705_ldo, REGULATOR_MODE_NORMAL);
+		}
+	}else
+		pr_err("%s Audience LDO node not available\n",__func__);
+
+err_reg_enable:
+	if(es705_ldo)
+		regulator_put(es705_ldo);
+
+	return ret;
+}
+
+static int es705_regulator_deinit(void)
+{
+	if(es705_ldo)
+	{
+		int ret;
+
+		ret = regulator_disable(es705_ldo);
+		if(ret < 0) {
+			pr_err("%s():Failed to disable regulator.\n",__func__);
+		}
+		regulator_put(es705_ldo);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_ARCH_MSM8226 */
+
 static int es705_slim_probe(struct slim_device *sbdev)
 {
 	int rc;
@@ -1259,6 +1324,10 @@ static int es705_slim_probe(struct slim_device *sbdev)
 		}
 	}
 #endif
+
+#ifdef CONFIG_ARCH_MSM8226
+		es705_regulator_init(&sbdev->dev);
+#endif /* CONFIG_ARCH_MSM8226 */
 
 	if (sbdev->dev.of_node) {
 		rc = es705_slim_probe_dts(sbdev);
@@ -1318,6 +1387,10 @@ static int es705_slim_remove(struct slim_device *sbdev)
 	struct esxxx_platform_data *pdata = sbdev->dev.platform_data;
 
 	dev_dbg(&sbdev->dev, "%s(): sbdev->name = %s\n", __func__, sbdev->name);
+
+#ifdef CONFIG_ARCH_MSM8226
+		es705_regulator_deinit();
+#endif /* CONFIG_ARCH_MSM8226 */
 
 	es705_gpio_free(pdata);
 

@@ -88,7 +88,11 @@
 #define ID_MIN		0
 #define ID_MAX		3
 #define CO_MIN		0
+#ifdef CONFIG_SEC_MEGA2LTE_COMMON
+#define CO_MAX		15
+#else
 #define CO_MAX		10
+#endif
 #define ID_DEFAULT	1
 #define CO_DEFAULT	1
 #define RETRY_LIMIT	10
@@ -108,7 +112,7 @@ int verification = -1, id = 2, color;
 char g_sn[14];
 #endif
 #ifdef CONFIG_W1_CF
-int cf_node=-1;
+int cf_node = -1;
 #endif
 #ifdef CONFIG_SEC_H_PROJECT
 extern int verified;
@@ -1909,6 +1913,9 @@ static bool w1_ds28el15_check_digit(const uchar *sn)
 	int i, tmp1 = 0, tmp2 = 0;
 	int cdigit = sn[3];
 
+	if (cdigit == 0x1e)
+		return true;
+
 	for (i=4;i<10;i++)
 		tmp1 += sn[i];
 
@@ -1945,9 +1952,14 @@ static void w1_ds28el15_slave_sn(const uchar *rdbuf)
 		for (i = 0 ; i < 14 ; i++)
 			sn[i] = w1_ds28el15_char_convert(rdbuf[i+4]);
 
+		pr_info("%s: %s\n", __func__, sn);
+
 		for (i = 0 ; i < 14 ; i++)
 			g_sn[i] = sn[13 - i];
 	} else {
+		for (i = 0 ; i < 14 ; i++)
+			sn[i] = w1_ds28el15_char_convert(rdbuf[i+4]);
+
 		pr_info("%s: sn is not good %s\n", __func__, sn);
 	}
 }

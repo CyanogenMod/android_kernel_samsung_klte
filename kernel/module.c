@@ -58,6 +58,11 @@
 #include <linux/jump_label.h>
 #include <linux/pfn.h>
 #include <linux/bsearch.h>
+
+#ifndef CONFIG_TIMA
+#undef CONFIG_TIMA_LKMAUTH
+#undef CONFIG_TIMA_LKMAUTH_CODE_PROT
+#endif
 #ifdef	CONFIG_TIMA_LKMAUTH_CODE_PROT
 #include <asm/tlbflush.h>
 #endif/*CONFIG_TIMA_LKMAUTH_CODE_PROT*/

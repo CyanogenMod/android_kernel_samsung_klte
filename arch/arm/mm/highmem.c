@@ -194,7 +194,7 @@ early_initcall(init_kmap_atomic);
 #ifdef CONFIG_TIMA_RKP
 static int __init tima_init_kmap_atomic(void)
 {
-	tima_send_cmd(__fix_to_virt(FIX_KMAP_BEGIN), 0x3f810221);
+	tima_send_cmd(__fix_to_virt(FIX_KMAP_BEGIN), 0x10);
 	return 1;
 }
 early_initcall(tima_init_kmap_atomic);

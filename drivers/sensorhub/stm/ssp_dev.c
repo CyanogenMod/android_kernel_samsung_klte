@@ -26,6 +26,10 @@ static void ssp_late_resume(struct early_suspend *handler);
 #endif
 
 #define NORMAL_SENSOR_STATE_K	0x3FEFF
+
+#define GES_LDO_ON  1
+#define GES_LDO_OFF 0
+
 void ssp_enable(struct ssp_data *data, bool enable)
 {
 	pr_info("[SSP] %s, enable = %d, old enable = %d\n",
@@ -49,6 +53,11 @@ void ssp_enable(struct ssp_data *data, bool enable)
 static irqreturn_t sensordata_irq_thread_fn(int iIrq, void *dev_id)
 {
 	struct ssp_data *data = dev_id;
+	struct timespec ts;
+
+	ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
 	if(gpio_get_value(data->mcu_int1)) {
 		pr_info("[SSP] MCU int HIGH");
 		return IRQ_HANDLED;
@@ -73,6 +82,8 @@ static void initialize_variable(struct ssp_data *data)
 		data->batchLatencyBuf[iSensorIndex] = 0;
 		data->batchOptBuf[iSensorIndex] = 0;
 		data->aiCheckStatus[iSensorIndex] = INITIALIZATION_STATE;
+		data->lastTimestamp[iSensorIndex] = 0;
+		data->reportedData[iSensorIndex] = false;
 	}
 
 	atomic_set(&data->aSensorEnable, 0);
@@ -249,8 +260,20 @@ static int ssp_parse_dt(struct device *dev,
 		errorno = data->ap_int;
 		goto dt_exit;
 	}
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+	if (of_property_read_string(np, "ssp,ges_vdd_1p8",
+		&data->ges_vdd) < 0)
+		 pr_err("%s - get ges_vdd error\n", __func__);
 
-#if defined(CONFIG_MACH_KLTE_JPN)
+	if (of_property_read_string(np, "ssp,ges_led_3p3",
+		&data->ges_led) < 0)
+		pr_err("%s - get ges_led error\n", __func__);
+
+	pr_err("%s - get ges_vcc pass\n", __func__);
+
+#endif
+
+#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KACTIVELTE_DCM)
 #if defined(CONFIG_MACH_KLTE_MAX77828_JPN)
 	data->rst = of_get_named_gpio_flags(np, "ssp,rst-gpio",
 		0, &flags);
@@ -327,13 +350,77 @@ static int ssp_parse_dt(struct device *dev,
 dt_exit:
 	return errorno;
 }
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+ static int ssp_gesture_regulator_onoff(struct ssp_data *data, int onoff)
+ {
+	int rc = 0;
+	struct regulator *regulator_led_3p3;
+	struct regulator *regulator_vdd_1p8;
 
+	pr_info("[SSP] %s - start = %d\n", __func__, onoff);
 
+	regulator_vdd_1p8 = regulator_get(NULL, data->ges_vdd);
+	if (IS_ERR(regulator_vdd_1p8)) {
+	pr_err("[SSP] %s - vdd_1p8 regulator_get fail\n", __func__);
+		return -ENODEV;
+	}
+
+	regulator_led_3p3 = regulator_get(NULL, data->ges_led);
+	if (IS_ERR(regulator_led_3p3)) {
+		pr_err("[SSP] %s - vdd_3p3 regulator_get fail\n", __func__);
+		regulator_put(regulator_vdd_1p8);
+		return -ENODEV;
+	}
+	pr_info("[SSP] %s - onoff = %d\n", __func__, onoff);
+
+	if (onoff == GES_LDO_ON) {
+		regulator_set_voltage(regulator_vdd_1p8, 1800000, 1800000);
+		rc = regulator_enable(regulator_vdd_1p8);
+		if (rc) {
+			pr_err("[SSP] %s - enable vdd_1p8 failed, rc=%d\n",
+			__func__, rc);
+			goto done;
+		}
+		regulator_set_voltage(regulator_led_3p3, 3300000, 3300000);
+		rc = regulator_enable(regulator_led_3p3);
+		if (rc) {
+			pr_err("[SSP] %s - enable led_3p3 failed, rc=%d\n",
+				__func__, rc);
+			goto done;
+		}
+	}else {
+		rc = regulator_disable(regulator_vdd_1p8);
+		if (rc) {
+			pr_err("[SSP] %s - disable vdd_1p8 failed, rc=%d\n",
+				__func__, rc);
+			goto done;
+		}
+		rc = regulator_disable(regulator_led_3p3);
+		if (rc) {
+			pr_err("[SSP] %s - disable led_3p3 failed, rc=%d\n",
+				__func__, rc);
+			goto done;
+		}
+	}
+
+	data->regulator_is_enable = (u8)onoff;
+
+done:
+	regulator_put(regulator_led_3p3);
+	regulator_put(regulator_vdd_1p8);
+
+	return rc;
+}
+#endif
 static int ssp_probe(struct spi_device *spi_dev)
 {
 	int iRet = 0;
 	struct ssp_data *data;
 	struct ssp_platform_data *pdata;
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+	int err =-1;
+#endif
+
 	pr_info("[SSP] %s\n", __func__);
 
 	if (poweroff_charging == 1 || boot_mode_recovery == 1) {
@@ -391,6 +478,16 @@ static int ssp_probe(struct spi_device *spi_dev)
 		}
 
 	}
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+       err = ssp_gesture_regulator_onoff(data, GES_LDO_ON);
+       if (err < 0) {
+		pr_err("[SSP] %s max88922_regulator_on fail err = %d\n",
+			__func__, err);
+		goto err_setup;
+	}
+       usleep_range(1000, 1100);
+#endif
+
 	spi_dev->mode = SPI_MODE_1;
 	if (spi_setup(spi_dev)) {
 		pr_err("failed to setup spi for ssp_spi\n");

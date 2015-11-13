@@ -20,46 +20,14 @@
 
 #ifndef _TSU6721_H_
 #define _TSU6721_H_
-
-
-enum cable_type_t {
-        CABLE_TYPE_NONE = 0,
-        CABLE_TYPE_USB,
-        CABLE_TYPE_AC,
-        CABLE_TYPE_MISC,
-        CABLE_TYPE_CARDOCK,
-        CABLE_TYPE_UARTOFF,
-        CABLE_TYPE_JIG,
-        CABLE_TYPE_UNKNOWN,
-        CABLE_TYPE_CDP,
-        CABLE_TYPE_SMART_DOCK,
-        CABLE_TYPE_OTG,
-        CABLE_TYPE_AUDIO_DOCK,
-#ifdef CONFIG_WIRELESS_CHARGING
-        CABLE_TYPE_WPC,
-#endif
-        CABLE_TYPE_INCOMPATIBLE,
-        CABLE_TYPE_DESK_DOCK,
-        CABLE_TYPE_JIG_UART_OFF_VB,
-        CABLE_TYPE_DESK_DOCK_NO_VB,
-};
-
-
+#include <linux/i2c/muic.h>
 
 enum {
 	TSU6721_DETACHED,
 	TSU6721_ATTACHED
 };
 
-enum {
-	DISABLE,
-	ENABLE
-};
-
-enum {
-	DOCK_UI_DESK = 1,
-	DOCK_UI_CAR
-};
+extern struct switch_dev switch_dock;
 
 struct tsu6721_platform_data {
 	void	(*callback)(enum cable_type_t cable_type, int attached);

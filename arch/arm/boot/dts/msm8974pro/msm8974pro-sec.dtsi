@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,7 @@
  */
 
 /*
- * As a general rule, only chipset-specific property overrides should be placed
+ * As a general rule, only version-specific property overrides should be placed
  * inside this file. However, device definitions should be placed inside the
  * msm8974.dtsi / msm8974pro.dtsi file(s).
  */
@@ -31,6 +31,7 @@
 		compatible = "qcom,android-usb";
 		reg = <0xfe8050c8 0xc8>;
 		qcom,android-usb-swfi-latency = <1>;
+		qcom,android-usb-uicc-nluns = /bits/ 8 <1>;
 	};
 
 	qcom,msm-imem@fe805000 {
@@ -1570,7 +1571,7 @@
 	qcom,chipid = <0x03030002>;
 	qcom,msm-bus,num-cases = <15>;
 	qcom,bus-control;
-	qcom,initial-pwrlevel = <3>;
+	qcom,initial-pwrlevel = <4>;
 
 	/* Updated bus bandwidth requirements */
 	qcom,msm-bus,vectors-KBps =
@@ -1592,12 +1593,12 @@
 		<26 512 0 3680000>, <89 604 0 6224000>,
 		/* Nominal / Nominal */
 		<26 512 0 4912000>, <89 604 0 6224000>,
-		/* low Turbo / Nominal */
-		<26 512 0 6400000>, <89 604 0 6224000>,
+		/* Turbo / Nominal */
+		<26 512 0 7464000>, <89 604 0 6224000>,
+		/* low Nominal / low Turbo */
+		<26 512 0 3680000>, <89 604 0 7398000>,
 		/* Nominal / low Turbo */
 		<26 512 0 4912000>, <89 604 0 7398000>,
-		/* low Turbo / low Turbo */
-		<26 512 0 6400000>, <89 604 0 7398000>,
 		/* Turbo / low Turbo */
 		<26 512 0 7464000>, <89 604 0 7398000>,
 		/* Nominal / Turbo */
@@ -1639,15 +1640,22 @@
                        qcom,io-fraction = <100>;
                 };
 
-                qcom,gpu-pwrlevel@4 {
-                        reg = <4>;
+               qcom,gpu-pwrlevel@4 {
+                       reg = <4>;
+                       qcom,gpu-freq = <266000000>;
+                       qcom,bus-freq = <2>;
+                       qcom,io-fraction = <100>;
+               };			   
+			   
+               qcom,gpu-pwrlevel@5 {
+                       reg = <5>;
                        qcom,gpu-freq = <200000000>;
                        qcom,bus-freq = <2>;
                        qcom,io-fraction = <100>;
                };
 
-               qcom,gpu-pwrlevel@5 {
-                       reg = <5>;
+               qcom,gpu-pwrlevel@6 {
+                       reg = <6>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
                        qcom,io-fraction = <0>;
@@ -1656,6 +1664,7 @@
 };
 
 &mdss_mdp {
+	qcom,max-bandwidth-low-kbps = <2750000>;
 	qcom,vbif-settings = <0x0004 0x00000001>;
 
 	qcom,mdss-wb-off = <0x00011100 0x00011500
@@ -1720,6 +1729,10 @@
 		<3240000 1600000>,
 		<4048000 1600000>,
 		<4264000 1600000>;
+    /*
+     * Performance is guaranteed only upto POR specification. Anything
+     * above that specification is best effort and might even be rejected.
+     */
 	qcom,max-hw-load = <1281600>; /* max(4k X 2304 @ 24, 4k X 2160 @ 30) + 1080p @ 30 */
 	qcom,buffer-type-tz-usage-table = <0x241 0x1>,
 					<0x106 0x2>,
@@ -1836,6 +1849,8 @@
 		HSUSB_VDDCX-supply = <&pma8084_s2>;
 		HSUSB_1p8-supply = <&pma8084_l6>;
 		HSUSB_3p3-supply = <&pma8084_l24>;
+		hsusb_vdd_dig-supply = <&pma8084_s2_corner>;
+		qcom,vdd-voltage-level = <1 2 3 5 7>;
 	};
 
 	qcom,gdsc@fd8c4024 {
@@ -1920,7 +1935,26 @@
 		status = "ok";
 	};
 };
-
+/* 
+&dsi_generic_720p_cmd {
+	qcom,mdss-dsi-bl-pmic-bank-select = <3>;
+};
+*/
 &pma8084_mvs1 {
 	/*parent-supply = <&pm8941_boost>;*/
 };
+
+/*need to check by USB team*/
+/*
+&usb3 {
+	vbus_dwc3-supply = <&pm8941_mvs1>;
+	qcom,misc-ref = <&pm8941_misc>;
+	dwc_usb3-adc_tm = <&pm8941_adc_tm>;
+	qcom,usbin-vadc = <&pm8941_vadc>;
+	qcom,utmi-clk-rate = <24000000>;   //updated on L version
+	interrupt-map-mask = <0x0 0xffffffff>;
+	interrupt-map = <0x0 0 &intc 0 133 0
+			0x0 1 &spmi_bus 0x0 0x2 0x9 0x0>;
+	interrupt-names = "hs_phy_irq", "pmic_id_irq";
+	qcom,dwc-ssphy-deemphasis-value = <26>;
+};*/

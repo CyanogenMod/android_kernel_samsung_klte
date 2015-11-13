@@ -1,5 +1,33 @@
 /*
- *  scfs.h
+ * fs/scfs/scfs.h
+ *
+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
+ *   Authors: Sunghwan Yun <sunghwan.yun@samsung.com>
+ *            Jongmin Kim <jm45.kim@samsung.com>
+ *            Sangwoo Lee <sangwoo2.lee@samsung.com>
+ *            Inbae Lee   <inbae.lee@samsung.com>
+ *
+ * This program has been developed as a stackable file system based on
+ * the WrapFS, which was written by:
+ *
+ * Copyright (C) 1997-2003 Erez Zadok
+ * Copyright (C) 2001-2003 Stony Brook University
+ * Copyright (C) 2004-2006 International Business Machines Corp.
+ *   Author(s): Michael A. Halcrow <mahalcro@us.ibm.com>
+ *              Michael C. Thompson <mcthomps@us.ibm.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef SCFS_HEADER_H
@@ -18,7 +46,11 @@
 #include <linux/time.h>
 #include <linux/mempool.h>
 #include <linux/version.h>
-
+#include <linux/debugfs.h>
+#include <linux/syscalls.h>
+#include <linux/delay.h>
+#include <linux/kernel.h>
+#include <linux/path.h>
 
 extern const struct address_space_operations scfs_aops;
 extern const struct inode_operations scfs_symlink_iops;
@@ -38,18 +70,15 @@ extern struct kmem_cache *scfs_header_cache;
 extern struct kmem_cache *scfs_xattr_cache;
 
 
-/************************/
-/* configurable options */
-/************************/
+/*****************/
+/* debug options */
+/*****************/
 
 //#define SCFS_DEBUG 			1
 #define SCFS_PROFILE_MEM		0
-#define SCFS_PROFILE_DURATION		0
+#define SCFS_PROFILE_DURATION	0
 #define SCFS_PROFILE 			0
  
-/*******************/
-/* profiling stuff */
-/*******************/
 #if SCFS_PROFILE_DURATION
 //static struct timeval start_time1, start_time2, start_time3;
 //static struct timeval end_time1, end_time2, end_time3;
@@ -66,39 +95,80 @@ extern struct kmem_cache *scfs_xattr_cache;
 /* magic values for sanity checking */
 #define SCFS_SUPER_MAGIC	0x53305955
 #define SCFS_MAGIC		SCFS_SUPER_MAGIC
-/* cluster-related */
-#define SCFS_CLUSTER_ALIGN	4
+/* cluster size */
+#define SCFS_CLUSTER_ALIGN_BYTE	4
 #define SCFS_CLUSTER_SIZE_DEF	(16 * 1024)
 #define SCFS_CLUSTER_SIZE_MAX	(16 * 1024)
 #define SCFS_CLUSTER_SIZE_MIN	(4 * 1024)
 /* file status flags */
-#define SCFS_DATA_RAW		0x00000001
-#define SCFS_DATA_COMPRESS	0x00000002
-#define SCFS_META_XATTR		0x00000004
+#define SCFS_DATA_RAW			0x00000001
+#define SCFS_DATA_COMPRESSABLE		0x00000002
+#define SCFS_META_XATTR			0x00000004
+#define SCFS_CINFO_OVER_PAGESIZE	0x00000008
 
 #define SCFS_INVALID_META	0x00000010
-/* error return code */
-#define SCFS_ERR_OUT_OF_MEMORY	(-ENOMEM)
-#define SCFS_ERR_IO		(-EIO)
-#define SCFS_ERR_INVALID	(-EINVAL)
-#define SCFS_ERR_NO_FILE	(-ENOENT)
-#define SCFS_ERR_PERMISSION	(-EACCES)
-#define SCFS_ERR_EXEC		(-ENOEXEC)
-#define SCFS_CONTINUE		0x2
-#define SCFS_ERR_CONTINUE	0x1
-#define SCFS_SUCCESS		0x0
 /* mount option flags */
 #define SCFS_MOUNT_XATTR_META 	0x00000001
-/* buffer sizes */
-#define SCFS_MEMPOOL_COUNT	32 //TODO may need to tune it down later
-#define SCFS_MEMPOOL_ORDER	3
+/* mempool for cluster buffers */
+/* i.e. flagship (16KB clusters): 32KB x 32, low-end (8KB): 16KB x 32 */
+#define SCFS_MEMPOOL_COUNT	32
+#define SCFS_MEMPOOL_ORDER	2
 #define SCFS_MEMPOOL_SIZE	(1 << SCFS_MEMPOOL_ORDER << PAGE_SHIFT)
 #define SCFS_MEMPOOL_SIZE_TOTAL	(SCFS_MEMPOOL_COUNT * SCFS_MEMPOOL_SIZE)
 /* misc */
 #define SCFS_IO_MAX_RETRY	10
 #define IS_POW2(n)		(n != 0 && ((n & (n - 1)) == 0))
+/* read performance tuning stuff */
+#define MAX_BUFFER_CACHE	SCFS_MEMPOOL_COUNT / 2
+#define SCFS_ASYNC_READ_PAGES
+#define SCFS_READ_PAGES_PROFILE
+//#define SCFS_NOTIFY_RANDOM_READ
+//#define SCFS_REMOVE_NO_COMPRESSED_UPPER_MEMCPY
+//#define SCFS_PRELOAD_BOOTING_CLUSTER
+//#define SCFS_SMB_THREAD_CPU_AFFINITY
 
+#define SCFS_SEQUENTIAL_PAGE_NUM	8
+
+enum scfs_mode {
+	SM_LowInval,		/* Lower page cache invalidation */
+	__NR_SCFSMODE,
+};
+
+#ifdef SCFS_ASYNC_READ_PAGES
+/* max buffer size (in page) */
+#define MAX_PAGE_BUFFER_SIZE_SMB	2048
+
+/* read helper thread wakeup threshold : 2 ~ 4 smb_thread each in order */
+#define SMB_THREAD_THRESHOLD_2	MAX_PAGE_BUFFER_SIZE_SMB / 64	// 32 pages
+#define SMB_THREAD_THRESHOLD_3	MAX_PAGE_BUFFER_SIZE_SMB / 32	// 64 pages
+#define SMB_THREAD_THRESHOLD_4	MAX_PAGE_BUFFER_SIZE_SMB / 16 	// 128 pages
+
+extern u64 scfs_readpage_total_count;
+extern u64 scfs_readpage_io_count;
+extern u64 scfs_lowerpage_total_count;
+extern u64 scfs_lowerpage_reclaim_count;
+extern u64 scfs_lowerpage_alloc_count;
+extern u64 scfs_op_mode;
+extern u64 scfs_sequential_page_number;
+extern struct task_struct *smb_task[NR_CPUS];
+
+int smb_init(void);
+int smb_thread(void *nothing);
+#endif
  
+#if SCFS_PROFILE_MEM
+extern u64 scfs_max_kmalloced;
+extern u64 scfs_max_vmalloced;
+extern u64 scfs_max_mempool_alloced;
+#endif
+
+#ifdef SCFS_PRELOAD_BOOTING_CLUSTER
+extern struct task_struct *scfs_pbc;
+extern int is_scfs_mounted;
+extern atomic_t pcb_read_count;
+extern atomic_t scfs_lower_read_count;
+#endif
+
 /*******************************/
 /* compression & cluster stuff */
 /*******************************/
@@ -110,8 +180,6 @@ enum comp_type {
     FASTLZO,
     TOTAL_TYPES,
 };
- 
-
 
 struct scfs_cinfo
 {
@@ -122,7 +190,7 @@ struct scfs_cinfo
 /* footer = scfs_cinfo * n_cluster + comp_footer (@ end of file) */
 struct comp_footer
 {
-	int footer_size; //TODO rename
+	int footer_size;
 	int cluster_size;
 	long long original_file_size;
 	enum comp_type comp_type;
@@ -167,6 +235,10 @@ struct scfs_sb_info
 	atomic_t time_11;
 	atomic_t time_12;
 #endif
+	/* for free (lower) space check */
+	atomic_t current_file_count; // open files
+	atomic_t total_cluster_count; // total clusters to be written to lower
+	atomic64_t current_data_size; // total data size in memory
 };
 
 struct cinfo_entry
@@ -193,15 +265,15 @@ struct scfs_inode_info
 	struct mutex cinfo_list_mutex;
 	atomic_t lower_file_count;
 	struct file *lower_file;
-	struct inode *lower_inode; // is it useful?
+	struct inode *lower_inode;
 	void *cinfo_array;
 	int cinfo_array_size;
 	int cluster_size;
 	enum comp_type comp_type;
 	size_t upper_file_size;
  	struct scfs_cluster_buffer cluster_buffer;
- 	struct list_head cinfo_list; // for written cluster. This will be written at close
-	unsigned char compressd;
+ 	struct list_head cinfo_list;
+	unsigned char compressed;
  	struct inode vfs_inode;
 	/* DO NOT ADD FIELDS BELOW vfs_inode */
 };
@@ -217,7 +289,6 @@ struct scfs_dentry_info
 	struct path lower_path;
 };
 
-/* this structure may be useless someday */
 struct scfs_open_req {
 #define SCFS_REQ_PROCESSED 0x00000001
 #define SCFS_REQ_DROPPED   0x00000002
@@ -231,8 +302,6 @@ struct scfs_open_req {
 	struct list_head kthread_ctl_list;
 };
 
-// shyoon - cluster read buffer cache
-#define MAX_BUFFER_CACHE 4
 struct read_buffer_cache {
 	struct page *u_page;
 	struct page *c_page;
@@ -250,12 +319,10 @@ struct read_buffer_cache {
 #define SCFS_I(inode)	(container_of(inode, struct scfs_inode_info, vfs_inode))
 #define SCFS_F(file)	((struct scfs_file_info *)(file->private_data))
 #define SCFS_D(dent)	((struct scfs_dentry_info *)(dent->d_fsdata))
-//#define SCFS_UCB(buffer)	((char *)(buffer->cluster_buffer))
-//#define SCFS_CB(buffer)	((char *)(((unsigned int)buffer->cluster_buffer) >> 1))
 
 #define CF_SIZE			sizeof(struct comp_footer)
 #define CMETA_SIZE(sii)		(sii->cinfo_array_size + CF_SIZE)
-#define IS_COMPRESSED(sii)	(sii->flags & SCFS_DATA_COMPRESS)
+#define IS_COMPRESSABLE(sii)	(sii->flags & SCFS_DATA_COMPRESSABLE)
 #define IS_INVALID_META(sii)	(sii->flags & SCFS_INVALID_META)	
 #define make_meta_invalid(sii)	(sii->flags |= SCFS_INVALID_META)
 #define clear_meta_invalid(sii)	(sii->flags &= ~SCFS_INVALID_META)
@@ -478,6 +545,9 @@ int
 scfs_privileged_open(struct file **lower_file, struct dentry *lower_dentry,
 			struct vfsmount *lower_mnt, const struct cred *cred);
 
+int
+scfs_check_space(struct scfs_sb_info *sbi, struct dentry *dentry);
+
 void
 sync_page_to_buffer(struct page *page, char *buffer);
 
@@ -503,14 +573,14 @@ scfs_get_cluster_from_lower(struct scfs_inode_info *sii, struct file *lower_file
 struct cinfo_entry *scfs_alloc_cinfo_entry(unsigned int cluster_index,
 	struct scfs_inode_info *sii);
 
-int 
-scfs_write_pending_cluster_buffer(struct scfs_cluster_buffer *cluster_buffer, struct file *lower_file, struct scfs_inode_info *sii);
+int scfs_write_pending_cluster_buffer(struct scfs_cluster_buffer *cluster_buffer,
+	struct file *lower_file, struct scfs_inode_info *sii);
 
-int 
-scfs_write_meta(struct scfs_inode_info *sii);
+int scfs_write_cinfo(struct scfs_inode_info *sii, loff_t *pos);
 
-ssize_t
-scfs_getxattr_lower(struct dentry *lower_dentry, const char *name,
+int scfs_write_meta(struct scfs_inode_info *sii);
+
+ssize_t scfs_getxattr_lower(struct dentry *lower_dentry, const char *name,
 			void *value, size_t size);
 
 int scfs_footer_read(struct dentry *dentry, struct inode *inode);
@@ -519,5 +589,8 @@ int scfs_reload_meta(struct file *file);
 int scfs_initialize_file(struct dentry *scfs_dentry, struct inode *scfs_inode);
 ssize_t scfs_lower_read(struct file *file, char *buf, size_t count, loff_t *pos);
 ssize_t scfs_lower_write(struct file *file, char *buf, size_t count, loff_t *pos);
+
+void *scfs_cinfo_alloc(struct scfs_inode_info *sii, unsigned long size);
+void scfs_cinfo_free(struct scfs_inode_info *sii, const void *addr);
 
 #endif //SCFS_HEADER_H

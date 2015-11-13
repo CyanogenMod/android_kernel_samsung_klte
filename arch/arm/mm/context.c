@@ -21,9 +21,7 @@
 
 static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
 unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-#ifdef CONFIG_TIMA_RKP_DEBUG
-unsigned long tima_debug_infra_cnt;
-#endif
+
 #ifdef CONFIG_SMP
 DEFINE_PER_CPU(struct mm_struct *, current_mm);
 #endif

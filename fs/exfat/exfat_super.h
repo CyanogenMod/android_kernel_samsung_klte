@@ -147,4 +147,12 @@ static inline void exfat_save_attr(struct inode *inode, u32 attr)
 		EXFAT_I(inode)->fid.attr = attr & (ATTR_RWMASK | ATTR_READONLY);
 }
 
+/* exfat_xattr.c */
+extern int exfat_setxattr(struct dentry *dentry, const char *name,
+		const void *value, size_t size, int flags);
+extern ssize_t exfat_getxattr(struct dentry *dentry, const char *name,
+		void *value, size_t size);
+extern ssize_t exfat_listxattr(struct dentry *dentry, char *list, size_t size);
+extern int exfat_removexattr(struct dentry *dentry, const char *name);
+
 #endif

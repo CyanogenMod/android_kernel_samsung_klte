@@ -12,8 +12,19 @@
 /**
         @brief ADPD142 ChipID
 */
-#define ADPD_CHIPID                     0x0116
-#define ADPD_CHIPID_REV2                0x0216
+#define ADPD_CHIPID_0			0x0016
+/**
+	@brief ADPD142 ChipID 1
+*/
+#define ADPD_CHIPID_1			0x0116
+/**
+	@brief ADPD142 ChipID 2
+*/
+#define ADPD_CHIPID_2			0x0216
+/**
+	@brief ADPD142 ChipID
+*/
+#define ADPD_CHIPID(id)			ADPD_CHIPID_##id
 
 /*ADPD142 REGISTER ADDRESS*/
 /**

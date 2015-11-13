@@ -38,6 +38,8 @@
 #if defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S)
 #define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1664S_v.fw"
 #define MXT_N_PROJECT_FIRMWARE_NAME	"mXT1664S_n.fw"
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) && defined(CONFIG_MACH_MATISSELTE_ATT)
+#define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1188S_att.fw"
 #elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S)
 #define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1188S.fw"
 #endif
@@ -492,6 +494,7 @@ struct mxt_finger {
 	u16 z;
 #if TSP_USE_SHAPETOUCH
 	u16 component;
+	bool palm;//20140320_2
 #endif
 	u8 state;
 	u8 type;
@@ -617,7 +620,7 @@ struct mxt_data {
 	struct mxt_fac_data *fdata;
 #endif
 #if TSP_USE_SHAPETOUCH
-	bool palm;
+	bool palm;//20140320_3
 	u16 sumsize;
 #endif
 #if ENABLE_TOUCH_KEY

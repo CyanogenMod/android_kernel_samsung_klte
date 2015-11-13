@@ -32,9 +32,10 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/gpio.h>
-
+#include <linux/spmi.h>
 #include <linux/io.h>
 #include <mach/isdbt_tuner_pdata.h>
+#include <mach/sec_debug.h>
 
 #include <mach/gpio.h>
 #include <linux/platform_device.h>
@@ -55,12 +56,17 @@
 
 struct ISDBT_INIT_INFO_T *hInit;
 
+int bbm_xtal_freq;
+unsigned int fc8300_xtal_freq;
+
 #define RING_BUFFER_SIZE	(188 * 320 * 17)
 
 /* GPIO(RESET & INTRRUPT) Setting */
 #define FC8300_NAME		"isdbt"
 static struct isdbt_platform_data *isdbt_pdata;
 
+#define TS0_5PKT_LENGTH	(188 * 5)
+#define TS0_32PKT_LENGTH (188 * 32)
 
 u8 static_ringbuffer[RING_BUFFER_SIZE];
 
@@ -72,6 +78,12 @@ static DECLARE_WAIT_QUEUE_HEAD(isdbt_isr_wait);
 static long 	open_cnt = 0;        /* OPEN counter             */
 static long   	moni_cnt = 0;		 /* Monitor counter			 */
 
+extern unsigned int system_rev;
+
+#ifdef CONFIG_ISDBT_SPMI
+static unsigned int spmi_addr;
+#endif
+
 #ifndef BBM_I2C_TSIF
 static u8 isdbt_isr_sig;
 static struct task_struct *isdbt_kthread;
@@ -82,6 +94,64 @@ static irqreturn_t isdbt_irq(int irq, void *dev_id)
 	wake_up_interruptible(&isdbt_isr_wait);
 	return IRQ_HANDLED;
 }
+#endif
+
+#ifdef CONFIG_ISDBT_SPMI
+struct isdbt_qpnp_data
+{
+	struct spmi_device *spmi;
+};
+
+static struct isdbt_qpnp_data *isdbt_spmi;
+
+static int qpnp_isdbt_clk_probe(struct spmi_device *spmi)
+{
+	int rc;
+	u8 reg = 0x00;
+	struct isdbt_qpnp_data *spmi_data;
+
+	pr_info("%s called\n", __func__);
+	spmi_data = devm_kzalloc(&spmi->dev, sizeof(struct isdbt_qpnp_data), GFP_KERNEL); //CID 25032
+	if(!spmi_data)
+		return -ENOMEM;
+
+	spmi_data->spmi = spmi;
+	isdbt_spmi = spmi_data;
+	spmi_addr = 0x5546;
+	rc = spmi_ext_register_readl(spmi->ctrl, spmi->sid, spmi_addr, &reg, 1);
+	if (rc) {
+		pr_err("Unable to read from addr=0x%x, rc(%d)\n", spmi_addr, rc);
+	}
+
+	pr_info("%s Register 0x%x contains 0x%x\n", __func__,spmi_addr,  reg);
+
+	return 0;
+}
+
+static int qpnp_isdbt_clk_remove(struct spmi_device *spmi)
+{
+	u8 reg = 0x00;
+	int rc = spmi_ext_register_writel(spmi->ctrl, spmi->sid, spmi_addr,&reg, 1);
+	if (rc) {
+		pr_err("Unable to write from addr=%x, rc(%d)\n", spmi_addr, rc);
+	}
+	return 0;
+}
+static struct of_device_id spmi_match_table[] = {
+	{
+		.compatible = "qcom,qpnp-clkrf2"
+	},
+	{}
+};
+
+static struct spmi_driver qpnp_isdbt_clk_driver = {
+	.driver = {
+		.name = "qcom,qpnp-isdbclk",
+		.of_match_table = spmi_match_table,
+	},
+	.probe = qpnp_isdbt_clk_probe,
+	.remove = qpnp_isdbt_clk_remove,
+};
 #endif
 
 static int tuner_ioctl_set_monitor_mode ( struct file* FIle, 
@@ -228,25 +298,15 @@ static void isdbt_gpio_init(void)
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_en, GPIOMUX_FUNC_GPIO,
 						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 						GPIO_CFG_ENABLE);
-	//gpio_set_value(isdbt_pdata->gpio_en, 0);
 
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_rst, GPIOMUX_FUNC_GPIO,
 						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 						GPIO_CFG_ENABLE);
-	//gpio_set_value(isdbt_pdata->gpio_rst, 0);
 
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_int, GPIOMUX_FUNC_GPIO,
 		GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 		GPIO_CFG_ENABLE);
-		
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_i2c_sda, GPIOMUX_FUNC_3,
-					 GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-					 GPIO_CFG_ENABLE);		
-	
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_i2c_scl, GPIOMUX_FUNC_3,
-					 GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-					 GPIO_CFG_ENABLE);			
-					 
+
 	isdbt_hw_setting();
 }
 
@@ -254,6 +314,10 @@ static void isdbt_gpio_init(void)
 void isdbt_hw_init(void)
 {
 	int i = 0;
+
+#ifdef CONFIG_ISDBT_SPMI
+	u8 reg = 0x00;
+#endif
 
 	while (driver_mode == ISDBT_DATAREAD) {
 		msWait(100);
@@ -265,17 +329,47 @@ void isdbt_hw_init(void)
 
 	gpio_set_value(isdbt_pdata->gpio_rst, 0);
 	gpio_set_value(isdbt_pdata->gpio_en, 1);
-	mdelay(5);
+	msleep(2); /* fc8300 chipspec is 1ms */
+#ifdef CONFIG_ISDBT_SPMI
+	pr_info("%s, Enabling ISDBT_CLK\n", __func__);
+	reg = 0x80;
+	if (isdbt_spmi) {
+		int rc = spmi_ext_register_writel(isdbt_spmi->spmi->ctrl, isdbt_spmi->spmi->sid, spmi_addr,&reg, 1);
+		if (rc)
+			pr_err("%s, Unable to write from addr=0x%x, rc(%d)\n", __func__, spmi_addr, rc);
+	} else {
+		pr_err("%s ERROR !! isdbt_spmi is NULL !!\n", __func__);
+	}
+#endif
+	msleep(1); /* fc8300 chipspec is 360us */
 	gpio_set_value(isdbt_pdata->gpio_rst, 1);
-	mdelay(5);
 	driver_mode = ISDBT_POWERON;
 }
 
 /*POWER_OFF */
 void isdbt_hw_deinit(void)
 {
+#ifdef CONFIG_ISDBT_SPMI
+	u8 reg = 0x00;
+#endif
+
 	pr_info("isdbt_hw_deinit \n");
 	driver_mode = ISDBT_POWEROFF;
+#ifdef CONFIG_ISDBT_SPMI
+	pr_info("%s, Turning ISDBT_CLK off\n", __func__);
+
+	reg = 0x00;
+	if(isdbt_spmi) {
+		int rc = spmi_ext_register_writel(isdbt_spmi->spmi->ctrl, isdbt_spmi->spmi->sid, spmi_addr,&reg, 1);
+
+		if (rc) {
+				pr_err("%s, Unable to write from addr=%x, rc(%d)\n", __func__, spmi_addr, rc );
+		}
+	}
+	else {
+		pr_err("%s ERROR !! isdbt_spmi is NULL !!\n", __func__);
+	}
+#endif
 	gpio_set_value(isdbt_pdata->gpio_en, 0);
 	gpio_set_value(isdbt_pdata->gpio_rst, 0);
 }
@@ -368,7 +462,11 @@ int isdbt_open(struct inode *inode, struct file *filp)
 	pr_info("isdbt open\n");
 	open_cnt++;
 	hOpen = kmalloc(sizeof(struct ISDBT_OPEN_INFO_T), GFP_KERNEL);
-
+	if(!hOpen)
+	{
+		pr_err("hOpen malloc failed ENOMEM\n");
+		return -ENOMEM;
+	}
 	hOpen->buf = &static_ringbuffer[0];
 	/*kmalloc(RING_BUFFER_SIZE, GFP_KERNEL);*/
 	hOpen->isdbttype = 0;
@@ -450,17 +548,20 @@ int isdbt_release(struct inode *inode, struct file *filp)
 	/* close all open */
 	if( open_cnt == 0 )
 	{
-	hOpen = filp->private_data;
+		hOpen = filp->private_data;
 
-	hOpen->isdbttype = 0;
+		if (hOpen != NULL)
+		{
+		hOpen->isdbttype = 0;
 
-	list_del(&(hOpen->hList));
+		list_del(&(hOpen->hList));
 		pr_info("isdbt_release hList\n");
-	//	if(hOpen->buf)
-	//	kfree(hOpen->buf);
-	pr_info("isdbt_release buf\n");
-	if (hOpen != NULL)
+		//	if(hOpen->buf)
+		//	kfree(hOpen->buf);
+		pr_info("isdbt_release buf\n");
+
 		kfree(hOpen);
+		}
 	}
 	
 
@@ -624,6 +725,29 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		res = bbm_com_tuner_select(hInit
 			, DIV_BROADCAST, (u32)info.buff[0], (u32)info.buff[1]);
 
+	if (((u32)info.buff[1] == ISDBTMM_13SEG) || ((u32)info.buff[1] == ISDBT_13SEG)) {
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_END
+					, TS0_32PKT_LENGTH - 1);
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
+					, TS0_32PKT_LENGTH / 2 - 1);
+			   print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+			   , TS0_32PKT_LENGTH / 2 - 1);
+                }
+		else
+		{
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_END
+				, TS0_5PKT_LENGTH - 1);
+			bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
+				, TS0_5PKT_LENGTH / 2 - 1);
+			print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+			, TS0_5PKT_LENGTH / 2 - 1);
+		}
+
+		print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_SELECT %d \n"
+		, (u32)info.buff[1]);
+
 		break;
 	case IOCTL_ISDBT_TS_START:
 	pr_info("[FC8300] IOCTL_ISDBT_TS_START \n");
@@ -675,6 +799,41 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 											   cmd, 
 											   arg );
 		break;
+		
+	case IOCTL_ISDBT_TUNER_PKT_MODE:
+
+		pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE \n");
+		err = copy_from_user((void *)&info, (void *)arg, size);
+		if (!err) {
+
+			if ((u32)info.buff[0] == ISDBT_INTERRUPT_32_PKT) {
+				pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE ISDBT_INTERRUPT_32_PKT\n");
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_END
+						, TS0_32PKT_LENGTH - 1);
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
+						, TS0_32PKT_LENGTH / 2 - 1);
+				   print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+				   , TS0_32PKT_LENGTH / 2 - 1);
+			 }
+			else
+			{
+				pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE ISDBT_INTERRUPT_5_PKT\n");
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_END
+					, TS0_32PKT_LENGTH - 1);
+				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
+					, TS0_5PKT_LENGTH / 2 - 1);
+				print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
+				, TS0_5PKT_LENGTH / 2 - 1);
+			}
+			
+			print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE %lu \n"
+			, info.buff[0]);
+		}
+		res = err;
+		break;	
+		
 	default:
 		pr_info("isdbt ioctl error!\n");
 		res = BBM_NOK;
@@ -693,7 +852,7 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 {
 	struct isdbt_platform_data *pdata;
-	
+
 	pr_info("%s\n", __func__);
 	pdata =  devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
@@ -701,43 +860,63 @@ static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 		goto err;
 	}
 
-
+	of_property_read_u32(dev->of_node, "qcom,isdb-bbm-xtal-freq", &bbm_xtal_freq);
+	if (bbm_xtal_freq < 0)
+	{
+		pr_err("%s : can not find the isdbt-bbmxtal-freq in the dt, set to : 26000\n", __func__);
+		bbm_xtal_freq = 26000;
+	}
 
 	pdata->gpio_en = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-pwr-en", 0);
-	if (pdata->gpio_en < 0) {
+	if (pdata->gpio_en < 0)
+		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-pwr-en", &pdata->gpio_en );
+	if (pdata->gpio_en < 0)
+	{
 		pr_err("%s : can not find the isdbt-detect-gpio gpio_en in the dt\n", __func__);
 		goto alloc_err;
-	} else
+	} else {
 		pr_info("%s : isdbt-detect-gpio gpio_en =%d\n", __func__, pdata->gpio_en);
-		
+	}
+
 	pdata->gpio_rst = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-rst", 0);
+	if (pdata->gpio_rst < 0)
+		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-rst", &pdata->gpio_rst);
 	if (pdata->gpio_rst < 0) {
 		pr_err("%s : can not find the isdbt-detect-gpio gpio_rst in the dt\n", __func__);
 		goto alloc_err;
-	} else
+	} else {
 		pr_info("%s : isdbt-detect-gpio gpio_rst =%d\n", __func__, pdata->gpio_rst);
-		
+	}
+
 	pdata->gpio_int = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-irq", 0);
+	if (pdata->gpio_int < 0)
+		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-irq", &pdata->gpio_int);
 	if (pdata->gpio_int < 0) {
 		pr_err("%s : can not find the isdbt-detect-gpio in the gpio_int dt\n", __func__);
 		goto alloc_err;
-	} else
+	} else {
 		pr_info("%s : isdbt-detect-gpio gpio_int =%d\n", __func__, pdata->gpio_int);
+	}
 		
 	pdata->gpio_i2c_sda = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-i2c_sda", 0);
+	if (pdata->gpio_i2c_sda < 0)
+		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-i2c_sda", &pdata->gpio_i2c_sda);
 	if (pdata->gpio_i2c_sda < 0) {
-			pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_sda in the dt\n", __func__);
-			goto alloc_err;
-	} else
-			pr_info("%s : isdbt-detect-gpio gpio_i2c_sda=%d\n", __func__, pdata->gpio_i2c_sda);
+		pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_sda in the dt\n", __func__);
+		goto alloc_err;
+	} else {
+		pr_info("%s : isdbt-detect-gpio gpio_i2c_sda=%d\n", __func__, pdata->gpio_i2c_sda);
+	}
 
 	pdata->gpio_i2c_scl = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-i2c_scl", 0);
+	if (pdata->gpio_i2c_scl < 0)
+		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-i2c_scl", &pdata->gpio_i2c_scl);
 	if (pdata->gpio_i2c_scl < 0) {
-			pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_scl in the dt\n", __func__);
-			goto alloc_err;
-	} else
-			pr_info("%s : isdbt-detect-gpio gpio_i2c_scl=%d\n", __func__, pdata->gpio_i2c_scl);
-		
+		pr_err("%s : can not find the isdbt-detect-gpio gpio_i2c_scl in the dt\n", __func__);
+		goto alloc_err;
+	} else {
+		pr_info("%s : isdbt-detect-gpio gpio_i2c_scl=%d\n", __func__, pdata->gpio_i2c_scl);
+	}
 
 	return pdata;
 alloc_err:
@@ -759,6 +938,7 @@ static int isdbt_probe(struct platform_device *pdev)
 	}
 	
 	isdbt_gpio_init();
+	fc8300_xtal_freq = bbm_xtal_freq;
 	
 	res = misc_register(&fc8300_misc_device);
 
@@ -807,7 +987,20 @@ static int isdbt_remove(struct platform_device *pdev)
 static int isdbt_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
        int value;
-	
+#ifdef CONFIG_ISDBT_SPMI
+	u8 reg = 0x00;
+	pr_info("%s, Turning ISDBT_CLK off\n", __func__);
+
+	if(isdbt_spmi) {
+		int rc = spmi_ext_register_writel(isdbt_spmi->spmi->ctrl, isdbt_spmi->spmi->sid, spmi_addr,&reg, 1);
+		if (rc) {
+				pr_err("%s, Unable to write from addr=%x, rc(%d)\n", __func__, spmi_addr, rc );
+		}
+	}
+	else {
+		pr_err("%s ERROR !! isdbt_spmi is NULL !!\n", __func__);
+	}
+#endif
 	
        value = gpio_get_value_cansleep(isdbt_pdata->gpio_en);
        pr_info("%s  value = %d\n",__func__,value);
@@ -849,6 +1042,13 @@ int isdbt_init(void)
 
 	pr_info("isdbt_fc8300_init started\n");
 
+#ifdef CONFIG_ISDBT_SPMI
+	res = spmi_driver_register(&qpnp_isdbt_clk_driver);
+	if(res < 0){
+		pr_err("Error : qpnp isdbt clk init fail : %d\n", res);
+	}
+#endif
+
 //	res = misc_register(&fc8300_misc_device);
 	res = platform_driver_register(&isdb_fc8300_driver);
 	if (res < 0) {
@@ -887,6 +1087,9 @@ void isdbt_exit(void)
 
 	if (hInit != NULL)
 		kfree(hInit);
+#ifdef CONFIG_ISDBT_SPMI
+	spmi_driver_unregister(&qpnp_isdbt_clk_driver);
+#endif
 }
 
 module_init(isdbt_init);

@@ -117,7 +117,7 @@ static void _set_vibetonz_work(struct work_struct *unused);
 static DECLARE_WORK(vibetonz_work, _set_vibetonz_work);
 struct vibrator_platform_data_isa1200 vibrator_drvdata;
 
-#if defined CONFIG_MACH_MATISSE3G_OPEN || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined (CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
 static void haptic_power_onoff(int onoff)
 {
 	int ret;
@@ -287,7 +287,9 @@ static int isa1200_parse_dt(struct device *dev)
 	struct device_node *np = dev->of_node;
 	vibrator_drvdata.motor_en = of_get_named_gpio(np, "isa1200,motor_en",0);
 	vibrator_drvdata.vib_clk = of_get_named_gpio(np, "isa1200,vib_clk",0);
-
+#if defined(CONFIG_MACH_T10_3G_OPEN)
+	gpio_tlmm_config(GPIO_CFG(vibrator_drvdata.motor_en,  0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_DISABLE);
+#endif
 	return 0;
 }
 
@@ -310,7 +312,12 @@ static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,
 	error = isa1200_parse_dt(&client->dev);
 	if (error)
 		return error;
-	gpio_request(vibrator_drvdata.motor_en, "MOTOR_EN");
+
+	if( gpio_request(vibrator_drvdata.motor_en, "MOTOR_EN") < 0)
+	{
+		return -EINVAL;
+	}
+
         gpio_direction_output(vibrator_drvdata.motor_en, 0);
         gpio_export(vibrator_drvdata.motor_en, 0);
 
@@ -318,7 +325,7 @@ static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,
 	if (!virt_mmss_gp1_base)
                 panic("tspdrv : Unable to ioremap MSM_MMSS_GP1 memory!");
 
-#if defined(CONFIG_MACH_MATISSE3G_OPEN) || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined(CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
 	vibrator_drvdata.power_onoff = haptic_power_onoff;
 #endif
 	nRet = misc_register(&miscdev);

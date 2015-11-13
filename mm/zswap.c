@@ -49,8 +49,11 @@
 static atomic_t zswap_pool_pages = ATOMIC_INIT(0);
 /* The number of compressed pages currently stored in zswap */
 static atomic_t zswap_stored_pages = ATOMIC_INIT(0);
+
+#ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
 /* The number of outstanding pages awaiting writeback */
 static atomic_t zswap_outstanding_writebacks = ATOMIC_INIT(0);
+#endif
 
 /*
  * The statistics below are not protected from concurrent access for
@@ -780,6 +783,12 @@ static int zswap_frontswap_store(unsigned type, pgoff_t offset,
 		goto reject;
 	}
 
+	/* if this page got EIO on pageout before, give up immediately */
+	if (PageError(page)) {
+		ret = -ENOMEM;
+		goto reject;
+	}
+
 	/* allocate entry */
 	entry = zswap_entry_cache_alloc(GFP_KERNEL);
 	if (!entry) {
@@ -1090,9 +1099,10 @@ static int __init zswap_debugfs_init(void)
 			zswap_debugfs_root, &zswap_pool_pages);
 	debugfs_create_atomic_t("stored_pages", S_IRUGO,
 			zswap_debugfs_root, &zswap_stored_pages);
+#ifdef CONFIG_ZSWAP_ENABLE_WRITEBACK
 	debugfs_create_atomic_t("outstanding_writebacks", S_IRUGO,
 			zswap_debugfs_root, &zswap_outstanding_writebacks);
-
+#endif
 	return 0;
 }
 

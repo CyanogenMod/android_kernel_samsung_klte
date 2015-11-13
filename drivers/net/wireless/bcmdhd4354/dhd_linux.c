@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c 480583 2014-05-24 07:26:44Z $
+ * $Id: dhd_linux.c 510762 2014-10-27 12:22:32Z $
  */
 
 #include <typedefs.h>
@@ -305,6 +305,16 @@ static int dhd_sysfs_create_node(struct net_device *net);
 static void dhd_sysfs_destroy_node(struct net_device *net);
 #endif /* ENABLE_CONTROL_SCHED */
 
+
+
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+extern int argos_task_affinity_setup(struct task_struct *p, int dev_num,
+	struct cpumask * affinity_cpu_mask, struct cpumask * default_cpu_mask);
+extern struct cpumask hmp_slow_cpu_mask;
+extern struct cpumask hmp_fast_cpu_mask;
+extern void set_cpucore_for_interrupt(cpumask_var_t default_cpu_mask,
+	cpuumask_var_t affinity_cpu_mask);
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 
 typedef struct dhd_if_event {
 	struct list_head	list;
@@ -1983,9 +1993,16 @@ done:
 		ifp->stats.tx_dropped++;
 	}
 	else {
-		dhd->pub.tx_packets++;
-		ifp->stats.tx_packets++;
-		ifp->stats.tx_bytes += datalen;
+
+#ifdef PROP_TXSTATUS
+		/* tx_packets counter can counted only when wlfc is disabled */
+		if (!dhd_wlfc_is_supported(&dhd->pub))
+#endif
+		{
+			dhd->pub.tx_packets++;
+			ifp->stats.tx_packets++;
+			ifp->stats.tx_bytes += datalen;
+		}
 	}
 
 	DHD_OS_WAKE_UNLOCK(&dhd->pub);
@@ -2352,6 +2369,20 @@ dhd_txcomplete(dhd_pub_t *dhdp, void *txp, bool success)
 		}
 	}
 #endif /* WLBTAMP */
+#ifdef PROP_TXSTATUS
+	if (dhdp->wlfc_state && (dhdp->proptxstatus_mode != WLFC_FCMODE_NONE)) {
+		dhd_if_t *ifp = dhd->iflist[DHD_PKTTAG_IF(PKTTAG(txp))];
+		uint datalen  = PKTLEN(dhd->pub.osh, txp);
+
+		if (success) {
+			dhd->pub.tx_packets++;
+			ifp->stats.tx_packets++;
+			ifp->stats.tx_bytes += datalen;
+		} else {
+			ifp->stats.tx_dropped++;
+		}
+	}
+#endif
 }
 
 static struct net_device_stats *
@@ -2503,6 +2534,11 @@ exit:
 static int
 dhd_dpc_thread(void *data)
 {
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	int ret = 0;
+	unsigned long flags;
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
+
 	tsk_ctl_t *tsk = (tsk_ctl_t *)data;
 	dhd_info_t *dhd = (dhd_info_t *)tsk->parent;
 
@@ -2516,13 +2552,46 @@ dhd_dpc_thread(void *data)
 		setScheduler(current, SCHED_FIFO, &param);
 	}
 
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	if (!zalloc_cpumask_var(&dhd->pub.default_cpu_mask, GFP_KERNEL)) {
+		DHD_ERROR(("dpc_thread, zalloc_cpumask_var error\n"));
+		dhd->pub.affinity_isdpc = FALSE;
+	 } else {
+			if (!zalloc_cpumask_var(&dhd->pub.dpc_affinity_cpu_mask, GFP_KERNEL)) {
+				DHD_ERROR(("dpc_thread, dpc_affinity_cpu_mask  error\n"));
+				free_cpumask_var(dhd->pub.default_cpu_mask);
+				dhd->pub.affinity_isdpc = FALSE;
+			} else {
+				cpumask_copy(dhd->pub.default_cpu_mask, &hmp_slow_cpu_mask);
+				cpumask_or(dhd->pub.dpc_affinity_cpu_mask,
+					dhd->pub.dpc_affinity_cpu_mask, cpumask_of(DPC_CPUCORE));
+
+				flags = dhd_os_spin_lock(&dhd->pub);
+				if ((ret = argos_task_affinity_setup(current, 2,
+					dhd->pub.dpc_affinity_cpu_mask,
+					dhd->pub.default_cpu_mask)) < 0) {
+					DHD_ERROR(("Failed to add CPU affinity(dpc) error=%d\n",
+						ret));
+					free_cpumask_var(dhd->pub.default_cpu_mask);
+					free_cpumask_var(dhd->pub.dpc_affinity_cpu_mask);
+					dhd->pub.affinity_isdpc = FALSE;
+				} else {
+					DHD_ERROR(("Argos set Completed : dpcthread\n"));
+					set_cpucore_for_interrupt(dhd->pub.default_cpu_mask,
+						dhd->pub.dpc_affinity_cpu_mask);
+					dhd->pub.affinity_isdpc = TRUE;
+				}
+				dhd_os_spin_unlock(&dhd->pub, flags);
+			}
+	}
+#else /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 #ifdef CUSTOM_DPC_CPUCORE
 	set_cpus_allowed_ptr(current, cpumask_of(CUSTOM_DPC_CPUCORE));
 #endif
 #ifdef CUSTOM_SET_CPUCORE
 	dhd->pub.current_dpc = current;
 #endif /* CUSTOM_SET_CPUCORE */
-
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 	/* Run until signal received */
 	while (1) {
 		if (!binary_sema_down(tsk)) {
@@ -2566,7 +2635,13 @@ dhd_dpc_thread(void *data)
 		else
 			break;
 	}
-
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	if (dhd->pub.affinity_isdpc == TRUE) {
+		free_cpumask_var(dhd->pub.default_cpu_mask);
+		free_cpumask_var(dhd->pub.dpc_affinity_cpu_mask);
+		dhd->pub.affinity_isdpc = FALSE;
+	}
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 	complete_and_exit(&tsk->completed, 0);
 }
 
@@ -2576,6 +2651,10 @@ dhd_rxf_thread(void *data)
 	tsk_ctl_t *tsk = (tsk_ctl_t *)data;
 	dhd_info_t *dhd = (dhd_info_t *)tsk->parent;
 	dhd_pub_t *pub = &dhd->pub;
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	int ret = 0;
+	unsigned long flags;
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 #if defined(WAIT_DEQUEUE)
 #define RXF_WATCHDOG_TIME 250 /* BARK_TIME(1000) /  */
 	ulong watchdogTime = OSL_SYSUPTIME(); /* msec */
@@ -2596,10 +2675,32 @@ dhd_rxf_thread(void *data)
 
 	/*  signal: thread has started */
 	complete(&tsk->completed);
+
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	if (!zalloc_cpumask_var(&dhd->pub.rxf_affinity_cpu_mask, GFP_KERNEL)) {
+		DHD_ERROR(("rxthread zalloc_cpumask_var error\n"));
+		dhd->pub.affinity_isrxf = FALSE;
+	} else {
+		cpumask_or(dhd->pub.rxf_affinity_cpu_mask, dhd->pub.rxf_affinity_cpu_mask,
+			cpumask_of(RXF_CPUCORE));
+
+		flags = dhd_os_spin_lock(&dhd->pub);
+		if ((ret = argos_task_affinity_setup(current, 2, dhd->pub.rxf_affinity_cpu_mask,
+			dhd->pub.default_cpu_mask)) < 0) {
+			DHD_ERROR(("Failed to add CPU affinity(rxf) error=%d\n", ret));
+			dhd->pub.affinity_isrxf = FALSE;
+			free_cpumask_var(dhd->pub.rxf_affinity_cpu_mask);
+		} else {
+			DHD_ERROR(("RXthread affinity completed\n"));
+			dhd->pub.affinity_isrxf = TRUE;
+		}
+		dhd_os_spin_unlock(&dhd->pub, flags);
+	}
+#else /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 #ifdef CUSTOM_SET_CPUCORE
 	dhd->pub.current_rxf = current;
 #endif /* CUSTOM_SET_CPUCORE */
-
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 	/* Run until signal received */
 	while (1) {
 		if (down_interruptible(&tsk->sema) == 0) {
@@ -2649,6 +2750,12 @@ dhd_rxf_thread(void *data)
 			break;
 	}
 
+#if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
+	if (dhd->pub.affinity_isrxf == TRUE) {
+		free_cpumask_var(dhd->pub.rxf_affinity_cpu_mask);
+		dhd->pub.affinity_isrxf = FALSE;
+	}
+#endif /* CUSTOMER_HW4 && ARGOS_CPU_SCHEDULER */
 	complete_and_exit(&tsk->completed, 0);
 }
 
@@ -3369,12 +3476,14 @@ static int dhd_interworking_enable(dhd_pub_t *dhd)
 	}
 
 	if (ret == BCME_OK) {
-		/* basic capabilities for HS20 REL2 */
 		uint32 cap = WL_WNM_BSSTRANS | WL_WNM_NOTIF;
+
+		/* set WNM capabilities */
 		bcm_mkiovar("wnm", (char *)&cap, sizeof(cap), iovbuf, sizeof(iovbuf));
 		if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR,
 			iovbuf, sizeof(iovbuf), TRUE, 0)) < 0) {
-			DHD_ERROR(("%s: failed to set WNM info, ret=%d\n", __FUNCTION__, ret));
+			DHD_ERROR(("%s: failed to set WNM capabilities, ret=%d\n",
+				__FUNCTION__, ret));
 		}
 	}
 
@@ -4496,6 +4605,14 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	char eventmask[WL_EVENTING_MASK_LEN];
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];	/*  Room for "event_msgs" + '\0' + bitvec  */
 	uint32 buf_key_b4_m4 = 1;
+#ifdef WLAIBSS
+	char iov_buf[WLC_IOCTL_SMLEN];
+	aibss_bcn_force_config_t bcn_config;
+	uint32 aibss;
+#ifdef WLAIBSS_PS
+	uint32 aibss_ps;
+#endif /* WLAIBSS_PS */
+#endif /* WLAIBSS */
 #if defined(BCMSUP_4WAY_HANDSHAKE) && defined(WLAN_AKM_SUITE_FT_8021X)
 	uint32 sup_wpa = 0;
 #endif
@@ -4993,6 +5110,45 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		}
 	}
 #endif /* CUSTOM_AMPDU_BA_WSIZE || (WLAIBSS && CUSTOM_IBSS_AMPDU_BA_WSIZE) */
+
+#ifdef WLAIBSS
+	/* Configure custom IBSS beacon transmission */
+	if (dhd->op_mode & DHD_FLAG_IBSS_MODE)
+	{
+		aibss = 1;
+		bcm_mkiovar("aibss", (char *)&aibss, 4, iovbuf, sizeof(iovbuf));
+		if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
+			sizeof(iovbuf), TRUE, 0)) < 0) {
+			DHD_ERROR(("%s Set aibss to %d failed  %d\n",
+				__FUNCTION__, aibss, ret));
+		}
+#ifdef WLAIBSS_PS
+		aibss_ps = 1;
+		bcm_mkiovar("aibss_ps", (char *)&aibss_ps, 4, iovbuf, sizeof(iovbuf));
+		if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
+			sizeof(iovbuf), TRUE, 0)) < 0) {
+			DHD_ERROR(("%s Set aibss PS to %d failed  %d\n",
+				__FUNCTION__, aibss, ret));
+		}
+#endif /* WLAIBSS_PS */
+	}
+	memset(&bcn_config, 0, sizeof(bcn_config));
+	bcn_config.initial_min_bcn_dur = AIBSS_INITIAL_MIN_BCN_DUR;
+	bcn_config.min_bcn_dur = AIBSS_MIN_BCN_DUR;
+	bcn_config.bcn_flood_dur = AIBSS_BCN_FLOOD_DUR;
+	bcn_config.version = AIBSS_BCN_FORCE_CONFIG_VER_0;
+	bcn_config.len = sizeof(bcn_config);
+
+	bcm_mkiovar("aibss_bcn_force_config", (char *)&bcn_config,
+		sizeof(aibss_bcn_force_config_t), iov_buf, sizeof(iov_buf));
+	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iov_buf,
+		sizeof(iov_buf), TRUE, 0)) < 0) {
+		DHD_ERROR(("%s Set aibss_bcn_force_config to %d, %d, %d failed %d\n",
+			__FUNCTION__, AIBSS_INITIAL_MIN_BCN_DUR, AIBSS_MIN_BCN_DUR,
+			AIBSS_BCN_FLOOD_DUR, ret));
+	}
+#endif /* WLAIBSS */
+
 #if defined(CUSTOM_AMPDU_MPDU)
 	ampdu_mpdu = CUSTOM_AMPDU_MPDU;
 	if (ampdu_mpdu != 0 && (ampdu_mpdu <= ampdu_ba_wsize)) {
@@ -5123,6 +5279,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #ifdef WLAIBSS
 	setbit(eventmask, WLC_E_AIBSS_TXFAIL);
 #endif /* WLAIBSS */
+
 	setbit(eventmask, WLC_E_TRACE);
 
 	/* Write updated Event mask */

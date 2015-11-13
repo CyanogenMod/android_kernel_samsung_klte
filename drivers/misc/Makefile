@@ -51,6 +51,7 @@ obj-y				+= carma/
 obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
 obj-$(CONFIG_USB_SWITCH_TSU6721) += tsu6721.o
 obj-$(CONFIG_SM5502_MUIC) += sm5502.o
+obj-$(CONFIG_SM5504_MUIC) += sm5504.o
 obj-$(CONFIG_USB_SWITCH_FSA9485) += fsa9485.o
 obj-$(CONFIG_USB_SWITCH_RT8973) += rt8973.o
 obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
@@ -80,8 +81,10 @@ obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
 obj-$(CONFIG_BCM2079X_NFC_I2C)	+= bcm2079x-i2c.o
 obj-$(CONFIG_NFC_PN547)	+= pn547.o
+ifneq ($(CONFIG_SEC_NFC_SENN3AB),y)
 obj-$(CONFIG_SEC_NFC_I2C) += sec_nfc.o
 obj-$(CONFIG_SEC_NFC) += sec_nfc.o
+endif
 obj-$(CONFIG_SAMSUNG_JACK)	+= sec_jack.o
 ifneq ($(CONFIG_EXTCON),y)
 obj-$(CONFIG_USB_SWITCH_TSU6721)    += tsu6721.o
@@ -93,4 +96,7 @@ obj-$(CONFIG_MAX77888_MUIC)	+= max77888-muic.o
 endif
 obj-$(CONFIG_SEC_FPGA_ICE40XX)	+= ice40xx.o
 obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
+obj-$(CONFIG_CHECK_SIMSLOT_COUNT) += sim_slot.o
 obj-$(CONFIG_SEC_MODEM) += modem_if/
+
+obj-y += dualwave/

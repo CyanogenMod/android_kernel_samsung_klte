@@ -1125,7 +1125,6 @@ static int bma280_probe(struct i2c_client *client,
 		       "reactive_wake_lock");
 
 	/* read chip id */
-	bma280_set_mode(data, BMA280_MODE_NORMAL);
 	for (i = 0; i < CHIP_ID_RETRIES; i++) {
 		ret = i2c_smbus_read_word_data(client, BMA280_CHIP_ID_REG);
 		if ((ret & 0x00ff) != BMA280_CHIP_ID) {

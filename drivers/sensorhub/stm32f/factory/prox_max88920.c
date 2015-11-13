@@ -27,18 +27,31 @@
 #define LDI_GRAY	'1'
 #define LDI_WHITE	'2'
 
+#if defined (CONFIG_MACH_JSGLTE_CHN_CMCC)
+#define HIGH_THRESHOLD_88921	60
+#define LOW_THRESHOLD_88921	40
+#else
 #define HIGH_THRESHOLD_88921	60
 #define LOW_THRESHOLD_88921	45
+#endif
 
 #if defined (CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM)
 #define DEFUALT_HIGH_THRESHOLD	90
-#define DEFUALT_LOW_THRESHOLD	60
+#define DEFUALT_LOW_THRESHOLD	65
 #define TBD_HIGH_THRESHOLD		90
-#define TBD_LOW_THRESHOLD		60
+#define TBD_LOW_THRESHOLD		65
 #define WHITE_HIGH_THRESHOLD	90
-#define WHITE_LOW_THRESHOLD		60
-#else
+#define WHITE_LOW_THRESHOLD		65
 
+#elif defined (CONFIG_MACH_JSGLTE_CHN_CMCC)
+
+#define DEFUALT_HIGH_THRESHOLD	60
+#define DEFUALT_LOW_THRESHOLD	40
+#define TBD_HIGH_THRESHOLD		60
+#define TBD_LOW_THRESHOLD		40
+#define WHITE_HIGH_THRESHOLD	60
+#define WHITE_LOW_THRESHOLD		40
+#else
 #define DEFUALT_HIGH_THRESHOLD	120
 #define DEFUALT_LOW_THRESHOLD	80
 #define TBD_HIGH_THRESHOLD		120
@@ -78,7 +91,7 @@ static ssize_t proximity_avg_show(struct device *dev,
 static ssize_t proximity_avg_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
-	char chTempbuf[4] = { 0 };
+	char chTempbuf[9] = { 0, };
 	int iRet;
 	int64_t dEnable;
 	struct ssp_data *data = dev_get_drvdata(dev);
@@ -91,7 +104,7 @@ static ssize_t proximity_avg_store(struct device *dev,
 		return iRet;
 
 	if (dEnable) {
-		send_instruction(data, ADD_SENSOR, PROXIMITY_RAW, chTempbuf, 4);
+		send_instruction(data, ADD_SENSOR, PROXIMITY_RAW, chTempbuf, 9);
 		data->bProximityRawEnabled = true;
 	} else {
 		send_instruction(data, REMOVE_SENSOR, PROXIMITY_RAW,
@@ -105,13 +118,13 @@ static ssize_t proximity_avg_store(struct device *dev,
 static u16 get_proximity_rawdata(struct ssp_data *data)
 {
 	u16 uRowdata = 0;
-	char chTempbuf[4] = { 0 };
+	char chTempbuf[9] = { 0, };
 
 	s32 dMsDelay = 20;
 	memcpy(&chTempbuf[0], &dMsDelay, 4);
 
 	if (data->bProximityRawEnabled == false) {
-		send_instruction(data, ADD_SENSOR, PROXIMITY_RAW, chTempbuf, 4);
+		send_instruction(data, ADD_SENSOR, PROXIMITY_RAW, chTempbuf, 9);
 		msleep(200);
 		uRowdata = data->buf[PROXIMITY_RAW].prox[0];
 		send_instruction(data, REMOVE_SENSOR, PROXIMITY_RAW,

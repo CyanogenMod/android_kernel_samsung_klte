@@ -64,6 +64,12 @@
 #define GPIO_BT_UART_TXD BT_UART_TXD
 #define GPIO_BT_HOST_WAKE BT_HOST_WAKE
 
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
+int bt_is_running=0;
+#endif
+
+EXPORT_SYMBOL(bt_is_running);
+
 #define FPGA_GPIO_BT_EN 4
 #define FPGA_GPIO_BT_WAKE 5
 
@@ -177,6 +183,10 @@ static int bcm4335_bt_rfkill_set_power(void *data, bool blocked)
 
 		if (ret)
 			pr_err("[BT] failed to set BT_EN.\n");
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
+		else
+			bt_is_running = 1;
+#endif
 	} else {
 #ifdef BT_UART_CFG
 	for (pin = 0; pin < ARRAY_SIZE(bt_uart_off_table); pin++) {
@@ -196,6 +206,10 @@ static int bcm4335_bt_rfkill_set_power(void *data, bool blocked)
 		ret = ice_gpiox_set(FPGA_GPIO_BT_WAKE, 0);	//tseop.kim
 		if (ret)
 			pr_err("[BT] failed to set ext_wake to low.\n");
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
+		else
+			bt_is_running = 0;
+#endif
 	}
 	return 0;
 }
@@ -234,6 +248,9 @@ static int bcm4335_bluetooth_probe(struct platform_device *pdev)
     int pin = 0;
     #endif
 
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
+	bt_is_running = 0;
+#endif
     /* temporailiy set HOST_WAKE OUT direction until FPGA work finishs */
 	/* if setting HOST_WAKE to NO PULL, BT would not be turned on. */
 	/* By guideline of BRCM, it is needed to determine pull status */

@@ -818,24 +818,35 @@ static int ext4_write_begin(struct file *file, struct address_space *mapping,
 	from = pos & (PAGE_CACHE_SIZE - 1);
 	to = from + len;
 
-retry:
+	/*
+	 * grab_cache_page_write_begin() can take a long time if the
+	 * system is thrashing due to memory pressure, or if the page
+	 * is being written back.  So grab it first before we start
+	 * the transaction handle.  This also allows us to allocate
+	 * the page (if needed) without using GFP_NOFS.
+	 */
+retry_grab:
+	page = grab_cache_page_write_begin(mapping, index, flags);
+	if (!page)
+		return -ENOMEM;
+	unlock_page(page);
+
+retry_journal:
 	handle = ext4_journal_start(inode, needed_blocks);
 	if (IS_ERR(handle)) {
-		ret = PTR_ERR(handle);
-		goto out;
+		page_cache_release(page);
+		return PTR_ERR(handle);
 	}
 
-	/* We cannot recurse into the filesystem as the transaction is already
-	 * started */
-	flags |= AOP_FLAG_NOFS;
-
-	page = grab_cache_page_write_begin(mapping, index, flags);
-	if (!page) {
+	lock_page(page);
+	if (page->mapping != mapping) {
+		/* The page got truncated from under us */
+		unlock_page(page);
+		page_cache_release(page);
 		ext4_journal_stop(handle);
-		ret = -ENOMEM;
-		goto out;
+		goto retry_grab;
 	}
-	*pagep = page;
+	wait_on_page_writeback(page);
 
 	if (ext4_should_dioread_nolock(inode))
 		ret = __block_write_begin(page, pos, len, ext4_get_block_write);
@@ -849,7 +860,6 @@ retry:
 
 	if (ret) {
 		unlock_page(page);
-		page_cache_release(page);
 		/*
 		 * __block_write_begin may have instantiated a few blocks
 		 * outside i_size.  Trim these off again. Don't need
@@ -873,11 +883,13 @@ retry:
 			if (inode->i_nlink)
 				ext4_orphan_del(NULL, inode);
 		}
+		if (ret == -ENOSPC &&
+		    ext4_should_retry_alloc(inode->i_sb, &retries))
+			goto retry_journal;
+		page_cache_release(page);
+		return ret;
 	}
-
-	if (ret == -ENOSPC && ext4_should_retry_alloc(inode->i_sb, &retries))
-		goto retry;
-out:
+	*pagep = page;
 	return ret;
 }
 
@@ -2408,35 +2420,46 @@ static int ext4_da_write_begin(struct file *file, struct address_space *mapping,
 	}
 	*fsdata = (void *)0;
 	trace_ext4_da_write_begin(inode, pos, len, flags);
-retry:
+	/*
+	 * grab_cache_page_write_begin() can take a long time if the
+	 * system is thrashing due to memory pressure, or if the page
+	 * is being written back.  So grab it first before we start
+	 * the transaction handle.  This also allows us to allocate
+	 * the page (if needed) without using GFP_NOFS.
+	 */
+retry_grab:
+	page = grab_cache_page_write_begin(mapping, index, flags);
+	if (!page)
+		return -ENOMEM;
+	unlock_page(page);
+
 	/*
 	 * With delayed allocation, we don't log the i_disksize update
 	 * if there is delayed block allocation. But we still need
 	 * to journalling the i_disksize update if writes to the end
 	 * of file which has an already mapped buffer.
 	 */
+retry_journal:
 	handle = ext4_journal_start(inode, 1);
 	if (IS_ERR(handle)) {
-		ret = PTR_ERR(handle);
-		goto out;
+		page_cache_release(page);
+		return PTR_ERR(handle);
 	}
-	/* We cannot recurse into the filesystem as the transaction is already
-	 * started */
-	flags |= AOP_FLAG_NOFS;
-
-	page = grab_cache_page_write_begin(mapping, index, flags);
-	if (!page) {
+	lock_page(page);
+	if (page->mapping != mapping) {
+		/* The page got truncated from under us */
+		unlock_page(page);
+		page_cache_release(page);
 		ext4_journal_stop(handle);
-		ret = -ENOMEM;
-		goto out;
+		goto retry_grab;
 	}
-	*pagep = page;
+	/* In case writeback began while the page was unlocked */
+	wait_on_page_writeback(page);
 
 	ret = __block_write_begin(page, pos, len, ext4_da_get_block_prep);
 	if (ret < 0) {
 		unlock_page(page);
 		ext4_journal_stop(handle);
-		page_cache_release(page);
 		/*
 		 * block_write_begin may have instantiated a few blocks
 		 * outside i_size.  Trim these off again. Don't need
@@ -2444,11 +2467,16 @@ retry:
 		 */
 		if (pos + len > inode->i_size)
 			ext4_truncate_failed_write(inode);
+
+		if (ret == -ENOSPC &&
+		    ext4_should_retry_alloc(inode->i_sb, &retries))
+			goto retry_journal;
+
+		page_cache_release(page);
+		return ret;
 	}
 
-	if (ret == -ENOSPC && ext4_should_retry_alloc(inode->i_sb, &retries))
-		goto retry;
-out:
+	*pagep = page;
 	return ret;
 }
 

@@ -6,11 +6,34 @@
 #define FTS_SUPPORT_TA_MODE
 #endif
 
+#if defined(CONFIG_SEC_T10_PROJECT)
+#define FTS_SUPPORT_TOUCH_KEY
+#endif
+
 #ifdef FTS_SUPPORT_NOISE_PARAM
 #define MAX_NOISE_PARAM 5
 struct fts_noise_param {
 	unsigned short pAddr[MAX_NOISE_PARAM];
 	unsigned short pData[MAX_NOISE_PARAM];
+};
+#endif
+
+#ifdef FTS_SUPPORT_TOUCH_KEY
+/* TSP Key Feature*/
+#define KEY_PRESS       1
+#define KEY_RELEASE     0
+#define TOUCH_KEY_NULL	0
+
+/* support 4 touch key */
+#define TOUCH_KEY_D_MENU	0x01
+#define TOUCH_KEY_RECENT		0x02
+#define TOUCH_KEY_BACK		0x04
+#define TOUCH_KEY_D_BACK	0x08
+
+struct fts_touchkey {
+	unsigned int value;
+	unsigned int keycode;
+	char *name;
 };
 #endif
 
@@ -42,6 +65,13 @@ struct fts_i2c_platform_data {
 
 	unsigned gpio;
 	int irq_type;
+
+#ifdef FTS_SUPPORT_TOUCH_KEY
+	unsigned int num_touchkey;
+	struct fts_touchkey *touchkey;
+	int (*led_power_on) (void);
+	int (*led_power_off) (void);
+#endif
 };
 
 #define SEC_TSP_FACTORY_TEST
@@ -49,5 +79,4 @@ struct fts_i2c_platform_data {
 #ifdef SEC_TSP_FACTORY_TEST
 extern struct class *sec_class;
 #endif
-
 #endif

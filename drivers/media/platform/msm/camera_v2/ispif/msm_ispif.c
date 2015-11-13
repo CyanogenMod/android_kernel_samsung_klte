@@ -97,8 +97,8 @@ static void msm_ispif_io_dump_start_reg(struct ispif_device *ispif)
 static inline int msm_ispif_is_intf_valid(uint32_t csid_version,
 					  uint8_t intf_type)
 {
-	return (csid_version <= CSID_VERSION_V2 && intf_type != VFE0) ?
-	       false : true;
+	return ((csid_version <= CSID_VERSION_V2 && intf_type != VFE0) ||
+		(intf_type >= VFE_MAX)) ? false : true;
 }
 
 static struct msm_cam_clk_info ispif_8974_ahb_clk_info[] = {
@@ -769,8 +769,8 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		pr_err("%s: VFE0 done\n", __func__);
 		if (timeout <= 0) {
 			pr_err("%s: VFE0 reset wait timeout\n", __func__);
-			rc = -ETIMEDOUT;
-			goto disable_clk;
+			//rc = -ETIMEDOUT;
+			//goto disable_clk;
 		}
 	}
 
@@ -781,8 +781,8 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 		pr_err("%s: VFE1 done\n", __func__);
 		if (timeout <= 0) {
 			pr_err("%s: VFE1 reset wait timeout\n", __func__);
-			rc = -ETIMEDOUT;
-			goto disable_clk;
+			//rc = -ETIMEDOUT;
+			//goto disable_clk;
 		}
 	}
 	pr_info("%s: ISPIF reset hw done", __func__);
@@ -856,7 +856,7 @@ static int msm_ispif_restart_frame_boundary(struct ispif_device *ispif,
 //  msm_camera_io_dump_3(ispif->base, 0x270);
  end:
 	return rc;
- disable_clk:
+// disable_clk:
 	pr_err("%s: <DBG01> ISPIF disable clk error case", __func__);
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
 				ispif_8974_reset_clk_info, reset_clk,
@@ -949,6 +949,7 @@ static int msm_ispif_stop_frame_boundary(struct ispif_device *ispif,
 	return rc;
 }
 
+#if 0
 static void ispif_process_irq(struct ispif_device *ispif,
 			      struct ispif_irq_status *out, enum msm_ispif_vfe_intf vfe_id)
 {
@@ -972,7 +973,7 @@ static void ispif_process_irq(struct ispif_device *ispif,
 		ispif->sof_count[vfe_id].sof_cnt[RDI2]++;
 	}
 }
-
+#endif
 static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 					     void *data)
 {
@@ -983,42 +984,58 @@ static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 
 	out[VFE0].ispifIrqStatus0 = msm_camera_io_r(ispif->base +
 						    ISPIF_VFE_m_IRQ_STATUS_0(VFE0));
+	/*
+	out[VFE0].ispifIrqStatus0 &= ~(0x249);
 	msm_camera_io_w(out[VFE0].ispifIrqStatus0,
 			ispif->base + ISPIF_VFE_m_IRQ_CLEAR_0(VFE0));
-
+    */
 	out[VFE0].ispifIrqStatus1 = msm_camera_io_r(ispif->base +
 						    ISPIF_VFE_m_IRQ_STATUS_1(VFE0));
+	/*
 	msm_camera_io_w(out[VFE0].ispifIrqStatus1,
 			ispif->base + ISPIF_VFE_m_IRQ_CLEAR_1(VFE0));
-
+    */
 	out[VFE0].ispifIrqStatus2 = msm_camera_io_r(ispif->base +
 						    ISPIF_VFE_m_IRQ_STATUS_2(VFE0));
+	/*
 	msm_camera_io_w_mb(out[VFE0].ispifIrqStatus2,
 			   ispif->base + ISPIF_VFE_m_IRQ_CLEAR_2(VFE0));
-
+    */
 	if (ispif->vfe_info.num_vfe > 1) {
 		out[VFE1].ispifIrqStatus0 = msm_camera_io_r(ispif->base +
 							    ISPIF_VFE_m_IRQ_STATUS_0(VFE1));
+		/*
+		out[VFE1].ispifIrqStatus0 &= ~(0x249);
 		msm_camera_io_w(out[VFE1].ispifIrqStatus0,
 				ispif->base + ISPIF_VFE_m_IRQ_CLEAR_0(VFE1));
+		*/
 
 		out[VFE1].ispifIrqStatus1 = msm_camera_io_r(ispif->base +
 							    ISPIF_VFE_m_IRQ_STATUS_1(VFE1));
+		/*
 		msm_camera_io_w(out[VFE1].ispifIrqStatus1,
 				ispif->base + ISPIF_VFE_m_IRQ_CLEAR_1(VFE1));
+		*/
 
 		out[VFE1].ispifIrqStatus2 = msm_camera_io_r(ispif->base +
 							    ISPIF_VFE_m_IRQ_STATUS_2(VFE1));
+		/*
 		msm_camera_io_w_mb(out[VFE1].ispifIrqStatus2,
 				   ispif->base + ISPIF_VFE_m_IRQ_CLEAR_2(VFE1));
+		*/
 	}
+	/*
 	msm_camera_io_w_mb(ISPIF_IRQ_GLOBAL_CLEAR_CMD, ispif->base +
 			   ISPIF_IRQ_GLOBAL_CLEAR_CMD_ADDR);
-
+    */
 	if (out[VFE0].ispifIrqStatus0 & ISPIF_IRQ_STATUS_MASK) {
-		if (out[VFE0].ispifIrqStatus0 & RESET_DONE_IRQ)
+		if (out[VFE0].ispifIrqStatus0 & 0x1)
+			ispif->sof_count[VFE0].sof_cnt[PIX0]++;
+		if (out[VFE0].ispifIrqStatus0 & RESET_DONE_IRQ) {
 			complete(&ispif->reset_complete[VFE0]);
-
+			msm_camera_io_w(RESET_DONE_IRQ,
+					ispif->base + ISPIF_VFE_m_IRQ_CLEAR_0(VFE0));
+		}
 		if (out[VFE0].ispifIrqStatus0 & PIX_INTF_0_OVERFLOW_IRQ)
 			pr_err("%s: VFE0 pix0 overflow.\n", __func__);
 
@@ -1031,12 +1048,14 @@ static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 		if (out[VFE0].ispifIrqStatus2 & RAW_INTF_2_OVERFLOW_IRQ)
 			pr_err("%s: VFE0 rdi2 overflow.\n", __func__);
 
-		ispif_process_irq(ispif, out, VFE0);
+		//ispif_process_irq(ispif, out, VFE0);
 	}
 	if (ispif->vfe_info.num_vfe > 1) {
-		if (out[VFE1].ispifIrqStatus0 & RESET_DONE_IRQ)
+		if (out[VFE1].ispifIrqStatus0 & RESET_DONE_IRQ) {
 			complete(&ispif->reset_complete[VFE1]);
-
+			msm_camera_io_w(RESET_DONE_IRQ,
+							ispif->base + ISPIF_VFE_m_IRQ_CLEAR_0(VFE1));
+		}
 		if (out[VFE1].ispifIrqStatus0 & PIX_INTF_0_OVERFLOW_IRQ)
 			pr_err("%s: VFE1 pix0 overflow.\n", __func__);
 
@@ -1049,7 +1068,7 @@ static inline void msm_ispif_read_irq_status(struct ispif_irq_status *out,
 		if (out[VFE1].ispifIrqStatus2 & RAW_INTF_2_OVERFLOW_IRQ)
 			pr_err("%s: VFE1 rdi2 overflow.\n", __func__);
 
-		ispif_process_irq(ispif, out, VFE1);
+		//ispif_process_irq(ispif, out, VFE1);
 	}
 }
 

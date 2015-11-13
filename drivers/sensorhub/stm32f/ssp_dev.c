@@ -47,6 +47,11 @@ void ssp_enable(struct ssp_data *data, bool enable)
 static irqreturn_t sensordata_irq_thread_fn(int iIrq, void *dev_id)
 {
 	struct ssp_data *data = dev_id;
+	struct timespec ts;
+
+	ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
 	if(gpio_get_value(data->mcu_int1)) {
 		pr_info("[SSP] MCU int HIGH");
 		return IRQ_HANDLED;
@@ -71,6 +76,8 @@ static void initialize_variable(struct ssp_data *data)
 		data->batchLatencyBuf[iSensorIndex] = 0;
 		data->batchOptBuf[iSensorIndex] = 0;
 		data->aiCheckStatus[iSensorIndex] = INITIALIZATION_STATE;
+		data->lastTimestamp[iSensorIndex] = 0;
+		data->reportedData[iSensorIndex] = false;
 	}
 
 	atomic_set(&data->aSensorEnable, 0);

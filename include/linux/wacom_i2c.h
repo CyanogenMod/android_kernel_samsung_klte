@@ -53,7 +53,7 @@
 #define WACOM_FW_NAME_W9007_BL92		"epen/W9007A_0267.bin"
 #define WACOM_FW_NAME_W9007_BL91		"epen/W9007A_0267.bin"
 #else
-#define WACOM_FW_NAME_W9007_BL92		"epen/W9007A_0330.bin"
+#define WACOM_FW_NAME_W9007_BL92		"epen/W9007A_0450.bin"
 #define WACOM_FW_NAME_W9007_BL91		"epen/W9007_0200.bin"
 #endif
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -150,6 +150,15 @@ struct mdss_panel_desc {
  * @MDSS_EVENT_DSI_CMDLIST_KOFF: kickoff sending dcs command from command list
  * @MDSS_EVENT_ENABLE_PARTIAL_UPDATE: Event to update ROI of the panel.
  * @MDSS_EVENT_DSI_CMDLIST_KOFF: acquire dsi_mdp_busy lock before kickoff.
+ * @MDSS_EVENT_DSI_ULPS_CTRL:	Event to configure Ultra Lower Power Saving
+ *				mode for the DSI data and clock lanes. The
+ *				event arguments can have one of these values:
+ *				- 0: Disable ULPS mode
+ *				- 1: Enable ULPS mode
+ * @MDSS_EVENT_DSI_DYNAMIC_SWITCH: Event to update the dsi driver structures
+ *				based on the dsi mode passed as argument.
+ *				- 0: update to video mode
+ *				- 1: update to command mode
  */
 enum mdss_intf_events {
 	MDSS_EVENT_RESET = 1,
@@ -174,6 +183,9 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_CMDLIST_KOFF,
 	MDSS_EVENT_MDNIE_DEFAULT_UPDATE,
 	MDSS_EVENT_ENABLE_PARTIAL_UPDATE,
+	MDSS_EVENT_DSI_ULPS_CTRL,
+	MDSS_EVENT_REGISTER_RECOVERY_HANDLER,
+	MDSS_EVENT_DSI_DYNAMIC_SWITCH,
 	MDSS_EVENT_BACKLIGHT_LATE_ON,
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	MDSS_EVENT_TE_UPDATE,
@@ -238,6 +250,7 @@ struct mipi_panel_info {
 	char hbp_power_stop;
 	char hsa_power_stop;
 	char eof_bllp_power_stop;
+	char last_line_interleave_en;
 	char bllp_power_stop;
 	char traffic_mode;
 	char frame_rate;
@@ -250,6 +263,9 @@ struct mipi_panel_info {
 	char stream;	/* 0 or 1 */
 	char mdp_trigger;
 	char dma_trigger;
+	/*Dynamic Switch Support*/
+	bool dynamic_switch_enabled;
+	u32 pixel_packing;
 	u32 dsi_pclk_rate;
 	/* The packet-size should not bet changed */
 	char no_max_pkt_size;
@@ -263,9 +279,14 @@ struct mipi_panel_info {
 	u32  init_delay;
 };
 
+struct edp_panel_info {
+	char frame_rate;	/* fps */
+};
+
 enum dynamic_fps_update {
 	DFPS_SUSPEND_RESUME_MODE,
 	DFPS_IMMEDIATE_CLK_UPDATE_MODE,
+	DFPS_IMMEDIATE_PORCH_UPDATE_MODE,
 };
 
 enum lvds_mode {
@@ -297,6 +318,17 @@ struct fbc_panel_info {
 	u32 lossy_mode_thd;
 	u32 lossy_rgb_thd;
 	u32 lossy_mode_idx;
+};
+
+struct mdss_mdp_pp_tear_check {
+	u32 tear_check_en;
+	u32 sync_cfg_height;
+	u32 vsync_init_val;
+	u32 sync_threshold_start;
+	u32 sync_threshold_continue;
+	u32 start_pos;
+	u32 rd_ptr_irq;
+	u32 refx100;
 };
 
 struct mdss_panel_info {
@@ -334,8 +366,19 @@ struct mdss_panel_info {
 	int pwm_period;
 	u32 mode_gpio_state;
 	bool dynamic_fps;
+	bool ulps_feature_enabled;
+	bool esd_check_enabled;
 	char dfps_update;
 	int new_fps;
+
+	int panel_max_fps;
+	int panel_max_vtotal;
+	u32 xstart_pix_align;
+	u32 width_pix_align;
+	u32 ystart_pix_align;
+	u32 height_pix_align;
+	u32 min_width;
+	u32 min_height;
 
 	u32 cont_splash_enabled;
 	u32 partial_update_enabled;
@@ -344,11 +387,16 @@ struct mdss_panel_info {
 	int force_screen_state;
 
 	uint32_t panel_dead;
+	bool dynamic_switch_pending;
+	bool is_lpm_mode;
+
+	struct mdss_mdp_pp_tear_check te;
 
 	struct lcd_panel_info lcdc;
 	struct fbc_panel_info fbc;
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
+	struct edp_panel_info edp;
 	u8 (*alpm_event) (u8 flag);
 	void (*alpm_gamma_read) (void);
 };
@@ -451,6 +499,9 @@ static inline u32 mdss_panel_get_framerate(struct mdss_panel_info *panel_info)
 	case MIPI_VIDEO_PANEL:
 	case MIPI_CMD_PANEL:
 		frame_rate = panel_info->mipi.frame_rate;
+		break;
+	case EDP_PANEL:
+		frame_rate = panel_info->edp.frame_rate;
 		break;
 	case WRITEBACK_PANEL:
 		frame_rate = DEFAULT_FRAME_RATE;

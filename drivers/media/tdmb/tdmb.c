@@ -52,6 +52,7 @@
 #include <linux/wakelock.h>
 #include <linux/input.h>
 #include <linux/pm_qos.h>
+#include <linux/regulator/consumer.h>
 
 #include <linux/of_gpio.h>
 #if defined(CONFIG_TDMB_QUALCOMM)
@@ -100,6 +101,46 @@ static struct tdmb_dt_platform_data *dt_pdata;
 static struct device  *dmb_device;
 
 static bool tdmb_pwr_on;
+
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+static int tdmb_vreg_init(struct device *dev)
+{
+	int rc = 0;
+	DPRINTK("vdd_name : %s", dt_pdata->tdmb_vreg_name);
+	dt_pdata->tdmb_vreg = regulator_get(dev, dt_pdata->tdmb_vreg_name);
+	if (IS_ERR(dt_pdata->tdmb_vreg)) {
+		DPRINTK("Failed to get tdmb_vreg\n");
+		rc = -ENXIO;
+		return rc;
+	}
+	rc = regulator_set_voltage(dt_pdata->tdmb_vreg, 1800000, 1800000);
+	if (rc) {
+		DPRINTK("regulator set_vtg failed rc=%d\n", rc);
+		regulator_put(dt_pdata->tdmb_vreg);
+		return rc;
+	}
+	return rc;
+}
+
+static void tdmb_vreg_onoff(bool onoff)
+{
+	int rc;
+	if (onoff) {
+		if (!regulator_is_enabled(dt_pdata->tdmb_vreg)) {
+			rc = regulator_enable(dt_pdata->tdmb_vreg);
+			if (rc)
+				DPRINTK("tdmb_vreg enable failed rc=%d\n", rc);
+		}
+	} else {
+		if (regulator_is_enabled(dt_pdata->tdmb_vreg)) {
+			rc = regulator_disable(dt_pdata->tdmb_vreg);
+			if (rc)
+				DPRINTK("tdmb_vreg disable failed rc=%d\n", rc);
+		}
+	}
+	DPRINTK("%s : (%d)\n", __func__, onoff);
+}
+#endif
 
 static void tdmb_set_config_poweron(void)
 {
@@ -159,7 +200,9 @@ static void tdmb_set_config_poweroff(void)
 static void tdmb_gpio_on(void)
 {
 	DPRINTK("tdmb_gpio_on\n");
-
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	tdmb_vreg_onoff(true);
+#endif
 	tdmb_set_config_poweron();
 
 	gpio_set_value(dt_pdata->tdmb_en, 0);
@@ -178,7 +221,9 @@ static void tdmb_gpio_on(void)
 static void tdmb_gpio_off(void)
 {
 	DPRINTK("tdmb_gpio_off\n");
-
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	tdmb_vreg_onoff(false);
+#endif
 	tdmb_set_config_poweroff();
 
 	gpio_set_value(dt_pdata->tdmb_en, 0);
@@ -943,6 +988,13 @@ static struct tdmb_dt_platform_data *get_tdmb_dt_pdata(struct device *dev)
 		goto alloc_err;
 	}
 #endif
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	if(of_property_read_string(dev->of_node,
+			"tdmb_vreg_supply", &pdata->tdmb_vreg_name)) {
+		DPRINTK("Unable to find tdmb_vdd_supply\n");
+		goto alloc_err;
+	}
+#endif
 	return pdata;
 alloc_err:
 	devm_kfree(dev, pdata);
@@ -956,12 +1008,18 @@ static int tdmb_probe(struct platform_device *pdev)
 	struct device *tdmb_dev;
 
 	DPRINTK("call tdmb_probe\n");
+
+#if defined(CONFIG_TDMB_TSIF_QC)
+	tdmb_tsi_init();
+#endif
+
 	dt_pdata = get_tdmb_dt_pdata(&pdev->dev);
-	dmb_device = &pdev->dev;
 	if (!dt_pdata) {
 		pr_err("%s : tdmb_dt_pdata is NULL.\n", __func__);
 		return -ENODEV;
 	}
+
+	dmb_device = &pdev->dev;
 
 	ret = register_chrdev(TDMB_DEV_MAJOR, TDMB_DEV_NAME, &tdmb_ctl_fops);
 	if (ret < 0)
@@ -1001,6 +1059,14 @@ static int tdmb_probe(struct platform_device *pdev)
 	wake_lock_init(&tdmb_wlock, WAKE_LOCK_SUSPEND, "tdmb_wlock");
 #endif
 
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	ret = tdmb_vreg_init(&pdev->dev);
+	if (ret) {
+		DPRINTK("tdmb_vreg_init failed!\n");
+		return -ENXIO;
+	}
+#endif
+
 #if defined(CONFIG_TDMB_ANT_DET)
 	wake_lock_init(&tdmb_ant_wlock, WAKE_LOCK_SUSPEND, "tdmb_ant_wlock");
 
@@ -1028,6 +1094,13 @@ static int tdmb_remove(struct platform_device *pdev)
 	tdmb_ant_det_destroy_wq();
 	tdmb_ant_det_irq_set(false);
 	wake_lock_destroy(&tdmb_ant_wlock);
+#endif
+
+#if defined(CONFIG_TDMB_TSIF_QC)
+	tdmb_tsi_deinit();
+#endif
+#ifdef CONFIG_TDMB_VREG_SUPPORT
+	regulator_put(dt_pdata->tdmb_vreg);
 #endif
 	return 0;
 }

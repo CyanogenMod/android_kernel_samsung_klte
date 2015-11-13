@@ -167,6 +167,7 @@ struct msm_vfe_axi_stream_cfg_cmd {
 };
 
 enum msm_vfe_axi_stream_update_type {
+    AXI_STREAM_UPDATE_INVALID,
 	ENABLE_STREAM_BUF_DIVERT,
 	DISABLE_STREAM_BUF_DIVERT,
 	UPDATE_STREAM_FRAMEDROP_PATTERN,

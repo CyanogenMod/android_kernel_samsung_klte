@@ -45,7 +45,7 @@
 #define DMP_PRECISION                   1000
 #define DMP_MAX_DIVIDER                 4
 #define DMP_MAX_MIN_TAPS                4
-#define DMP_IMAGE_CRC_VALUE             0x0e2c583e
+#define DMP_IMAGE_CRC_VALUE             0x34fc5c2d
 
 /*--- Test parameters defaults --- */
 #define DEF_OLDEST_SUPP_PROD_REV        8
@@ -265,6 +265,12 @@ static const int gyro_3500_st_tb[255] = {
 	30903, 31212, 31524, 31839, 32157, 32479, 32804
 };
 
+static const int cosine_value[] = {
+	536870912, 534827968, 528714624, 518577472, 504493632, 486570304,
+	464943840, 439778912, 411266976, 379625056, 345093984, 307936512,
+	268435456, 226891456, 183620672, 138952416, 93226656, 46791384, 0,
+};
+
 char *wr_pr_debug_begin(u8 const *data, u32 len, char *string)
 {
 	int ii;
@@ -323,7 +329,7 @@ int mpu_memory_write(struct inv_mpu_state *st, u8 mpu_addr, u16 mem_addr,
 	msgs[2].len = len + 1;
 
 	INV_I2C_INC_MPUWRITE(3 + 3 + (2 + len));
-#ifdef INV_CONFIG_DYNAMIC_DEBUG
+#ifdef CONFIG_DYNAMIC_DEBUG
 	{
 		char *write = 0;
 		pr_debug("%s WM%02X%02X%02X%s%s - %d\n", st->hw->name,
@@ -395,7 +401,7 @@ int mpu_memory_read(struct inv_mpu_state *st, u8 mpu_addr, u16 mem_addr,
 
 	INV_I2C_INC_MPUWRITE(3 + 3 + 3);
 	INV_I2C_INC_MPUREAD(len);
-#ifdef INV_CONFIG_DYNAMIC_DEBUG
+#ifdef CONFIG_DYNAMIC_DEBUG
 	{
 		char *read = 0;
 		pr_debug("%s RM%02X%02X%02X%02X - %s%s\n", st->hw->name,
@@ -409,7 +415,7 @@ int mpu_memory_read(struct inv_mpu_state *st, u8 mpu_addr, u16 mem_addr,
 }
 
 int mpu_memory_write_unaligned(struct inv_mpu_state *st, u16 key, int len,
-								u8 const *d)
+				u8 const *d)
 {
 	u32 addr;
 	int start, end;
@@ -603,7 +609,8 @@ static int read_accel_hw_self_test_prod_shift(struct inv_mpu_state *st,
 *  @*st_avg:  average value of self test
 */
 static int inv_check_accel_self_test(struct inv_mpu_state *st,
-						int *reg_avg, int *st_avg){
+						int *reg_avg, int *st_avg)
+{
 	int gravity, j, ret_val;
 	int tmp;
 	int st_shift_prod[THREE_AXIS], st_shift_cust[THREE_AXIS];
@@ -664,7 +671,6 @@ static int inv_check_accel_self_test(struct inv_mpu_state *st,
 *  @*reg_avg: average value of normal test.
 *  @*st_avg:  average value of self test
 */
-
 static int inv_check_3500_gyro_self_test(struct inv_mpu_state *st,
 						int *reg_avg, int *st_avg){
 	int result;
@@ -1219,6 +1225,113 @@ static int inv_load_firmware(struct inv_mpu_state *st,
 	return 0;
 }
 
+static int inv_verify_firmware(struct inv_mpu_state *st,
+	u8 *data, int size)
+{
+	int bank, write_size;
+	int result;
+	u16 memaddr;
+	u8 firmware[MPU_MEM_BANK_SIZE];
+
+	/* Write and verify memory */
+	write_size = MPU_MEM_BANK_SIZE - MPU_DMP_LOAD_START;
+	size -= write_size;
+	data += write_size;
+	for (bank = 1; size > 0; bank++,
+		size -= write_size,
+		data += write_size) {
+		if (size > MPU_MEM_BANK_SIZE)
+			write_size = MPU_MEM_BANK_SIZE;
+		else
+			write_size = size;
+
+		memaddr = ((bank << 8) | 0x00);
+		result = mpu_memory_read(st,
+			st->i2c_addr, memaddr, write_size, firmware);
+		if (result)
+			return result;
+		if (0 != memcmp(firmware, data, write_size))
+			return -EINVAL;
+	}
+	return 0;
+}
+
+/*	Turns Qshot start interrupt on or off in the DMP
+	on: on=1, off: on=0
+	DMP default: off */
+int inv_enable_Qshot_start_interrupt_klp(struct inv_mpu_state *st, bool on)
+{
+	int result;
+	u8 regs[2] = {0};
+
+	if (on) {
+		regs[0] = 0xf4;
+		regs[1] = 0x48;
+	} else {
+		regs[0] = 0xf2;
+		regs[1] = 0xf2;
+	}
+
+	result = mem_w_key(KEY_CFG_QSHOT_START_INT, ARRAY_SIZE(regs), regs);
+
+	return result;
+}
+
+/*	Turns Qshot finished interrupt on or off in the DMP
+	on: on=1, off: on=0
+	DMP default: off */
+int inv_enable_Qshot_finish_interrupt_klp(struct inv_mpu_state *st, bool on)
+{
+	int result;
+	u8 regs[2] = {0};
+
+	if (on) {
+		regs[0] = 0xf4;
+		regs[1] = 0x50;
+	} else {
+		regs[0] = 0xf1;
+		regs[1] = 0xf1;
+	}
+	result = mem_w_key(KEY_CFG_QSHOT_FINISH_INT, ARRAY_SIZE(regs), regs);
+
+	return result;
+}
+/*	Configures the vertical angle to indicate user starts taking picture
+	DMP default: 504493634L = 20 degrees	*/
+int inv_set_Qshot_start_angle(struct inv_mpu_state *st, int angle)
+{
+	int v;
+	int result;
+
+	if (angle < 0)
+		angle = 0;
+	if (angle > 90)
+		angle = 90;
+	v = cosine_value[((angle + 3) / 5)];
+
+	result = write_be32_key_to_mem(st, v, KEY_D_QSHOT_START_ANGLE);
+
+	return result;
+}
+
+/*	Configures the vertical angle to indicate user finished taking picture
+	DMP default: 464943848L = 30 degrees	*/
+int inv_set_Qshot_finish_angle(struct inv_mpu_state *st, int angle)
+{
+	int v;
+	int result;
+
+	if (angle < 0)
+		angle = 0;
+	if (angle > 90)
+		angle = 90;
+	v = cosine_value[((angle + 3) / 5)];
+
+	result = write_be32_key_to_mem(st, v, KEY_D_QSHOT_FINISH_ANGLE);
+
+	return result;
+}
+
 int inv_enable_pedometer_interrupt(struct inv_mpu_state *st, bool en)
 {
 	u8 reg[3];
@@ -1274,6 +1387,18 @@ int inv_enable_pedometer(struct inv_mpu_state *st, bool en)
 	return mem_w_key(KEY_CFG_PED_ENABLE, ARRAY_SIZE(d), d);
 }
 
+int inv_reset_pedometer_internal_timer(struct inv_mpu_state *st)
+{
+	u8 d[4] = {0,};
+	int result;
+
+	pr_info("[INV] %s\n", __func__);
+
+	result = mpu_memory_write(st, st->i2c_addr, 0x324, 4, d);
+
+	return result;
+}
+
 int inv_get_pedometer_steps(struct inv_mpu_state *st, u32 *steps)
 {
 	u8 d[4];
@@ -1310,138 +1435,6 @@ int inv_set_display_orient_interrupt_dmp(struct inv_mpu_state *st, bool on)
 		r = mem_w_key(KEY_CFG_DISPLAY_ORIENT_INT, ARRAY_SIZE(rf), rf);
 
 	return r;
-}
-
-static int inv_set_tap_interrupt_dmp(struct inv_mpu_state *st, u8 on)
-{
-	int result;
-	u16 d;
-
-	if (on)
-		d = 192;
-	else
-		d = 128;
-
-	result = inv_write_2bytes(st, KEY_DMP_TAP_GATE, d);
-
-	return result;
-}
-
-/*
- * inv_set_tap_threshold_dmp():
- * Sets the tap threshold in the dmp
- * Simultaneously sets secondary tap threshold to help correct the tap
- * direction for soft taps.
- */
-int inv_set_tap_threshold_dmp(struct inv_mpu_state *st, u16 threshold)
-{
-	int result;
-	int sampleDivider;
-	int scaledThreshold;
-	u32 dmpThreshold;
-	u8 sample_div;
-	const u32  accel_sens = (0x20000000 / 0x00010000);
-
-	if (threshold > (1 << 15))
-		return -EINVAL;
-	sample_div = st->sample_divider;
-
-	sampleDivider = (1 + sample_div);
-	/* Scale factor corresponds linearly using
-	* 0  : 0
-	* 25 : 0.0250  g/ms
-	* 50 : 0.0500  g/ms
-	* 100: 1.0000  g/ms
-	* 200: 2.0000  g/ms
-	* 400: 4.0000  g/ms
-	* 800: 8.0000  g/ms
-	*/
-	/*multiply by 1000 to avoid floating point 1000/1000*/
-	scaledThreshold = threshold;
-	/* Convert to per sample */
-	scaledThreshold *= sampleDivider;
-
-	/* Scale to DMP 16 bit value */
-	if (accel_sens != 0)
-		dmpThreshold = (u32)(scaledThreshold * accel_sens);
-	else
-		return -EINVAL;
-	dmpThreshold = dmpThreshold / DMP_PRECISION;
-	result = inv_write_2bytes(st, KEY_DMP_TAP_THR_Z, dmpThreshold);
-	if (result)
-		return result;
-	result = inv_write_2bytes(st, KEY_DMP_TAP_PREV_JERK_Z,
-						dmpThreshold * 3 / 4);
-
-	return result;
-}
-
-
-/*
- * inv_set_min_taps_dmp():
- * Indicates the minimum number of consecutive taps required
- * before the DMP will generate an interrupt.
- */
-int inv_set_min_taps_dmp(struct inv_mpu_state *st, u16 min_taps)
-{
-	u8 result;
-
-	/* check if any spurious bit other the ones expected are set */
-	if ((min_taps > DMP_MAX_MIN_TAPS) || (min_taps < 1))
-		return -EINVAL;
-
-	/* DMP tap count is zero-based. So single-tap is 0.
-	   Furthermore, DMP code checks for tap_count > min_taps.
-	   So we have to do minus 2 here.
-	   For example, if the user expects any single tap will generate an
-	   interrupt, (s)he will call inv_set_min_taps_dmp(1).
-	   When DMP gets a single tap, tap_count = 0. To get
-	   tap_count > min_taps, we have to decrement min_taps by 2 to -1. */
-	result = inv_write_2bytes(st, KEY_DMP_TAP_MIN_TAPS, (u16)(min_taps-2));
-
-	return result;
-}
-
-/*
- * inv_set_tap_time_dmp():
- * Determines how long after a tap the DMP requires before
- * another tap can be registered.
- */
-int  inv_set_tap_time_dmp(struct inv_mpu_state *st, u16 time)
-{
-	int result;
-	u16 dmpTime;
-	u8 sampleDivider;
-
-	sampleDivider = st->sample_divider;
-	sampleDivider++;
-
-	/* 60 ms minimum time added */
-	dmpTime = ((time) / sampleDivider);
-	result = inv_write_2bytes(st, KEY_DMP_TAPW_MIN, dmpTime);
-
-	return result;
-}
-
-/*
- * inv_set_multiple_tap_time_dmp():
- * Determines how close together consecutive taps must occur
- * to be considered double/triple taps.
- */
-static int inv_set_multiple_tap_time_dmp(struct inv_mpu_state *st, u32 time)
-{
-	int result;
-	u16 dmpTime;
-	u8 sampleDivider;
-
-	sampleDivider = st->sample_divider;
-	sampleDivider++;
-
-	/* 60 ms minimum time added */
-	dmpTime = ((time) / sampleDivider);
-	result = inv_write_2bytes(st, KEY_DMP_TAP_NEXT_TAP_THRES, dmpTime);
-
-	return result;
 }
 
 int inv_q30_mult(int a, int b)
@@ -1615,96 +1608,6 @@ int inv_set_accel_bias_dmp(struct inv_mpu_state *st)
 	return result;
 }
 
-/*
- * inv_set_gyro_sf_dmp():
- * The gyro threshold, in dps, above which taps will be rejected.
- */
-static int inv_set_gyro_sf_dmp(struct inv_mpu_state *st)
-{
-	int result;
-	u8 sampleDivider;
-	u32 gyro_sf;
-	const u32 gyro_sens = 0x03e80000;
-
-	sampleDivider = st->sample_divider;
-	gyro_sf = inv_q30_mult(gyro_sens,
-			(int)(DMP_TAP_SCALE * (sampleDivider + 1)));
-	result = write_be32_key_to_mem(st, gyro_sf, KEY_D_0_104);
-
-	return result;
-}
-
-/*
- * inv_set_shake_reject_thresh_dmp():
- * The gyro threshold, in dps, above which taps will be rejected.
- */
-static int inv_set_shake_reject_thresh_dmp(struct inv_mpu_state *st,
-						int thresh)
-{
-	int result;
-	u8 sampleDivider;
-	int thresh_scaled;
-	u32 gyro_sf;
-	const u32 gyro_sens = 0x03e80000;
-
-	sampleDivider = st->sample_divider;
-	gyro_sf = inv_q30_mult(gyro_sens, (int)(DMP_TAP_SCALE *
-			(sampleDivider + 1)));
-	/* We're in units of DPS, convert it back to chip units*/
-	/*split the operation to aviod overflow of integer*/
-	thresh_scaled = gyro_sens / (1L << 16);
-	thresh_scaled = thresh_scaled / thresh;
-	thresh_scaled = gyro_sf / thresh_scaled;
-	result = write_be32_key_to_mem(st, thresh_scaled,
-						KEY_DMP_TAP_SHAKE_REJECT);
-
-	return result;
-}
-
-/*
- * inv_set_shake_reject_time_dmp():
- * How long a gyro axis must remain above its threshold
- * before taps are rejected.
- */
-static int inv_set_shake_reject_time_dmp(struct inv_mpu_state *st,
-						u32 time)
-{
-	int result;
-	u16 dmpTime;
-	u8 sampleDivider;
-
-	sampleDivider = st->sample_divider;
-	sampleDivider++;
-
-	/* 60 ms minimum time added */
-	dmpTime = ((time) / sampleDivider);
-	result = inv_write_2bytes(st, KEY_DMP_TAP_SHAKE_COUNT_MAX, dmpTime);
-
-	return result;
-}
-
-/*
- * inv_set_shake_reject_timeout_dmp():
- * How long the gyros must remain below their threshold,
- * after taps have been rejected, before taps can be detected again.
- */
-static int inv_set_shake_reject_timeout_dmp(struct inv_mpu_state *st,
-						u32 time)
-{
-	int result;
-	u16 dmpTime;
-	u8 sampleDivider;
-
-	sampleDivider = st->sample_divider;
-	sampleDivider++;
-
-	/* 60 ms minimum time added */
-	dmpTime = ((time) / sampleDivider);
-	result = inv_write_2bytes(st, KEY_DMP_TAP_SHAKE_TIMEOUT_MAX, dmpTime);
-
-	return result;
-}
-
 int inv_set_interrupt_on_gesture_event(struct inv_mpu_state *st, bool on)
 {
 	u8 r;
@@ -1719,49 +1622,452 @@ int inv_set_interrupt_on_gesture_event(struct inv_mpu_state *st, bool on)
 	return r;
 }
 
-/*
- * inv_enable_tap_dmp() -  calling this function will enable/disable tap
- *                         function.
- */
-int inv_enable_tap_dmp(struct inv_mpu_state *st, bool on)
+/* cadence interrupt timer */
+int inv_set_shealth_interrupt_period(struct inv_mpu_state *st, s16 period)
 {
+	s16 s_health_period;
 	int result;
 
-	result = inv_set_tap_interrupt_dmp(st, on);
-	if (result)
-		return result;
-	result = inv_set_tap_threshold_dmp(st, st->tap.thresh);
+	s_health_period = period - 1;
+
+	result = inv_write_2bytes(st, KEY_S_HEALTH_INT_PERIOD, s_health_period);
 	if (result)
 		return result;
 
-	result = inv_set_min_taps_dmp(st, st->tap.min_count);
-	if (result)
-		return result;
-
-	result = inv_set_tap_time_dmp(st, st->tap.time);
-	if (result)
-		return result;
-
-	result = inv_set_multiple_tap_time_dmp(st, DMP_MULTI_TAP_TIME);
-	if (result)
-		return result;
-
-	result = inv_set_gyro_sf_dmp(st);
-	if (result)
-		return result;
-
-	result = inv_set_shake_reject_thresh_dmp(st, DMP_SHAKE_REJECT_THRESH);
-	if (result)
-		return result;
-
-	result = inv_set_shake_reject_time_dmp(st, DMP_SHAKE_REJECT_TIME);
-	if (result)
-		return result;
-
-	result = inv_set_shake_reject_timeout_dmp(st,
-						  DMP_SHAKE_REJECT_TIMEOUT);
+	result = inv_write_2bytes(st, KEY_S_HEALTH_INT_PERIOD2,
+							s_health_period);
 	return result;
 }
+
+int inv_set_shealth_walk_run_thresh(struct inv_mpu_state *st, u32 freq)
+{
+	u32 cadence;
+	int result;
+
+	/* cadence = 50Hz / Freq << 15 */
+	cadence = 50000 * 32768 / freq;
+
+	pr_info("[SHEALTH:%s] Frequency threshold : %u %u", __func__, cadence, freq);
+	//result = inv_set_mpu_memory(KEY_S_HEALTH_FREQ_TH, 4, inv_int32_to_big8(cadence,reg));
+	result = write_be32_key_to_mem(st, cadence, KEY_S_HEALTH_FREQ_TH);
+
+	if (result) {
+		//LOG_RESULT_LOCATION(result);
+		return result;
+	} else {
+		return 0;
+	}
+}
+
+int inv_get_shealth_walk_run_thresh(struct inv_mpu_state *st, char *buf)
+{
+	u8 d[4];
+	int result;
+	u32 cadence = 0;
+	u32 freq = 0;
+
+	result = mpu_memory_read(st, st->i2c_addr,
+				(16*25 +  0), 4, d);
+	/* freq = 50 / cadence << 15 */
+	cadence = (u32) be32_to_cpup((__be32 *)(d));
+
+	if(cadence)
+	{
+		freq = 50000 * 32768 / cadence;
+	}
+
+	pr_info("[SHEALTH:%s] FT d0 d1 d2 d3 : %d %d %d %d\n", __func__, d[0], d[1], d[2], d[3]);
+	pr_info("[SHEALTH:%s] Frequency threshold : %u %u\n", __func__, cadence, freq);
+
+	sprintf(buf, "%d\n", freq);
+
+	return result;
+}
+
+s64 inv_shealth_get_elapsed_time(struct inv_mpu_state *st)
+{
+	u8 d[2];
+	int result;
+	s16 period_min, period2_min;
+	s32 period_sec, period2_sec;
+	s64 elapsed = 0;
+
+	/*minute*/
+	result = mpu_memory_read(st, st->i2c_addr,
+		inv_dmp_get_address(KEY_S_HEALTH_INT_PERIOD ), 2, d);
+
+	period_min = (s16)(be16_to_cpup((short *)d));
+
+	result = mpu_memory_read(st, st->i2c_addr,
+		inv_dmp_get_address(KEY_S_HEALTH_INT_PERIOD2 ), 2, d);
+
+	period2_min = (s16)(be16_to_cpup((short *)d));
+
+	/*second*/
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CNTR), 2, d);
+
+	period_sec = (s16)(be16_to_cpup((short *)d));
+
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CONST), 2, d);
+
+	period2_sec = (s16)(be16_to_cpup((short *)d));
+
+	elapsed = (s64)(period2_min - period_min) *60000000000LL +
+		(s64)(period2_sec - period_sec) * 20000000LL;
+
+	pr_info("[SHEALTH:%s] period_min:%d period2_min:%d\n", __func__, period_min, period2_min);
+	pr_info("[SHEALTH:%s] period_sec:%d period2_sec:%d\n", __func__, period_sec, period2_sec);
+
+	pr_info("%s : elapsed = %lld, period = %d, period2= %d\n", __func__,elapsed, period_sec, period2_sec);
+	return elapsed;
+}
+
+int inv_get_shealth_cadence(struct inv_mpu_state *st, u8 start, u8 end, s32 cadence[])
+{
+	int i, result, sign;
+	short cad, walk;
+	u8 len;
+	u8 d[2];
+
+	len = end - start;
+
+	if(len < 0 || len >  SHEALTH_CADENCE_LEN + 1)
+		return -EINVAL;
+
+	for(i = start; i < end; i ++) {
+		result = mpu_memory_read(st, st->i2c_addr,
+		inv_dmp_get_address(KEY_D_S_HEALTH_WALK_RUN_1 + i), 2, d);
+		if(result)
+			goto read_fail;
+
+		walk = (signed short)(be16_to_cpup((short *)d));
+
+		result = mpu_memory_read(st, st->i2c_addr,
+		inv_dmp_get_address(KEY_D_S_HEALTH_CADENCE1 + i), 2, d);
+		if(result)
+			goto read_fail;
+
+		cad = (unsigned short)(be16_to_cpup((short *)d));
+
+		if(walk > 0)
+			sign = 1;
+		else
+			sign = -1;
+
+		cadence[i - start] = cad & 0xFFFF;
+	}
+
+	return 0;
+
+read_fail:
+	pr_err("[SHEALTH] %s error\n", __FUNCTION__);
+	return result;
+}
+
+int inv_reset_shealth_update_timer(struct inv_mpu_state *st)
+{
+	int result = 0;
+	u8 d[2]={0,};
+
+	/*reset cadence update timer*/
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CONST), 2, d);
+	if(result)
+		goto read_fail;
+
+	result = mpu_memory_write(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CNTR), 2, d);
+	if(result)
+		goto read_fail;
+
+	return result;
+
+read_fail:
+	pr_err("[SHEALTH] %s error\n", __func__);
+	return result;
+}
+
+/**
+ * @fn int inv_set_shealth_update_timer(struct inv_mpu_state *st)
+ * @brief Default value is 2999 during 1 minute.
+ */
+int inv_set_shealth_update_timer(struct inv_mpu_state *st, u16 timer)
+{
+	int result = 0;
+	u8 d[2]={0,};
+	u16 data = 0;
+
+	/*reset cadence update timer*/
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CONST), 2, d);
+	if(result)
+		goto read_fail;
+
+	data = (u16) be16_to_cpup((__be16 *)(d));
+
+	//result = write_be32_key_to_mem(st, timer, KEY_S_HEALTH_MIN_CONST);
+	inv_write_2bytes(st, KEY_S_HEALTH_MIN_CONST, timer);
+
+	return result;
+
+read_fail:
+	pr_err("[SHEALTH] %s error\n", __func__);
+	return result;
+}
+
+int inv_get_shealth_update_timer(struct inv_mpu_state *st, char *buf)
+{
+	int result = 0;
+	u8 d[2]={0,};
+	u16 data = 0;
+
+	/*reset cadence update timer*/
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_MIN_CONST), 2, d);
+	if(result)
+		goto read_fail;
+
+	data = (u16) be16_to_cpup((__be16 *)(d));
+	pr_info("[SHEALTH] %s before timer=%d\n", __func__, data);
+
+	sprintf(buf, "%d\n", data);
+
+	return result;
+
+read_fail:
+	pr_err("[SHEALTH] %s error\n", __func__);
+	return result;
+}
+
+
+/**
+ * @fn int inv_clear_shealth_cadence(struct inv_mpu_state *st)
+ * @brief Clear cadence buffer in MPU
+ * @return Success/Fail
+ * @param st main structure of MPU
+ */
+int inv_clear_shealth_cadence(struct inv_mpu_state *st)
+{
+	int i, result;
+	u8 d[4]={0,};
+
+	/*reset cadence update timer*/
+	result = inv_reset_shealth_update_timer(st);
+	if(result)
+		goto read_fail;
+
+	/*reset counter : copy current to previous*/
+	result = mpu_memory_read(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_STEP_CNT), 4, d);
+	if(result)
+		goto read_fail;
+
+	result = mpu_memory_write(st, st->i2c_addr,
+			inv_dmp_get_address(KEY_S_HEALTH_STEP_CNT_P), 4, d);
+	if(result)
+		goto read_fail;
+
+
+	d[0] = 0;
+	d[1] = 0;
+	/*reset data*/
+	for(i = 0; i < 21; i ++) {
+		result = mpu_memory_write(st, st->i2c_addr,
+				inv_dmp_get_address(KEY_D_S_HEALTH_WALK_RUN_1 + i), 2, d);
+		if(result)
+			goto read_fail;
+
+		result = mpu_memory_write(st, st->i2c_addr,
+				inv_dmp_get_address(KEY_D_S_HEALTH_CADENCE1 + i), 2, d);
+		if(result)
+			goto read_fail;
+	}
+
+	return 0;
+
+read_fail:
+	pr_err("[SHEALTH] %s error\n", __func__);
+	return result;
+}
+
+
+int inv_enable_shealth(struct inv_mpu_state *st, bool en, bool irq_en)
+{
+	int result;
+	unsigned char reg[3] = {0};
+	pr_info("[SHEALTH] %s [Time] %ds en=%d\n", __func__, (u16)(get_time_ns()>>30), en);
+	if (en) {
+
+		reg[0] = 0xf4;
+		reg[1] = 0x41;
+		reg[2] = 0xf1;
+
+		result = mem_w_key(KEY_CFG_S_HEALTH_INT, ARRAY_SIZE(reg), reg);
+		if (result)
+			return result;
+
+	} else {
+
+		reg[0] = 0xf1;
+		reg[1] = 0xf1;
+		reg[2] = 0xf1;
+
+		result = mem_w_key(KEY_CFG_S_HEALTH_INT, ARRAY_SIZE(reg), reg);
+		if (result)
+			return result;
+	}
+
+	st->shealth.enabled = en;
+	if(en) {
+		st->shealth.start_timestamp = inv_get_shealth_timestamp(st, true);
+		st->shealth.start_time_timeofday = get_time_timeofday();
+
+		st->shealth.interrupt_timestamp = -1;
+		st->shealth.stop_timestamp = -1;
+		st->shealth.valid_count = 0;
+
+		pr_info("[SHEALTH:%s] Enable start:%lld, Interrupt Duration:%d\n", __func__, st->shealth.start_timestamp, st->shealth.interrupt_duration);
+
+		if(st->shealth.interrupt_duration == 0)
+			st->shealth.interrupt_duration = 20; //default 20 minute;
+
+		/* reset shealth interrupt period */
+		inv_set_shealth_interrupt_period(st,st->shealth.interrupt_duration);
+
+		/* set 1minute timer value */
+		st->shealth.tick_count = 2981;
+		inv_set_shealth_update_timer(st, st->shealth.tick_count);
+
+		inv_clear_shealth_cadence(st);
+	} else {
+		if(st->shealth.start_timestamp > 0) {
+			st->shealth.stop_timestamp = inv_get_shealth_timestamp(st, false);
+			st->shealth.stop_time_timeofday = get_time_timeofday();
+
+			inv_get_shealth_cadence(st, 0, 20 , st->shealth.cadence);
+			inv_get_shealth_valid_count(st);
+			pr_info("[SHEALTH:%s] Disable start:%lld valid_count %d\n", __func__, st->shealth.start_timestamp, st->shealth.valid_count);
+
+			if(irq_en) {
+				st->shealth.interrupt_mask |= SHEALTH_INT_CADENCE;
+				complete(&st->shealth.wait);
+			}
+		}
+	}
+
+	st->shealth.state = SHEALTH_STAT_STOP;
+	return result;
+}
+
+/* true: start time, false: elapsed time */
+s64 inv_get_shealth_timestamp(struct inv_mpu_state *st, bool start)
+{
+	s64 timestamp = 0;
+	static s64 start_timestamp = 0;
+
+	if(start) {
+		timestamp = get_time_ns();
+		start_timestamp = timestamp;
+		st->shealth.interrupt_counter = 0;
+
+	} else {
+		timestamp = st->shealth.interrupt_counter* st->shealth.interrupt_duration;
+		timestamp *= 60000000000LL;
+
+		timestamp += start_timestamp +  inv_shealth_get_elapsed_time(st);
+	}
+
+	pr_info("%s : timestamp = %lld, st->shealth.interrupt_counter=%d\n", __func__, timestamp,
+		st->shealth.interrupt_counter);
+
+	return timestamp;
+}
+
+int inv_get_shealth_valid_count(struct inv_mpu_state *st)
+{
+	s64 diff_timestamp = 0;
+	s32 sec_diff_timestamp = 0;
+	s16 valid_count = 0;
+
+	if(st->shealth.interrupt_timestamp == -1) {
+		diff_timestamp = st->shealth.stop_timestamp - st->shealth.start_timestamp;
+
+		pr_info("[SHEALTH:%s] start %lld, stop %lld\n", __func__,
+			st->shealth.start_timestamp, st->shealth.stop_timestamp);
+	} else {
+		diff_timestamp = st->shealth.stop_timestamp - st->shealth.interrupt_timestamp;
+
+		pr_info("[SHEALTH:%s] interrupt %lld, stop %lld\n", __func__,
+			st->shealth.interrupt_timestamp, st->shealth.stop_timestamp);
+	}
+
+	sec_diff_timestamp = (s32)(diff_timestamp >> 30) / 56;
+	valid_count = (s16)sec_diff_timestamp + 1;
+	st->shealth.valid_count = valid_count;
+
+	pr_info("[SHEALTH:%s] diff %d, count %d\n", __func__, sec_diff_timestamp, valid_count);
+	return 0;
+}
+
+
+ssize_t inv_get_shealth_instant_cadence(struct inv_mpu_state *st, char* buf)
+{
+	int i = 0, result;
+	s32 cadence_array[SHEALTH_CADENCE_LEN] = {0,};
+	s32 cadence;
+	char concat[256];
+	s64 start_timestamp = 0, end_timestamp = 0;
+	bool is_data_ready = false;
+	u16 valid_count = 0;
+
+	if (st->shealth.enabled)
+		result = inv_get_shealth_cadence(st, 0, 20, cadence_array);
+
+	if(st->shealth.enabled ||st->shealth.stop_timestamp > 0)
+		is_data_ready = true;
+
+	if(is_data_ready) {
+		/* If interrupt time exists, time difference should be calculated
+		   between interrupt & stop time. */
+		if(st->shealth.interrupt_timestamp > 0)
+			start_timestamp = st->shealth.interrupt_timestamp;
+		else if(st->shealth.start_timestamp > 0)
+			start_timestamp = st->shealth.start_timestamp;
+
+		if(st->shealth.stop_timestamp > 0)
+			end_timestamp = st->shealth.stop_timestamp;
+		else {
+			end_timestamp = inv_get_shealth_timestamp(st, false);
+		}
+	}
+
+	/*start timestamp*/
+	sprintf(concat, "%lld,", start_timestamp);
+	strcat(buf, concat);
+
+	/*interrupt or stop timestap*/
+	sprintf(concat, "%lld,", end_timestamp);
+	strcat(buf, concat);
+
+	/*valid count of cadence*/
+	if (st->shealth.enabled)
+		valid_count = (u16)(((s32)((end_timestamp - start_timestamp) >> 30)) / 56) + 1;
+	sprintf(concat, "%d,", valid_count);
+	strcat(buf, concat);
+
+	for( i = 0; i < SHEALTH_CADENCE_LEN; i++) {
+		cadence = cadence_array[i];
+
+		sprintf(concat, "%u,", cadence);
+		strcat(buf, concat);
+	}
+	strcat(buf, "\n");
+
+	return strlen(buf);
+}
+
 
 static int inv_dry_run_dmp(struct inv_mpu_state *st)
 {
@@ -1775,7 +2081,7 @@ static int inv_dry_run_dmp(struct inv_mpu_state *st)
 	result = inv_i2c_single_write(st, reg->user_ctrl, BIT_DMP_EN);
 	if (result)
 		return result;
-	msleep(20);
+	msleep(10);
 	result = inv_i2c_single_write(st, reg->user_ctrl, 0);
 	if (result)
 		return result;
@@ -1835,6 +2141,10 @@ ssize_t inv_dmp_firmware_write(struct file *fp, struct kobject *kobj,
 		goto firmware_write_fail;
 
 	result = inv_load_firmware(st, firmware, size);
+	if (result)
+		goto firmware_write_fail;
+
+	result = inv_verify_firmware(st, firmware, size);
 	if (result)
 		goto firmware_write_fail;
 

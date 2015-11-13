@@ -23,10 +23,8 @@
 #include <linux/io.h>
 #include <linux/types.h>
 
-#if defined(CONFIG_ARCH_MSM8974PRO)
 #define REMOTE_SPINLOCK_NUM_PID 128
 #define REMOTE_SPINLOCK_TID_START REMOTE_SPINLOCK_NUM_PID
-#endif
 
 /* Remote spinlock definitions. */
 
@@ -54,10 +52,8 @@ void _remote_spin_unlock(_remote_spinlock_t *lock);
 int _remote_spin_trylock(_remote_spinlock_t *lock);
 int _remote_spin_release(_remote_spinlock_t *lock, uint32_t pid);
 int _remote_spin_owner(_remote_spinlock_t *lock);
-#if defined(CONFIG_ARCH_MSM8974PRO)
 void _remote_spin_lock_rlock_id(_remote_spinlock_t *lock, uint32_t tid);
 void _remote_spin_unlock_rlock(_remote_spinlock_t *lock);
-#endif
 #else
 static inline
 int _remote_spin_lock_init(remote_spinlock_id_t id, _remote_spinlock_t *lock)
@@ -79,11 +75,9 @@ static inline int _remote_spin_owner(_remote_spinlock_t *lock)
 {
 	return -ENODEV;
 }
-#if defined(CONFIG_ARCH_MSM8974PRO)
 static inline void _remote_spin_lock_rlock_id(_remote_spinlock_t *lock,
 					      uint32_t tid) {}
 static inline void _remote_spin_unlock_rlock(_remote_spinlock_t *lock) {}
-#endif
 #endif
 
 

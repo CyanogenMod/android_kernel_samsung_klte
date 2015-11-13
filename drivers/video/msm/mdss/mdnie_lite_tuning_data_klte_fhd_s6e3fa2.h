@@ -24,7 +24,7 @@
 #define ADDRESS_SCR_WHITE_BLUE  0x7E
 
 ////////////////// UI /// /////////////////////
-static char SCREEN_CURTAIN_1_FHD[] = {
+static char SCREEN_CURTAIN_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -50,7 +50,7 @@ static char SCREEN_CURTAIN_1_FHD[] = {
 	0x00,
 };
 
-static char SCREEN_CURTAIN_2_FHD[] = {
+static char SCREEN_CURTAIN_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -182,7 +182,7 @@ static char SCREEN_CURTAIN_2_FHD[] = {
 	//end
 };
 
-static char STANDARD_UI_1_FHD[] = {
+static char STANDARD_UI_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -208,7 +208,7 @@ static char STANDARD_UI_1_FHD[] = {
 	0x00,
 };
 
-static char STANDARD_UI_2_FHD[] = {
+static char STANDARD_UI_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -341,7 +341,7 @@ static char STANDARD_UI_2_FHD[] = {
 
 };
 
-static char NATURAL_UI_1_FHD[] = {
+static char NATURAL_UI_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -367,7 +367,7 @@ static char NATURAL_UI_1_FHD[] = {
 	0x00,
 };
 
-static char NATURAL_UI_2_FHD[] = {
+static char NATURAL_UI_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -500,7 +500,7 @@ static char NATURAL_UI_2_FHD[] = {
 
 };
 
-static char DYNAMIC_UI_1_FHD[] = {
+static char DYNAMIC_UI_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -526,7 +526,7 @@ static char DYNAMIC_UI_1_FHD[] = {
 	0x00,
 };
 
-static char DYNAMIC_UI_2_FHD[] = {
+static char DYNAMIC_UI_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -659,7 +659,7 @@ static char DYNAMIC_UI_2_FHD[] = {
 
 };
 
-static char MOVIE_UI_1_FHD[] = {
+static char MOVIE_UI_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -685,7 +685,7 @@ static char MOVIE_UI_1_FHD[] = {
 	0x00,
 };
 
-static char MOVIE_UI_2_FHD[] = {
+static char MOVIE_UI_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -818,7 +818,7 @@ static char MOVIE_UI_2_FHD[] = {
 
 };
 
-char AUTO_UI_1_FHD[] = {
+char AUTO_UI_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -844,7 +844,7 @@ char AUTO_UI_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_UI_2_FHD[] = {
+char AUTO_UI_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -978,7 +978,7 @@ char AUTO_UI_2_FHD[] = {
 };
 
 ////////////////// GALLERY /////////////////////
-static char STANDARD_GALLERY_1_FHD[] = {
+static char STANDARD_GALLERY_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1004,7 +1004,7 @@ static char STANDARD_GALLERY_1_FHD[] = {
 	0x00,
 };
 
-static char STANDARD_GALLERY_2_FHD[] = {
+static char STANDARD_GALLERY_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1137,7 +1137,7 @@ static char STANDARD_GALLERY_2_FHD[] = {
 
 };
 
-static char NATURAL_GALLERY_1_FHD[] = {
+static char NATURAL_GALLERY_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1163,7 +1163,7 @@ static char NATURAL_GALLERY_1_FHD[] = {
 	0x00,
 };
 
-static char NATURAL_GALLERY_2_FHD[] = {
+static char NATURAL_GALLERY_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1296,7 +1296,7 @@ static char NATURAL_GALLERY_2_FHD[] = {
 
 };
 
-static char DYNAMIC_GALLERY_1_FHD[] = {
+static char DYNAMIC_GALLERY_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1322,7 +1322,7 @@ static char DYNAMIC_GALLERY_1_FHD[] = {
 	0x00,
 };
 
-static char DYNAMIC_GALLERY_2_FHD[] = {
+static char DYNAMIC_GALLERY_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1455,7 +1455,7 @@ static char DYNAMIC_GALLERY_2_FHD[] = {
 
 };
 
-static char MOVIE_GALLERY_1_FHD[] = {
+static char MOVIE_GALLERY_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1481,7 +1481,7 @@ static char MOVIE_GALLERY_1_FHD[] = {
 	0x00,
 };
 
-static char MOVIE_GALLERY_2_FHD[] = {
+static char MOVIE_GALLERY_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1614,7 +1614,7 @@ static char MOVIE_GALLERY_2_FHD[] = {
 
 };
 
-char AUTO_GALLERY_1_FHD[] = {
+char AUTO_GALLERY_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1641,7 +1641,7 @@ char AUTO_GALLERY_1_FHD[] = {
 
 };
 
-char AUTO_GALLERY_2_FHD[] = {
+char AUTO_GALLERY_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1776,7 +1776,7 @@ char AUTO_GALLERY_2_FHD[] = {
 
 ////////////////// VIDEO /////////////////////
 
-static char STANDARD_VIDEO_1_FHD[] = {
+static char STANDARD_VIDEO_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1802,7 +1802,7 @@ static char STANDARD_VIDEO_1_FHD[] = {
 	0x00,
 };
 
-static char STANDARD_VIDEO_2_FHD[] = {
+static char STANDARD_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -1935,7 +1935,7 @@ static char STANDARD_VIDEO_2_FHD[] = {
 
 };
 
-static char NATURAL_VIDEO_1_FHD[] = {
+static char NATURAL_VIDEO_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -1961,7 +1961,7 @@ static char NATURAL_VIDEO_1_FHD[] = {
 	0x00,
 };
 
-static char NATURAL_VIDEO_2_FHD[] = {
+static char NATURAL_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2094,7 +2094,7 @@ static char NATURAL_VIDEO_2_FHD[] = {
 
 };
 
-static char DYNAMIC_VIDEO_1_FHD[] = {
+static char DYNAMIC_VIDEO_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2120,7 +2120,7 @@ static char DYNAMIC_VIDEO_1_FHD[] = {
 	0x00,
 };
 
-static char DYNAMIC_VIDEO_2_FHD[] = {
+static char DYNAMIC_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2253,7 +2253,7 @@ static char DYNAMIC_VIDEO_2_FHD[] = {
 
 };
 
-static char MOVIE_VIDEO_1_FHD[] = {
+static char MOVIE_VIDEO_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2279,7 +2279,7 @@ static char MOVIE_VIDEO_1_FHD[] = {
 	0x00,
 };
 
-static char MOVIE_VIDEO_2_FHD[] = {
+static char MOVIE_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2412,7 +2412,7 @@ static char MOVIE_VIDEO_2_FHD[] = {
 
 };
 
-char AUTO_VIDEO_1_FHD[] = {
+char AUTO_VIDEO_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2438,7 +2438,7 @@ char AUTO_VIDEO_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_VIDEO_2_FHD[] = {
+char AUTO_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2573,7 +2573,7 @@ char AUTO_VIDEO_2_FHD[] = {
 
 ////////////////// VT /////////////////////
 
-static char STANDARD_VT_1_FHD[] = {
+static char STANDARD_VT_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2599,7 +2599,7 @@ static char STANDARD_VT_1_FHD[] = {
 	0x00,
 };
 
-static char STANDARD_VT_2_FHD[] = {
+static char STANDARD_VT_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2732,7 +2732,7 @@ static char STANDARD_VT_2_FHD[] = {
 
 };
 
-static char NATURAL_VT_1_FHD[] = {
+static char NATURAL_VT_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2758,7 +2758,7 @@ static char NATURAL_VT_1_FHD[] = {
 	0x00,
 };
 
-static char NATURAL_VT_2_FHD[] = {
+static char NATURAL_VT_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -2891,7 +2891,7 @@ static char NATURAL_VT_2_FHD[] = {
 
 };
 
-static char DYNAMIC_VT_1_FHD[] = {
+static char DYNAMIC_VT_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -2917,7 +2917,7 @@ static char DYNAMIC_VT_1_FHD[] = {
 	0x00,
 };
 
-static char DYNAMIC_VT_2_FHD[] = {
+static char DYNAMIC_VT_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3050,7 +3050,7 @@ static char DYNAMIC_VT_2_FHD[] = {
 
 };
 
-static char MOVIE_VT_1_FHD[] = {
+static char MOVIE_VT_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -3076,7 +3076,7 @@ static char MOVIE_VT_1_FHD[] = {
 	0x00,
 };
 
-static char MOVIE_VT_2_FHD[] = {
+static char MOVIE_VT_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3209,7 +3209,7 @@ static char MOVIE_VT_2_FHD[] = {
 
 };
 
-char BYPASS_1_FHD[] = {
+char BYPASS_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -3235,7 +3235,7 @@ char BYPASS_1_FHD[] = {
 	0x00,
 };
 
-char BYPASS_2_FHD[] = {
+char BYPASS_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3368,7 +3368,7 @@ char BYPASS_2_FHD[] = {
 
 };
 
-char AUTO_VT_1_FHD[] = {
+char AUTO_VT_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -3394,7 +3394,7 @@ char AUTO_VT_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_VT_2_FHD[] = {
+char AUTO_VT_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3529,7 +3529,7 @@ char AUTO_VT_2_FHD[] = {
 
 ////////////////// CAMERA /////////////////////
 
-static char CAMERA_1_FHD[] = {
+static char CAMERA_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -3555,7 +3555,7 @@ static char CAMERA_1_FHD[] = {
 	0x00,
 };
 
-static char CAMERA_2_FHD[] = {
+static char CAMERA_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3688,7 +3688,7 @@ static char CAMERA_2_FHD[] = {
 
 };
 
-char AUTO_CAMERA_1_FHD[] = {
+char AUTO_CAMERA_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -3714,7 +3714,7 @@ char AUTO_CAMERA_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_CAMERA_2_FHD[] = {
+char AUTO_CAMERA_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -3848,7 +3848,7 @@ char AUTO_CAMERA_2_FHD[] = {
 };
 
 
-static char CAMERA_OUTDOOR_1_FHD[] = {
+static char CAMERA_OUTDOOR_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -3874,7 +3874,7 @@ static char CAMERA_OUTDOOR_1_FHD[] = {
 
 };
 
-static char CAMERA_OUTDOOR_2_FHD[] = {
+static char CAMERA_OUTDOOR_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4007,7 +4007,7 @@ static char CAMERA_OUTDOOR_2_FHD[] = {
 
 };
 
-static char COLD_1_FHD[] = {
+static char COLD_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4033,7 +4033,7 @@ static char COLD_1_FHD[] = {
 
 };
 
-static char COLD_2_FHD[] = {
+static char COLD_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4166,7 +4166,7 @@ static char COLD_2_FHD[] = {
 
 };
 
-static char COLD_OUTDOOR_1_FHD[] = {
+static char COLD_OUTDOOR_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4192,7 +4192,7 @@ static char COLD_OUTDOOR_1_FHD[] = {
 
 };
 
-static char COLD_OUTDOOR_2_FHD[] = {
+static char COLD_OUTDOOR_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4325,7 +4325,7 @@ static char COLD_OUTDOOR_2_FHD[] = {
 
 };
 
-static char WARM_1_FHD[] = {
+static char WARM_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4351,7 +4351,7 @@ static char WARM_1_FHD[] = {
 
 };
 
-static char WARM_2_FHD[] = {
+static char WARM_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4484,7 +4484,7 @@ static char WARM_2_FHD[] = {
 
 };
 
-static char WARM_OUTDOOR_1_FHD[] = {
+static char WARM_OUTDOOR_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4510,7 +4510,7 @@ static char WARM_OUTDOOR_1_FHD[] = {
 
 };
 
-static char WARM_OUTDOOR_2_FHD[] = {
+static char WARM_OUTDOOR_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4643,7 +4643,7 @@ static char WARM_OUTDOOR_2_FHD[] = {
 
 };
 
-static char NEGATIVE_1_FHD[] = {
+static char NEGATIVE_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -4669,7 +4669,7 @@ static char NEGATIVE_1_FHD[] = {
 	0x00,
 };
 
-static char NEGATIVE_2_FHD[] = {
+static char NEGATIVE_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4802,7 +4802,7 @@ static char NEGATIVE_2_FHD[] = {
 
 };
 
-static char OUTDOOR_VIDEO_1_FHD[] = {
+static char OUTDOOR_VIDEO_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4828,7 +4828,7 @@ static char OUTDOOR_VIDEO_1_FHD[] = {
 
 };
 
-static char OUTDOOR_VIDEO_2_FHD[] = {
+static char OUTDOOR_VIDEO_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -4961,7 +4961,7 @@ static char OUTDOOR_VIDEO_2_FHD[] = {
 
 };
 
-char COLOR_BLIND_1_FHD[] = {
+char COLOR_BLIND_1[] = {
 	0xEB,
 	0x01, //mdnie_en
 	0x00, //data_width mask 00 0000
@@ -4987,7 +4987,7 @@ char COLOR_BLIND_1_FHD[] = {
 
 };
 
-char COLOR_BLIND_2_FHD[] = {
+char COLOR_BLIND_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5122,7 +5122,7 @@ char COLOR_BLIND_2_FHD[] = {
 
 ////////////////// BROWSER /////////////////////
 
-char STANDARD_BROWSER_1_FHD[] = {
+char STANDARD_BROWSER_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5148,7 +5148,7 @@ char STANDARD_BROWSER_1_FHD[] = {
 	0x00,
 };
 
-char STANDARD_BROWSER_2_FHD[] = {
+char STANDARD_BROWSER_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5281,7 +5281,7 @@ char STANDARD_BROWSER_2_FHD[] = {
 
 };
 
-char NATURAL_BROWSER_1_FHD[] = {
+char NATURAL_BROWSER_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5308,7 +5308,7 @@ char NATURAL_BROWSER_1_FHD[] = {
 
 };
 
-char NATURAL_BROWSER_2_FHD[] = {
+char NATURAL_BROWSER_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5441,7 +5441,7 @@ char NATURAL_BROWSER_2_FHD[] = {
 
 };
 
-char DYNAMIC_BROWSER_1_FHD[] = {
+char DYNAMIC_BROWSER_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5467,7 +5467,7 @@ char DYNAMIC_BROWSER_1_FHD[] = {
 	0x00,
 };
 
-char DYNAMIC_BROWSER_2_FHD[] = {
+char DYNAMIC_BROWSER_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5600,7 +5600,7 @@ char DYNAMIC_BROWSER_2_FHD[] = {
 
 };
 
-char MOVIE_BROWSER_1_FHD[] = {
+char MOVIE_BROWSER_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5626,7 +5626,7 @@ char MOVIE_BROWSER_1_FHD[] = {
 	0x00,
 };
 
-char MOVIE_BROWSER_2_FHD[] = {
+char MOVIE_BROWSER_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5759,7 +5759,7 @@ char MOVIE_BROWSER_2_FHD[] = {
 
 };
 
-char AUTO_BROWSER_1_FHD[] = {
+char AUTO_BROWSER_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5785,7 +5785,7 @@ char AUTO_BROWSER_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_BROWSER_2_FHD[] = {
+char AUTO_BROWSER_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -5919,7 +5919,7 @@ char AUTO_BROWSER_2_FHD[] = {
 };
 
 ////////////////// eBOOK /////////////////////
-char DYNAMIC_EBOOK_1_FHD[] = {
+char DYNAMIC_EBOOK_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -5946,7 +5946,7 @@ char DYNAMIC_EBOOK_1_FHD[] = {
 
 };
 
-char DYNAMIC_EBOOK_2_FHD[] = {
+char DYNAMIC_EBOOK_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6079,7 +6079,7 @@ char DYNAMIC_EBOOK_2_FHD[] = {
 
 };
 
-char STANDARD_EBOOK_1_FHD[] = {
+char STANDARD_EBOOK_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6106,7 +6106,7 @@ char STANDARD_EBOOK_1_FHD[] = {
 
 };
 
-char STANDARD_EBOOK_2_FHD[] = {
+char STANDARD_EBOOK_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6238,7 +6238,7 @@ char STANDARD_EBOOK_2_FHD[] = {
 	//end
 
 };
-char NATURAL_EBOOK_1_FHD[] = {
+char NATURAL_EBOOK_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6265,7 +6265,7 @@ char NATURAL_EBOOK_1_FHD[] = {
 
 };
 
-char NATURAL_EBOOK_2_FHD[] = {
+char NATURAL_EBOOK_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6397,7 +6397,7 @@ char NATURAL_EBOOK_2_FHD[] = {
 	//end
 
 };
-char MOVIE_EBOOK_1_FHD[] = {
+char MOVIE_EBOOK_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6424,7 +6424,7 @@ char MOVIE_EBOOK_1_FHD[] = {
 
 };
 
-char MOVIE_EBOOK_2_FHD[] = {
+char MOVIE_EBOOK_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6556,7 +6556,7 @@ char MOVIE_EBOOK_2_FHD[] = {
 	//end
 
 };
-char AUTO_EBOOK_1_FHD[] = {
+char AUTO_EBOOK_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6583,7 +6583,7 @@ char AUTO_EBOOK_1_FHD[] = {
 
 };
 
-char AUTO_EBOOK_2_FHD[] = {
+char AUTO_EBOOK_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6716,7 +6716,7 @@ char AUTO_EBOOK_2_FHD[] = {
 
 };
 
-char AUTO_EMAIL_1_FHD[] = {
+char AUTO_EMAIL_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6742,7 +6742,7 @@ char AUTO_EMAIL_1_FHD[] = {
 	0x00,
 };
 
-char AUTO_EMAIL_2_FHD[] = {
+char AUTO_EMAIL_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -6875,7 +6875,7 @@ char AUTO_EMAIL_2_FHD[] = {
 };
 
 #if defined(CONFIG_LCD_HMT)
-char HMT_GRAY_8_1_FHD[] = {
+char HMT_GRAY_8_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -6901,7 +6901,7 @@ char HMT_GRAY_8_1_FHD[] = {
 	0x00,
 };
 
-char HMT_GRAY_8_2_FHD[] = {
+char HMT_GRAY_8_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -7033,7 +7033,7 @@ char HMT_GRAY_8_2_FHD[] = {
 	//end
 };
 
-char HMT_GRAY_16_1_FHD[] = {
+char HMT_GRAY_16_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -7059,7 +7059,7 @@ char HMT_GRAY_16_1_FHD[] = {
 	0x00,
 };
 
-char HMT_GRAY_16_2_FHD[] = {
+char HMT_GRAY_16_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -7191,7 +7191,7 @@ char HMT_GRAY_16_2_FHD[] = {
 	//end
 };
 #endif
-char LOCAL_CE_1_FHD[] = {
+char LOCAL_CE_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -7217,7 +7217,7 @@ char LOCAL_CE_1_FHD[] = {
 	0x00,
 };
 
-char LOCAL_CE_2_FHD[] = {
+char LOCAL_CE_2[] = {
 	0xEC,
 	0x06, //lce_gain 00 0000
 	0x30, //lce_color_gain 00 0000
@@ -7509,7 +7509,7 @@ char LOCAL_CE_2_ENHENCED[] = {
 
 
 
-char *blind_tune_value_fhd[ACCESSIBILITY_MAX][2] = {
+char *blind_tune_value[ACCESSIBILITY_MAX][2] = {
 		/*
 			ACCESSIBILITY_OFF,
 			NEGATIVE,
@@ -7517,12 +7517,12 @@ char *blind_tune_value_fhd[ACCESSIBILITY_MAX][2] = {
 			SCREEN_CURTAIN,
 		*/
 		{NULL, NULL},
-		{NEGATIVE_1_FHD, NEGATIVE_2_FHD},
-		{COLOR_BLIND_1_FHD, COLOR_BLIND_2_FHD},
-		{SCREEN_CURTAIN_1_FHD, SCREEN_CURTAIN_2_FHD},
+		{NEGATIVE_1, NEGATIVE_2},
+		{COLOR_BLIND_1, COLOR_BLIND_2},
+		{SCREEN_CURTAIN_1, SCREEN_CURTAIN_2},
 };
 
-char *mdnie_tune_value_fhd[MAX_mDNIe_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE][2] = {
+char *mdnie_tune_value[MAX_mDNIe_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE][2] = {
 		/*
 			DYNAMIC_MODE (outdoor off/on)
 			STANDARD_MODE (outdoor off/on)
@@ -7532,43 +7532,43 @@ char *mdnie_tune_value_fhd[MAX_mDNIe_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE
 		*/
 		// UI_APP
 		{
-			{{DYNAMIC_UI_1_FHD, DYNAMIC_UI_2_FHD}, {NULL, NULL}},
-			{{STANDARD_UI_1_FHD, STANDARD_UI_2_FHD}, {NULL, NULL}},
-			{{NATURAL_UI_1_FHD, NATURAL_UI_2_FHD}, {NULL, NULL}},
-			{{MOVIE_UI_1_FHD, MOVIE_UI_2_FHD}, {NULL, NULL}},
-			{{AUTO_UI_1_FHD, AUTO_UI_2_FHD}, {NULL, NULL}},
+			{{DYNAMIC_UI_1, DYNAMIC_UI_2}, {NULL, NULL}},
+			{{STANDARD_UI_1, STANDARD_UI_2}, {NULL, NULL}},
+			{{NATURAL_UI_1, NATURAL_UI_2}, {NULL, NULL}},
+			{{MOVIE_UI_1, MOVIE_UI_2}, {NULL, NULL}},
+			{{AUTO_UI_1, AUTO_UI_2}, {NULL, NULL}},
 		},
 		// VIDEO_APP
 		{
-			{{DYNAMIC_VIDEO_1_FHD, DYNAMIC_VIDEO_2_FHD}, {OUTDOOR_VIDEO_1_FHD, OUTDOOR_VIDEO_2_FHD}},
-			{{STANDARD_VIDEO_1_FHD, STANDARD_VIDEO_2_FHD}, {OUTDOOR_VIDEO_1_FHD, OUTDOOR_VIDEO_2_FHD}},
-			{{NATURAL_VIDEO_1_FHD, NATURAL_VIDEO_2_FHD}, {OUTDOOR_VIDEO_1_FHD, OUTDOOR_VIDEO_2_FHD}},
-			{{MOVIE_VIDEO_1_FHD, MOVIE_VIDEO_2_FHD}, {OUTDOOR_VIDEO_1_FHD, OUTDOOR_VIDEO_2_FHD}},
-			{{AUTO_VIDEO_1_FHD, AUTO_VIDEO_2_FHD}, {OUTDOOR_VIDEO_1_FHD, OUTDOOR_VIDEO_2_FHD}},
+			{{DYNAMIC_VIDEO_1, DYNAMIC_VIDEO_2}, {OUTDOOR_VIDEO_1, OUTDOOR_VIDEO_2}},
+			{{STANDARD_VIDEO_1, STANDARD_VIDEO_2}, {OUTDOOR_VIDEO_1, OUTDOOR_VIDEO_2}},
+			{{NATURAL_VIDEO_1, NATURAL_VIDEO_2}, {OUTDOOR_VIDEO_1, OUTDOOR_VIDEO_2}},
+			{{MOVIE_VIDEO_1, MOVIE_VIDEO_2}, {OUTDOOR_VIDEO_1, OUTDOOR_VIDEO_2}},
+			{{AUTO_VIDEO_1, AUTO_VIDEO_2}, {OUTDOOR_VIDEO_1, OUTDOOR_VIDEO_2}},
 		},
 		// VIDEO_WARM_APP
 		{
-			{{WARM_1_FHD, WARM_2_FHD}, {WARM_OUTDOOR_1_FHD, WARM_OUTDOOR_2_FHD}},
-			{{WARM_1_FHD, WARM_2_FHD}, {WARM_OUTDOOR_1_FHD, WARM_OUTDOOR_2_FHD}},
-			{{WARM_1_FHD, WARM_2_FHD}, {WARM_OUTDOOR_1_FHD, WARM_OUTDOOR_2_FHD}},
-			{{WARM_1_FHD, WARM_2_FHD}, {WARM_OUTDOOR_1_FHD, WARM_OUTDOOR_2_FHD}},
-			{{WARM_1_FHD, WARM_2_FHD}, {WARM_OUTDOOR_1_FHD, WARM_OUTDOOR_2_FHD}},
+			{{WARM_1, WARM_2}, {WARM_OUTDOOR_1, WARM_OUTDOOR_2}},
+			{{WARM_1, WARM_2}, {WARM_OUTDOOR_1, WARM_OUTDOOR_2}},
+			{{WARM_1, WARM_2}, {WARM_OUTDOOR_1, WARM_OUTDOOR_2}},
+			{{WARM_1, WARM_2}, {WARM_OUTDOOR_1, WARM_OUTDOOR_2}},
+			{{WARM_1, WARM_2}, {WARM_OUTDOOR_1, WARM_OUTDOOR_2}},
 		},
 		// VIDEO_COLD_APP
 		{
-			{{COLD_1_FHD, COLD_2_FHD}, {COLD_OUTDOOR_1_FHD, COLD_OUTDOOR_2_FHD}},
-			{{COLD_1_FHD, COLD_2_FHD}, {COLD_OUTDOOR_1_FHD, COLD_OUTDOOR_2_FHD}},
-			{{COLD_1_FHD, COLD_2_FHD}, {COLD_OUTDOOR_1_FHD, COLD_OUTDOOR_2_FHD}},
-			{{COLD_1_FHD, COLD_2_FHD}, {COLD_OUTDOOR_1_FHD, COLD_OUTDOOR_2_FHD}},
-			{{COLD_1_FHD, COLD_2_FHD}, {COLD_OUTDOOR_1_FHD, COLD_OUTDOOR_2_FHD}},
+			{{COLD_1, COLD_2}, {COLD_OUTDOOR_1, COLD_OUTDOOR_2}},
+			{{COLD_1, COLD_2}, {COLD_OUTDOOR_1, COLD_OUTDOOR_2}},
+			{{COLD_1, COLD_2}, {COLD_OUTDOOR_1, COLD_OUTDOOR_2}},
+			{{COLD_1, COLD_2}, {COLD_OUTDOOR_1, COLD_OUTDOOR_2}},
+			{{COLD_1, COLD_2}, {COLD_OUTDOOR_1, COLD_OUTDOOR_2}},
 		},
 		// CAMERA_APP
 		{
-			{{CAMERA_1_FHD, CAMERA_2_FHD}, {CAMERA_OUTDOOR_1_FHD, CAMERA_OUTDOOR_2_FHD}},
-			{{CAMERA_1_FHD, CAMERA_2_FHD}, {CAMERA_OUTDOOR_1_FHD, CAMERA_OUTDOOR_2_FHD}},
-			{{CAMERA_1_FHD, CAMERA_2_FHD}, {CAMERA_OUTDOOR_1_FHD, CAMERA_OUTDOOR_2_FHD}},
-			{{CAMERA_1_FHD, CAMERA_2_FHD}, {CAMERA_OUTDOOR_1_FHD, CAMERA_OUTDOOR_2_FHD}},
-			{{AUTO_CAMERA_1_FHD, AUTO_CAMERA_2_FHD}, {CAMERA_OUTDOOR_1_FHD, CAMERA_OUTDOOR_2_FHD}},
+			{{CAMERA_1, CAMERA_2}, {CAMERA_OUTDOOR_1, CAMERA_OUTDOOR_2}},
+			{{CAMERA_1, CAMERA_2}, {CAMERA_OUTDOOR_1, CAMERA_OUTDOOR_2}},
+			{{CAMERA_1, CAMERA_2}, {CAMERA_OUTDOOR_1, CAMERA_OUTDOOR_2}},
+			{{CAMERA_1, CAMERA_2}, {CAMERA_OUTDOOR_1, CAMERA_OUTDOOR_2}},
+			{{AUTO_CAMERA_1, AUTO_CAMERA_2}, {CAMERA_OUTDOOR_1, CAMERA_OUTDOOR_2}},
 		},
 		// NAVI_APP
 		{
@@ -7580,60 +7580,60 @@ char *mdnie_tune_value_fhd[MAX_mDNIe_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE
 		},
 		// GALLERY_APP
 		{
-			{{DYNAMIC_GALLERY_1_FHD, DYNAMIC_GALLERY_2_FHD}, {NULL,NULL}},
-			{{STANDARD_GALLERY_1_FHD, STANDARD_GALLERY_2_FHD}, {NULL,NULL}},
-			{{NATURAL_GALLERY_1_FHD, NATURAL_GALLERY_2_FHD}, {NULL,NULL}},
-			{{MOVIE_GALLERY_1_FHD, MOVIE_GALLERY_2_FHD}, {NULL,NULL}},
-			{{AUTO_GALLERY_1_FHD, AUTO_GALLERY_2_FHD}, {NULL,NULL}},
+			{{DYNAMIC_GALLERY_1, DYNAMIC_GALLERY_2}, {NULL,NULL}},
+			{{STANDARD_GALLERY_1, STANDARD_GALLERY_2}, {NULL,NULL}},
+			{{NATURAL_GALLERY_1, NATURAL_GALLERY_2}, {NULL,NULL}},
+			{{MOVIE_GALLERY_1, MOVIE_GALLERY_2}, {NULL,NULL}},
+			{{AUTO_GALLERY_1, AUTO_GALLERY_2}, {NULL,NULL}},
 		},
 		// VT_APP
 		{
-			{{DYNAMIC_VT_1_FHD, DYNAMIC_VT_2_FHD}, {NULL, NULL}},
-			{{STANDARD_VT_1_FHD, STANDARD_VT_2_FHD}, {NULL, NULL}},
-			{{NATURAL_VT_1_FHD, NATURAL_VT_2_FHD}, {NULL, NULL}},
-			{{MOVIE_VT_1_FHD, MOVIE_VT_2_FHD}, {NULL, NULL}},
-			{{AUTO_VT_1_FHD, AUTO_VT_2_FHD}, {NULL, NULL}},
+			{{DYNAMIC_VT_1, DYNAMIC_VT_2}, {NULL, NULL}},
+			{{STANDARD_VT_1, STANDARD_VT_2}, {NULL, NULL}},
+			{{NATURAL_VT_1, NATURAL_VT_2}, {NULL, NULL}},
+			{{MOVIE_VT_1, MOVIE_VT_2}, {NULL, NULL}},
+			{{AUTO_VT_1, AUTO_VT_2}, {NULL, NULL}},
 		},
 		// BROWSER_APP
 		{
-			{{DYNAMIC_BROWSER_1_FHD, DYNAMIC_BROWSER_2_FHD}, {NULL, NULL}},
-			{{STANDARD_BROWSER_1_FHD, STANDARD_BROWSER_2_FHD}, {NULL, NULL}},
-			{{NATURAL_BROWSER_1_FHD, NATURAL_BROWSER_2_FHD}, {NULL, NULL}},
-			{{MOVIE_BROWSER_1_FHD, MOVIE_BROWSER_2_FHD}, {NULL, NULL}},
-			{{AUTO_BROWSER_1_FHD, AUTO_BROWSER_2_FHD}, {NULL, NULL}},
+			{{DYNAMIC_BROWSER_1, DYNAMIC_BROWSER_2}, {NULL, NULL}},
+			{{STANDARD_BROWSER_1, STANDARD_BROWSER_2}, {NULL, NULL}},
+			{{NATURAL_BROWSER_1, NATURAL_BROWSER_2}, {NULL, NULL}},
+			{{MOVIE_BROWSER_1, MOVIE_BROWSER_2}, {NULL, NULL}},
+			{{AUTO_BROWSER_1, AUTO_BROWSER_2}, {NULL, NULL}},
 		},
 		// eBOOK_APP
 		{
-			{{DYNAMIC_EBOOK_1_FHD, DYNAMIC_EBOOK_2_FHD}, {NULL, NULL}},
-			{{STANDARD_EBOOK_1_FHD, STANDARD_EBOOK_2_FHD}, {NULL, NULL}},
-			{{NATURAL_EBOOK_1_FHD, NATURAL_EBOOK_2_FHD}, {NULL, NULL}},
-			{{MOVIE_EBOOK_1_FHD, MOVIE_EBOOK_2_FHD}, {NULL, NULL}},
-			{{AUTO_EBOOK_1_FHD, AUTO_EBOOK_2_FHD}, {NULL, NULL}},
+			{{DYNAMIC_EBOOK_1, DYNAMIC_EBOOK_2}, {NULL, NULL}},
+			{{STANDARD_EBOOK_1, STANDARD_EBOOK_2}, {NULL, NULL}},
+			{{NATURAL_EBOOK_1, NATURAL_EBOOK_2}, {NULL, NULL}},
+			{{MOVIE_EBOOK_1, MOVIE_EBOOK_2}, {NULL, NULL}},
+			{{AUTO_EBOOK_1, AUTO_EBOOK_2}, {NULL, NULL}},
 		},
 		// EMAIL_APP
 		{
-			{{AUTO_EMAIL_1_FHD, AUTO_EMAIL_2_FHD}, {NULL, NULL}},
-			{{AUTO_EMAIL_1_FHD, AUTO_EMAIL_2_FHD}, {NULL, NULL}},
-			{{AUTO_EMAIL_1_FHD, AUTO_EMAIL_2_FHD}, {NULL, NULL}},
-			{{AUTO_EMAIL_1_FHD, AUTO_EMAIL_2_FHD}, {NULL, NULL}},
-			{{AUTO_EMAIL_1_FHD, AUTO_EMAIL_2_FHD}, {NULL, NULL}},
+			{{AUTO_EMAIL_1, AUTO_EMAIL_2}, {NULL, NULL}},
+			{{AUTO_EMAIL_1, AUTO_EMAIL_2}, {NULL, NULL}},
+			{{AUTO_EMAIL_1, AUTO_EMAIL_2}, {NULL, NULL}},
+			{{AUTO_EMAIL_1, AUTO_EMAIL_2}, {NULL, NULL}},
+			{{AUTO_EMAIL_1, AUTO_EMAIL_2}, {NULL, NULL}},
 		},
 #if defined(CONFIG_LCD_HMT)
 		// HMT GRAY 8
 		{
-			{{HMT_GRAY_8_1_FHD, HMT_GRAY_8_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_8_1_FHD, HMT_GRAY_8_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_8_1_FHD, HMT_GRAY_8_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_8_1_FHD, HMT_GRAY_8_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_8_1_FHD, HMT_GRAY_8_2_FHD}, {NULL, NULL}},
+			{{HMT_GRAY_8_1, HMT_GRAY_8_2}, {NULL, NULL}},
+			{{HMT_GRAY_8_1, HMT_GRAY_8_2}, {NULL, NULL}},
+			{{HMT_GRAY_8_1, HMT_GRAY_8_2}, {NULL, NULL}},
+			{{HMT_GRAY_8_1, HMT_GRAY_8_2}, {NULL, NULL}},
+			{{HMT_GRAY_8_1, HMT_GRAY_8_2}, {NULL, NULL}},
 		},
 		// HMT GRAY 16
 		{
-			{{HMT_GRAY_16_1_FHD, HMT_GRAY_16_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_16_1_FHD, HMT_GRAY_16_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_16_1_FHD, HMT_GRAY_16_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_16_1_FHD, HMT_GRAY_16_2_FHD}, {NULL, NULL}},
-			{{HMT_GRAY_16_1_FHD, HMT_GRAY_16_2_FHD}, {NULL, NULL}},
+			{{HMT_GRAY_16_1, HMT_GRAY_16_2}, {NULL, NULL}},
+			{{HMT_GRAY_16_1, HMT_GRAY_16_2}, {NULL, NULL}},
+			{{HMT_GRAY_16_1, HMT_GRAY_16_2}, {NULL, NULL}},
+			{{HMT_GRAY_16_1, HMT_GRAY_16_2}, {NULL, NULL}},
+			{{HMT_GRAY_16_1, HMT_GRAY_16_2}, {NULL, NULL}},
 		},
 #endif
 };

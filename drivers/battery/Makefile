@@ -23,3 +23,4 @@ obj-$(CONFIG_CHARGER_MAX77803)	+= max77803_charger.o
 obj-$(CONFIG_CHARGER_MAX77804K)	+= max77804k_charger.o
 obj-$(CONFIG_CHARGER_MAX77888)  += max77888_charger.o
 obj-$(CONFIG_CHARGER_MAX77823)	+= max77823_charger.o
+obj-$(CONFIG_CHARGER_SM5414)	+= sm5414_charger.o

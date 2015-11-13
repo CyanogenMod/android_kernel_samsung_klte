@@ -507,6 +507,7 @@ void *a3xx_snapshot(struct adreno_device *adreno_dev, void *snapshot,
 		adreno_readreg(adreno_dev, ADRENO_REG_CP_ME_CNTL, &reg);
 		reg |= (1 << 27) | (1 << 28);
 		adreno_writereg(adreno_dev, ADRENO_REG_CP_ME_CNTL, reg);
+
 		snapshot = kgsl_snapshot_add_section(device,
 			KGSL_SNAPSHOT_SECTION_DEBUG, snapshot, remain,
 			a3xx_snapshot_cp_pfp_ram, NULL);

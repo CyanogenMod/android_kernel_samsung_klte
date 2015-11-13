@@ -97,9 +97,7 @@ static int cortex_set_config(struct mux_div_clk *md, u32 src_sel, u32 div)
 
 static int cortex_enable(struct mux_div_clk *md)
 {
-	u32 src_sel = parent_to_src_sel(md->parents, md->num_parents,
-							md->c.parent);
-	return cortex_set_config(md, src_sel, md->data.div);
+	return cortex_set_config(md, md->src_sel, md->data.div);
 }
 
 static void cortex_disable(struct mux_div_clk *md)
@@ -193,7 +191,8 @@ static int of_get_fmax_vdd_class(struct platform_device *pdev, struct clk *c,
 	if (!c->fmax)
 		return -ENOMEM;
 
-	array = devm_kzalloc(&pdev->dev, prop_len * sizeof(u32) * 2, GFP_KERNEL);
+	array = devm_kzalloc(&pdev->dev,
+			prop_len * sizeof(u32) * 2, GFP_KERNEL);
 	if (!array)
 		return -ENOMEM;
 

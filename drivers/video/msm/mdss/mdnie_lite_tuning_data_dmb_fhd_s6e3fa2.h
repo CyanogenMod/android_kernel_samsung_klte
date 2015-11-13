@@ -19,7 +19,7 @@
 #ifndef _MDNIE_LITE_TUNING_DATA_DMB_FHD_S6E3FA2_H_
 #define _MDNIE_LITE_TUNING_DATA_DMB_FHD_S6E3FA2_H_
 
-static char STANDARD_DMB_1_FHD[] = {
+static char STANDARD_DMB_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -45,7 +45,7 @@ static char STANDARD_DMB_1_FHD[] = {
 	0x00,
 };
 
-static char STANDARD_DMB_2_FHD[] = {
+static char STANDARD_DMB_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -174,10 +174,10 @@ static char STANDARD_DMB_2_FHD[] = {
 	0x00, //ascr_Kg
 	0xff, //ascr_Wb
 	0x00, //ascr_Kb
-//end	
+//end
 };
 
-static char NATURAL_DMB_1_FHD[] = {
+static char NATURAL_DMB_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -204,7 +204,7 @@ static char NATURAL_DMB_1_FHD[] = {
 
 };
 
-static char NATURAL_DMB_2_FHD[] = {
+static char NATURAL_DMB_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -337,7 +337,7 @@ static char NATURAL_DMB_2_FHD[] = {
 
 };
 
-static char DYNAMIC_DMB_1_FHD[] = {
+static char DYNAMIC_DMB_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -364,7 +364,7 @@ static char DYNAMIC_DMB_1_FHD[] = {
 
 };
 
-static char DYNAMIC_DMB_2_FHD[] = {
+static char DYNAMIC_DMB_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -497,7 +497,7 @@ static char DYNAMIC_DMB_2_FHD[] = {
 
 };
 
-static char MOVIE_DMB_1_FHD[] = {
+static char MOVIE_DMB_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -524,7 +524,7 @@ static char MOVIE_DMB_1_FHD[] = {
 
 };
 
-static char MOVIE_DMB_2_FHD[] = {
+static char MOVIE_DMB_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -657,7 +657,7 @@ static char MOVIE_DMB_2_FHD[] = {
 
 };
 
-static char AUTO_DMB_1_FHD[] = {
+static char AUTO_DMB_1[] = {
 	//start
 	0xEB,
 	0x01, //mdnie_en
@@ -684,7 +684,7 @@ static char AUTO_DMB_1_FHD[] = {
 
 };
 
-static char AUTO_DMB_2_FHD[] = {
+static char AUTO_DMB_2[] = {
 	0xEC,
 	0x18, //lce_gain 00 0000
 	0x24, //lce_color_gain 00 0000
@@ -818,7 +818,7 @@ static char AUTO_DMB_2_FHD[] = {
 
 
 
-char *dmb_tune_value_fhd[MAX_DMB_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE][2] = {
+char *dmb_tune_value[MAX_DMB_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE][2] = {
 		/*
 			DMB MODE (outdoor off/on)
 			DMB_WARM MODE (outdoor off/on)
@@ -826,27 +826,27 @@ char *dmb_tune_value_fhd[MAX_DMB_MODE][MAX_BACKGROUND_MODE][MAX_OUTDOOR_MODE][2]
 		*/
 		// DMB
 		{
-			{{DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}, {DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}},
-			{{STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}, {STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}},
-			{{NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}, {NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}},
-			{{MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}, {MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}},
-			{{AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}, {AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}},
+			{{DYNAMIC_DMB_1, DYNAMIC_DMB_2}, {DYNAMIC_DMB_1, DYNAMIC_DMB_2}},
+			{{STANDARD_DMB_1, STANDARD_DMB_2}, {STANDARD_DMB_1, STANDARD_DMB_2}},
+			{{NATURAL_DMB_1, NATURAL_DMB_2}, {NATURAL_DMB_1, NATURAL_DMB_2}},
+			{{MOVIE_DMB_1, MOVIE_DMB_2}, {MOVIE_DMB_1, MOVIE_DMB_2}},
+			{{AUTO_DMB_1, AUTO_DMB_2}, {AUTO_DMB_1, AUTO_DMB_2}},
 		},
 		// DMB_WARM
 		{
-			{{DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}, {DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}},
-			{{STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}, {STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}},
-			{{NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}, {NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}},
-			{{MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}, {MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}},
-			{{AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}, {AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}},
+			{{DYNAMIC_DMB_1, DYNAMIC_DMB_2}, {DYNAMIC_DMB_1, DYNAMIC_DMB_2}},
+			{{STANDARD_DMB_1, STANDARD_DMB_2}, {STANDARD_DMB_1, STANDARD_DMB_2}},
+			{{NATURAL_DMB_1, NATURAL_DMB_2}, {NATURAL_DMB_1, NATURAL_DMB_2}},
+			{{MOVIE_DMB_1, MOVIE_DMB_2}, {MOVIE_DMB_1, MOVIE_DMB_2}},
+			{{AUTO_DMB_1, AUTO_DMB_2}, {AUTO_DMB_1, AUTO_DMB_2}},
 		},
 		// DMB_COLD
 		{
-			{{DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}, {DYNAMIC_DMB_1_FHD, DYNAMIC_DMB_2_FHD}},
-			{{STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}, {STANDARD_DMB_1_FHD, STANDARD_DMB_2_FHD}},
-			{{NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}, {NATURAL_DMB_1_FHD, NATURAL_DMB_2_FHD}},
-			{{MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}, {MOVIE_DMB_1_FHD, MOVIE_DMB_2_FHD}},
-			{{AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}, {AUTO_DMB_1_FHD, AUTO_DMB_2_FHD}},
+			{{DYNAMIC_DMB_1, DYNAMIC_DMB_2}, {DYNAMIC_DMB_1, DYNAMIC_DMB_2}},
+			{{STANDARD_DMB_1, STANDARD_DMB_2}, {STANDARD_DMB_1, STANDARD_DMB_2}},
+			{{NATURAL_DMB_1, NATURAL_DMB_2}, {NATURAL_DMB_1, NATURAL_DMB_2}},
+			{{MOVIE_DMB_1, MOVIE_DMB_2}, {MOVIE_DMB_1, MOVIE_DMB_2}},
+			{{AUTO_DMB_1, AUTO_DMB_2}, {AUTO_DMB_1, AUTO_DMB_2}},
 		},
 };
 

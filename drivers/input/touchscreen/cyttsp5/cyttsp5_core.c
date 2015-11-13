@@ -775,6 +775,7 @@ static int cyttsp5_hid_send_output_(struct cyttsp5_core_data *cd,
 		length = 11 /* 5 + SOP + LEN(2) + CRC(2) + EOP */;
 		break;
 	default:
+		dev_err(cd->dev, "%s: invalid cmd_type\n", __func__);
 		return -EINVAL;
 	}
 
@@ -848,8 +849,11 @@ static int cyttsp5_hid_send_output_and_wait_(struct cyttsp5_core_data *cd,
 		timeout_ms = CY_HID_OUTPUT_TIMEOUT;
 
 	rc = cyttsp5_hid_send_output_(cd, hid_output);
-	if (rc)
+	if (rc) {
+		dev_err(cd->dev, "%s: Error on cyttsp5_hid_send_output_ r=%d\n",
+				__func__, rc);
 		goto error;
+	}
 
 	t = wait_event_timeout(cd->wait_q, (cd->hid_cmd_state == 0),
 			msecs_to_jiffies(timeout_ms));
@@ -1005,7 +1009,7 @@ static int cyttsp5_si_setup(struct cyttsp5_core_data *cd)
 	struct cyttsp5_sysinfo *si = &cd->sysinfo;
 
 	if (si->xy_data == NULL)
-		si->xy_data = kzalloc(MAX_TOUCH_NUMBER
+		si->xy_data = kzalloc(MAX_TOUCH_ID_NUMBER
 				* si->desc.tch_record_size, GFP_KERNEL);
 	if (si->xy_data == NULL) {
 		dev_err(cd->dev, "%s: fail alloc xy_data\n",
@@ -1190,6 +1194,8 @@ static int cyttsp5_hid_output_get_sysinfo_(struct cyttsp5_core_data *cd)
 		.timeout_ms = CY_HID_OUTPUT_GET_SYSINFO_TIMEOUT,
 	};
 
+	dev_dbg(cd->dev, "%s: \n", __func__);
+
 	rc = cyttsp5_hid_send_output_and_wait_(cd, &hid_output);
 	if (rc)
 		return rc;
@@ -1198,6 +1204,7 @@ static int cyttsp5_hid_output_get_sysinfo_(struct cyttsp5_core_data *cd)
 	if (rc)
 		cyttsp5_free_si_ptrs(cd);
 
+	dev_dbg(cd->dev, "%s: rc=%d\n", __func__, rc);
 	return rc;
 }
 
@@ -1331,7 +1338,8 @@ static int cyttsp5_hid_output_get_param(struct cyttsp5_core_data *cd,
 		u8 param_id, u32 *value)
 {
 	int rc;
-	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT);
+	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT_GET_PARAM);
+	/* change delay time for touchmode read fail in factory probe */
 	if (rc < 0) {
 		dev_err(cd->dev, "%s: fail get exclusive ex=%p own=%p\n",
 				__func__, cd->exclusive_dev, cd->dev);
@@ -1397,7 +1405,8 @@ static int cyttsp5_hid_output_set_param(struct cyttsp5_core_data *cd,
 		u8 param_id, u32 value)
 {
 	int rc;
-	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT);
+	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT_SET_PARAM);
+	/* change delay time for hover/glove mode settting error */
 	if (rc < 0) {
 		dev_err(cd->dev, "%s: fail get exclusive ex=%p own=%p\n",
 				__func__, cd->exclusive_dev, cd->dev);
@@ -1694,9 +1703,10 @@ static int cyttsp5_hid_output_read_conf_ver_(struct cyttsp5_core_data *cd,
 	/* row:0, length:10 */
 	rc = cyttsp5_hid_output_read_conf_block_(cd, 0, 10, CY_TCH_PARM_EBID,
 			read_buf, &crc);
-	if (rc)
+	if (rc) {
+		dev_err(cd->dev, "%s: rc=%d\n", __func__, rc);
 		return rc;
-
+	}
 	*config_ver = get_unaligned_le16(&read_buf[8]);
 
 	return 0;
@@ -2366,6 +2376,51 @@ static int cyttsp5_hid_output_start_sensor_data_mode_(
 	return cyttsp5_hid_send_output_and_wait_(cd, &hid_output);
 }
 
+int cyttsp5_fw_calibrate(struct device *dev)
+{
+	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
+	u8 mode;
+	int rc;
+
+	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT);
+	if (rc < 0) {
+		dev_err(cd->dev, "%s: fail get exclusive ex=%p own=%p\n",
+				__func__, cd->exclusive_dev, cd->dev);
+		return rc;
+	}
+
+	rc = cyttsp5_hid_output_suspend_scanning_(cd);
+	if (rc) {
+		dev_err(cd->dev, "%s: error on suspend scanning\n",
+			__func__);
+		goto release;
+	}
+
+	for (mode = 0; mode < 3; mode++) {
+		rc = cyttsp5_hid_output_calibrate_idacs_(cd, mode);
+		if (rc < 0) {
+			dev_err(cd->dev, "%s: error on calibrate idac\n",
+			__func__);
+			goto release;
+		}
+	}
+
+	rc = cyttsp5_hid_output_resume_scanning_(cd);
+	if (rc < 0) {
+		dev_err(cd->dev, "%s: error on resume scanning\n",
+			__func__);
+		goto release;
+	}
+
+	dev_dbg(cd->dev, "%s: Calibration Done\n", __func__);
+
+release:
+	if (release_exclusive(cd, cd->dev) < 0)
+		dev_err(cd->dev, "%s: fail to release exclusive\n", __func__);
+
+	return rc;
+}
+
 /* TODO: Remove inline when function used */
 static inline int cyttsp5_hid_output_start_sensor_data_mode(
 		struct cyttsp5_core_data *cd, u8 data_point_desc_count,
@@ -2656,20 +2711,29 @@ static int cyttsp5_get_config_ver_(struct cyttsp5_core_data *cd)
 	int rc;
 	u16 config_ver = 0;
 
+	dev_vdbg(cd->dev, "%s: \n", __func__);
+
 	rc = cyttsp5_hid_output_suspend_scanning_(cd);
-	if (rc)
+	if (rc) {
+		dev_err(cd->dev, "%s: error on cyttsp5_hid_output_suspend_scanning_\n",
+			__func__);
 		goto error;
+	}
 
 	rc = cyttsp5_hid_output_read_conf_ver_(cd, &config_ver);
-	if (rc)
+	if (rc) {
+		dev_err(cd->dev, "%s: error on cyttsp5_hid_output_read_conf_ver_\n",
+			__func__);
 		goto exit;
+	}
 
 	si->cydata.fw_ver_conf = config_ver;
 
 exit:
 	cyttsp5_hid_output_resume_scanning_(cd);
 error:
-	dev_dbg(cd->dev, "%s: CONFIG_VER:%04X\n", __func__, config_ver);
+	dev_dbg(cd->dev, "%s: rc=%d CONFIG_VER:%04X\n", __func__,
+		rc, config_ver);
 	return rc;
 }
 
@@ -2972,6 +3036,15 @@ static int cyttsp5_hid_output_bl_launch_app_(struct cyttsp5_core_data *cd)
 	return cyttsp5_hid_send_output_and_wait_(cd, &hid_output);
 }
 
+static int cyttsp5_hid_output_bl_launch_app_fast_(struct cyttsp5_core_data *cd)
+{
+	struct cyttsp5_hid_output hid_output = {
+		HID_OUTPUT_BL_COMMAND(HID_OUTPUT_BL_LAUNCH_APP_FAST),
+		.novalidate = 1,
+	};
+
+	return cyttsp5_hid_send_output_and_wait_(cd, &hid_output);
+}
 static int cyttsp5_hid_output_bl_launch_app(struct cyttsp5_core_data *cd)
 {
 	int rc;
@@ -3014,6 +3087,8 @@ static int cyttsp5_get_hid_descriptor_(struct cyttsp5_core_data *cd,
 	int rc;
 	int t;
 	u8 cmd[2];
+
+	dev_vdbg(cd->dev, "%s: \n", __func__);
 
 	/* Read HID descriptor length and version */
 	mutex_lock(&cd->system_lock);
@@ -3127,7 +3202,11 @@ static int cyttsp5_hw_reset(struct cyttsp5_core_data *cd)
 	int rc;
 
 	mutex_lock(&cd->system_lock);
+	if (cd->irq_enabled)
+		disable_irq_nosync(cd->irq);
 	rc = cyttsp5_hw_hard_reset(cd);
+	if (cd->irq_enabled)
+		enable_irq(cd->irq);
 	mutex_unlock(&cd->system_lock);
 	if (rc == -ENOSYS)
 		rc = cyttsp5_hw_soft_reset(cd);
@@ -3563,6 +3642,8 @@ static int cyttsp5_get_report_descriptor_(struct cyttsp5_core_data *cd)
 	int rc;
 	int t;
 
+	dev_vdbg(cd->dev, "%s: \n", __func__);
+
 	/* Read report descriptor length and version */
 	mutex_lock(&cd->system_lock);
 	cd->hid_cmd_state = 1;
@@ -3599,8 +3680,8 @@ static int cyttsp5_get_report_descriptor_(struct cyttsp5_core_data *cd)
 			__func__, rc);
 	}
 
-	dev_dbg(cd->dev, "%s: %d reports found in descriptor\n", __func__,
-		cd->num_hid_reports);
+//	dev_dbg(cd->dev, "%s: %d reports found in descriptor\n", __func__,
+//		cd->num_hid_reports);
 
 	for (t = 0; t < cd->num_hid_reports; t++) {
 		struct cyttsp5_hid_report *report = cd->hid_reports[t];
@@ -3725,6 +3806,8 @@ static void cyttsp5_start_wd_timer(struct cyttsp5_core_data *cd)
 	if (!CY_WATCHDOG_TIMEOUT)
 		return;
 
+	dev_vdbg(cd->dev, "%s: \n", __func__);
+
 	mod_timer(&cd->watchdog_timer, jiffies +
 			msecs_to_jiffies(CY_WATCHDOG_TIMEOUT));
 	return;
@@ -3734,6 +3817,8 @@ static void cyttsp5_stop_wd_timer(struct cyttsp5_core_data *cd)
 {
 	if (!CY_WATCHDOG_TIMEOUT)
 		return;
+
+	dev_vdbg(cd->dev, "%s: \n", __func__);
 
 	/*
 	 * Ensure we wait until the watchdog timer
@@ -3828,6 +3913,7 @@ static int cyttsp5_core_poweroff_device_(struct cyttsp5_core_data *cd)
 	int rc;
 
 	/* No need for cd->pdata->power check since we did it in probe */
+	cd->hw_power_state = false;
 	rc = cd->cpdata->power(cd->cpdata, 0, cd->dev, 0);
 	if (rc < 0)
 		dev_err(cd->dev, "%s: HW Power down fails r=%d\n",
@@ -3854,17 +3940,32 @@ static int cyttsp5_core_sleep_(struct cyttsp5_core_data *cd)
 
 	return rc;
 }
-
-static int cyttsp5_core_sleep(struct cyttsp5_core_data *cd)
+extern int cyttsp5_samsung_factory_suspend_attention(struct device *dev);
+static int cyttsp5_core_sleep(struct cyttsp5_core_data *cd,
+	bool _disable_irq)
 {
 	int rc;
 
+	cyttsp5_stop_wd_timer(cd);
+	cancel_work_sync(&cd->startup_work);
+	cyttsp5_stop_wd_timer(cd);
 	rc = request_exclusive(cd, cd->dev, CY_REQUEST_EXCLUSIVE_TIMEOUT);
 	if (rc < 0) {
 		dev_err(cd->dev, "%s: fail get exclusive ex=%p own=%p\n",
 				__func__, cd->exclusive_dev, cd->dev);
 		return 0;
 	}
+
+	cyttsp5_samsung_factory_suspend_attention(cd->dev);
+	mutex_lock(&cd->system_lock);
+	if (_disable_irq && cd->irq_enabled) {
+		cd->irq_enabled = false;
+		disable_irq_nosync(cd->irq);
+		mutex_unlock(&cd->system_lock);
+
+		dev_dbg(cd->dev, "%s: irq disabled\n", __func__);
+	} else
+		mutex_unlock(&cd->system_lock);
 
 	rc = cyttsp5_core_sleep_(cd);
 
@@ -3977,8 +4078,8 @@ static int move_touch_data(struct cyttsp5_core_data *cd,
 
 	cyttsp5_get_touch_axis(cd, &num_cur_tch, tch->size,
 			tch->max, si->xy_mode + 3 + tch->ofs, tch->bofs);
-	if (unlikely(num_cur_tch > MAX_TOUCH_NUMBER))
-		num_cur_tch = MAX_TOUCH_NUMBER;
+	if (unlikely(num_cur_tch > MAX_TOUCH_ID_NUMBER))
+		num_cur_tch = MAX_TOUCH_ID_NUMBER;
 
 	length = num_cur_tch * si->desc.tch_record_size;
 
@@ -4045,22 +4146,26 @@ static int cyttsp5_parse_input(struct cyttsp5_core_data *cd)
 
 	size = get_unaligned_le16(&cd->input_buf[0]);
 
+	cyttsp5_pr_buf(cd->dev, cd->pr_buf, cd->input_buf, 2 + size,
+			"irq_read");
+
 	/* check reset */
 	if (size == 0) {
 		dev_dbg(cd->dev, "%s: Reset complete\n", __func__);
 		mutex_lock(&cd->system_lock);
-		if (!cd->hid_reset_cmd_state && !cd->hid_cmd_state) {
+		if (!cd->hid_reset_cmd_state && // set in reset() and cleared here.
+		    !cd->hid_cmd_state) {		// set when a command is issued and cleared here.
+			cd->check_postl = 1;
 			mutex_unlock(&cd->system_lock);
 			dev_dbg(cd->dev, "%s: Device Initiated Reset\n",
 					__func__);
 			return 0;
 		} else {
 			cd->hid_reset_cmd_state = 0;
-			if (cd->hid_cmd_state == HID_OUTPUT_START_BOOTLOADER + 1
-				|| cd->hid_cmd_state ==
-					HID_OUTPUT_BL_LAUNCH_APP + 1
-				|| cd->hid_cmd_state ==
-					HID_OUTPUT_USER_CMD + 1)
+			if (cd->hid_cmd_state == HID_OUTPUT_START_BOOTLOADER + 1 ||
+				cd->hid_cmd_state == HID_OUTPUT_BL_LAUNCH_APP + 1 ||
+				cd->hid_cmd_state == HID_OUTPUT_BL_LAUNCH_APP_FAST + 1 ||
+				cd->hid_cmd_state == HID_OUTPUT_USER_CMD + 1)
 				cd->hid_cmd_state = 0;
 			wake_up(&cd->wait_q);
 		}
@@ -4115,8 +4220,21 @@ static irqreturn_t cyttsp5_irq(int irq, void *handle)
 	int rc;
 
 	if (!cd->irq_enabled)
+	{
+		dev_dbg(cd->dev, "%s: irq_enabled 0\n", __func__);
 		return IRQ_HANDLED;
+	}
+	if (!cd->hw_power_state)
+	{
+		dev_dbg(cd->dev, "%s: hw_power_state 0\n", __func__);
+		return IRQ_HANDLED;
+	}
+	if (cd->cpdata->irq_stat && 
+		cd->cpdata->irq_stat(cd->cpdata, cd->dev)) {
+		dev_dbg(cd->dev, "%s: interrupt pin is high\n", __func__);
 
+		return IRQ_HANDLED;
+	}
 	rc = cyttsp5_read_input(cd);
 	if (!rc)
 		cyttsp5_parse_input(cd);
@@ -4215,38 +4333,6 @@ static int cyttsp5_reset(struct cyttsp5_core_data *cd)
 	return rc;
 }
 
-static int cyttsp5_reset_and_wait(struct cyttsp5_core_data *cd)
-{
-	int rc;
-	int t;
-
-	mutex_lock(&cd->system_lock);
-	cd->hid_reset_cmd_state = 1;
-	mutex_unlock(&cd->system_lock);
-
-	rc = cyttsp5_reset(cd);
-	if (rc < 0)
-		goto error;
-
-	t = wait_event_timeout(cd->wait_q, (cd->hid_reset_cmd_state == 0),
-			msecs_to_jiffies(CY_HID_RESET_TIMEOUT));
-	if (IS_TMO(t)) {
-		dev_err(cd->dev, "%s: reset timed out\n",
-			__func__);
-		rc = -ETIME;
-		goto error;
-	}
-
-	goto exit;
-
-error:
-	mutex_lock(&cd->system_lock);
-	cd->hid_reset_cmd_state = 0;
-	mutex_unlock(&cd->system_lock);
-exit:
-	return rc;
-}
-
 /*
  * returns err if refused or timeout(core uses fixed timeout period) occurs;
  * blocks until ISR occurs
@@ -4254,6 +4340,7 @@ exit:
 static int _cyttsp5_request_reset(struct device *dev)
 {
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
+	int t;
 	int rc;
 
 	mutex_lock(&cd->system_lock);
@@ -4261,31 +4348,72 @@ static int _cyttsp5_request_reset(struct device *dev)
 	mutex_unlock(&cd->system_lock);
 
 	rc = cyttsp5_reset(cd);
-	if (rc < 0) {
-		dev_err(cd->dev, "%s: Error on h/w reset r=%d\n",
-			__func__, rc);
-		mutex_lock(&cd->system_lock);
-		cd->hid_reset_cmd_state = 0;
-		mutex_unlock(&cd->system_lock);
+	if (rc < 0)
+		goto reset_error;
+	t = wait_event_timeout(cd->wait_q, (cd->hid_reset_cmd_state == 0),
+			msecs_to_jiffies(CY_HID_RESET_TIMEOUT));
+	if (IS_TMO(t)) {
+		dev_err(cd->dev, "%s: reset timed out\n",
+			__func__);
+		rc = -ETIME;
+		goto reset_error;
 	}
+	goto exit_reset;
 
+reset_error:
+	mutex_lock(&cd->system_lock);
+	cd->hid_reset_cmd_state = 0;
+	mutex_unlock(&cd->system_lock);
+exit_reset:
 	return rc;
 }
+
+#define CALIBRATION_RETRY 3
+#define CALIBRATION_DELAY 2000 // in ms, to avoid firmware's self calibration time.
+#define CALIBRATION_RETRY_DELAY 1000 // in ms
 
 /*
  * returns err if refused ; if no error then restart has completed
  * and system is in normal operating mode
  */
+static int cyttsp5_startup(struct cyttsp5_core_data *cd);
 static int _cyttsp5_request_restart(struct device *dev)
 {
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
+	int retry = CALIBRATION_RETRY;
+	int rc = 0;
 
-	if (!cd->sysinfo.ready)
-		return 0;
-	
-	cyttsp5_queue_startup(cd);
+	mutex_lock(&cd->system_lock);
+	cd->sysinfo.ready = false;
+	mutex_unlock(&cd->system_lock);
 
-	return 0;
+	dev_dbg(cd->dev, "%s: startup\n", __func__);
+	rc = cyttsp5_startup(cd);
+	if (rc < 0) {
+		dev_err(cd->dev, "%s: Fail startup after fw downlaod, r=%d\n",
+			__func__, rc);
+		return rc;
+	}
+
+	dev_dbg(dev, "%s: calibrate after fw upgrade\n", __func__);
+	msleep(CALIBRATION_DELAY);
+recal:
+	if (retry != CALIBRATION_RETRY) {
+		dev_dbg(cd->dev, "%s: Retry %d\n", __func__,
+			CALIBRATION_RETRY - retry);
+		msleep(CALIBRATION_RETRY_DELAY);
+	}
+
+	rc = cyttsp5_fw_calibrate(cd->dev);
+	if (rc < 0) {
+		dev_err(cd->dev, "%s: calibration fail, rc=%d\n", __func__,
+			rc);
+		if (retry--)
+			goto recal;
+		goto exit;
+	}
+exit:
+	return rc;
 }
 
 /*
@@ -4344,7 +4472,7 @@ static int cyttsp5_core_wake_device_(struct cyttsp5_core_data *cd)
 
 	return cyttsp5_core_wake_device_from_deep_sleep_(cd);
 }
-#endif
+
 static int cyttsp5_core_poweron_device_(struct cyttsp5_core_data *cd)
 {
 	struct device *dev = cd->dev;
@@ -4356,31 +4484,32 @@ static int cyttsp5_core_poweron_device_(struct cyttsp5_core_data *cd)
 		dev_err(dev, "%s: HW Power up fails r=%d\n", __func__, rc);
 		goto exit;
 	}
-	cyttsp5_queue_startup(cd);/* calling this causes kernel reboot */
+	cd->hw_power_state = true;
+	cyttsp5_queue_startup(cd);
 exit:
 	return rc;
 }
+#endif
 
 static int cyttsp5_core_wake_(struct cyttsp5_core_data *cd)
 {
-	int rc;
+	int rc = 0;
 #if CYTTSP5_USE_SLEEP
 	if (cd->cpdata->flags & CY_FLAG_CORE_POWEROFF_ON_SLEEP)
 		rc = cyttsp5_core_poweron_device_(cd);
 	else
 		rc = cyttsp5_core_wake_device_(cd);
-#else
-	rc = cyttsp5_core_poweron_device_(cd);
 #endif
+
 	mutex_lock(&cd->system_lock);
 	cd->sleep_state = SS_SLEEP_OFF;
 	mutex_unlock(&cd->system_lock);
 
-	cyttsp5_start_wd_timer(cd);
 	return rc;
 }
 
-static int cyttsp5_core_wake(struct cyttsp5_core_data *cd)
+static int cyttsp5_core_wake(struct cyttsp5_core_data *cd,
+	bool _enable_irq)
 {
 	int rc;
 
@@ -4392,11 +4521,21 @@ static int cyttsp5_core_wake(struct cyttsp5_core_data *cd)
 	}
 
 	rc = cyttsp5_core_wake_(cd);
+	if (_enable_irq && !cd->irq_enabled) {
+		cd->irq_enabled = true;
+		enable_irq(cd->irq);
+		dev_dbg(cd->dev, "%s: irq enabled\n", __func__);
+	}
 
 	if (release_exclusive(cd, cd->dev) < 0)
 		dev_err(cd->dev, "%s: fail to release exclusive\n", __func__);
 	else
 		dev_vdbg(cd->dev, "%s: pass release exclusive\n", __func__);
+
+	rc = cyttsp5_startup(cd);
+	if (rc < 0)
+		dev_err(cd->dev, "%s: Fail startup r=%d\n",
+			__func__, rc);
 
 	return rc;
 }
@@ -4408,6 +4547,8 @@ static int cyttsp5_get_ic_crc_(struct cyttsp5_core_data *cd, u8 ebid)
 	u8 status;
 	u16 calculated_crc = 0;
 	u16 stored_crc = 0;
+
+	dev_vdbg(cd->dev, "%s: \n", __func__);
 
 	rc = cyttsp5_hid_output_suspend_scanning_(cd);
 	if (rc)
@@ -4476,7 +4617,7 @@ error:
 }
 #endif
 
-
+#if CYTTSP5_USE_SLEEP
 static int cyttsp4_check_and_deassert_int(struct cyttsp5_core_data *cd)
 {
 	u16 size;
@@ -4506,25 +4647,61 @@ static int cyttsp4_check_and_deassert_int(struct cyttsp5_core_data *cd)
 
 	return -EINVAL;
 }
+#endif
 
 static int cyttsp5_startup_(struct cyttsp5_core_data *cd)
 {
 	int rc;
-
+	int t;
+	int retry;
 #ifdef TTHE_TUNER_SUPPORT
 	tthe_print(cd, NULL, 0, "enter startup");
 #endif
 
 	cyttsp5_stop_wd_timer(cd);
+	retry = CY_CORE_STARTUP_RETRY_COUNT;
+reset:
+	if (retry != CY_CORE_STARTUP_RETRY_COUNT)
+		dev_dbg(cd->dev, "%s: Retry %d\n", __func__,
+			CY_CORE_STARTUP_RETRY_COUNT - retry);
 
+#if CYTTSP5_USE_SLEEP
 	rc = cyttsp4_check_and_deassert_int(cd);
+#endif
 
-	/* reset hardware */
-	rc = cyttsp5_reset_and_wait(cd);
-	if (rc < 0)
-		dev_err(cd->dev, "%s: Error on h/w reset r=%d\n",
-				__func__, rc);
-	msleep(200);
+	mutex_lock(&cd->system_lock);
+	cd->hid_reset_cmd_state = 1;
+	mutex_unlock(&cd->system_lock);
+
+	if (cd->hw_power_state == true) {
+		rc = cyttsp5_reset(cd);
+		if (rc < 0)
+			goto reset_error;
+	} else {
+		dev_dbg(cd->dev, "%s: hw power on now\n", __func__);
+#if defined(CONFIG_SEC_ATLANTIC_PROJECT)
+		cd->hw_power_state = true;
+#endif
+		rc = cd->cpdata->power(cd->cpdata, 1, cd->dev, 0);
+#if !defined(CONFIG_SEC_ATLANTIC_PROJECT)
+		cd->hw_power_state = true;
+#endif
+	}
+	t = wait_event_timeout(cd->wait_q, (cd->hid_reset_cmd_state == 0),
+			msecs_to_jiffies(CY_HID_RESET_TIMEOUT));
+	if (IS_TMO(t)) {
+			dev_err(cd->dev, "%s: reset timed out\n",
+			__func__);
+		rc = -ETIME;
+		goto reset_error;
+	}
+	goto exit_reset;
+
+reset_error:
+	mutex_lock(&cd->system_lock);
+	cd->hid_reset_cmd_state = 0;
+	mutex_unlock(&cd->system_lock);
+exit_reset:
 
 	rc = cyttsp5_get_hid_descriptor_(cd, &cd->hid_desc);
 	if (rc < 0) {
@@ -4536,7 +4713,14 @@ static int cyttsp5_startup_(struct cyttsp5_core_data *cd)
 
 	if (cd->mode == CY_MODE_BOOTLOADER) {
 		dev_info(cd->dev, "%s: Bootloader mode\n", __func__);
-		rc = cyttsp5_hid_output_bl_launch_app_(cd);
+
+		if (cd->sysinfo.ready) {
+			dev_dbg(cd->dev, "%s: launch app fast\n", __func__);
+			rc = cyttsp5_hid_output_bl_launch_app_fast_(cd);
+		} else {
+			dev_dbg(cd->dev, "%s: launch app normal\n", __func__);
+			rc = cyttsp5_hid_output_bl_launch_app_(cd);
+		}
 		if (rc < 0) {
 			dev_err(cd->dev, "%s: Error on launch app r=%d\n",
 				__func__, rc);
@@ -4584,35 +4768,46 @@ static int cyttsp5_startup_(struct cyttsp5_core_data *cd)
 		goto exit;
 	}
 
-	rc = cyttsp5_hid_output_get_sysinfo_(cd);
-	if (rc) {
-		dev_err(cd->dev, "%s: Error on getting sysinfo r=%d\n",
-			__func__, rc);
-		goto exit;
-	}
-
-	rc = cyttsp5_get_config_ver_(cd);
-	if (rc)
-		dev_err(cd->dev, "%s: failed to read config version rc=%d\n",
-			__func__, rc);
-
-	rc = cyttsp5_get_ic_crc_(cd, CY_TCH_PARM_EBID);
-	if (rc)
-		dev_err(cd->dev, "%s: failed to crc data rc=%d\n",
-			__func__, rc);
+	if (!cd->sysinfo.ready || cd->check_postl) {
+		cd->check_postl = 0;
+		rc = cyttsp5_hid_output_get_sysinfo_(cd);
+		if (rc) {
+			dev_err(cd->dev, "%s: Error on getting sysinfo r=%d\n",
+				__func__, rc);
+			goto exit;
+		}
 
 #ifdef SAMSUNG_TSP_INFO
-	rc = cyttsp5_si_get_samsung_tsp_info_(cd);
-	if (rc)
-		dev_err(cd->dev, "%s: failed to get samsung tsp info rc=%d\n",
-			__func__, rc);
+		rc = cyttsp5_si_get_samsung_tsp_info_(cd);
+		if (rc)
+			dev_err(cd->dev, "%s: failed to get samsung tsp info rc=%d\n",
+				__func__, rc);
 #endif
+
+		rc = cyttsp5_get_config_ver_(cd);
+		if (rc)
+			dev_err(cd->dev, "%s: failed to read config version rc=%d\n",
+				__func__, rc);
+
+		rc = cyttsp5_get_ic_crc_(cd, CY_TCH_PARM_EBID);
+		if (rc)
+			dev_err(cd->dev, "%s: failed to crc data rc=%d\n",
+				__func__, rc);
+	} else {
+		dev_dbg(cd->dev, "%s: bypass getting sysinfo\n", __func__);
+		//msleep(100);
+	}
 
 	/* attention startup */
 	call_atten_cb(cd, CY_ATTEN_STARTUP, 0);
 
 exit:
-	cyttsp5_start_wd_timer(cd);
+	if (rc && retry) {
+		retry--;
+		goto reset;
+	}
+	if (cd->probe_done)
+		cyttsp5_start_wd_timer(cd);
 
 #ifdef TTHE_TUNER_SUPPORT
 	tthe_print(cd, NULL, 0, "exit startup");
@@ -4621,6 +4816,7 @@ exit:
 	return rc;
 }
 
+int cyttsp5_samsung_factory_startup_attention(struct device *dev);
 static int cyttsp5_startup(struct cyttsp5_core_data *cd)
 {
 	int rc;
@@ -4637,6 +4833,7 @@ static int cyttsp5_startup(struct cyttsp5_core_data *cd)
 	}
 
 	rc = cyttsp5_startup_(cd);
+	cyttsp5_samsung_factory_startup_attention(cd->dev);
 
 	if (release_exclusive(cd, cd->dev) < 0)
 		/* Don't return fail code, mode is already changed. */
@@ -4649,6 +4846,7 @@ exit:
 	cd->startup_state = STARTUP_NONE;
 	mutex_unlock(&cd->system_lock);
 
+	dev_dbg(cd->dev, "%s: done, rc=%d\n", __func__, rc);
 	return rc;
 }
 
@@ -4672,7 +4870,7 @@ static int cyttsp5_core_rt_suspend(struct device *dev)
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
 	int rc;
 
-	rc = cyttsp5_core_sleep(cd);
+	rc = cyttsp5_core_sleep(cd, 0);
 	if (rc < 0) {
 		dev_err(dev, "%s: Error on sleep\n", __func__);
 		return -EAGAIN;
@@ -4685,7 +4883,7 @@ static int cyttsp5_core_rt_resume(struct device *dev)
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
 	int rc;
 
-	rc = cyttsp5_core_wake(cd);
+	rc = cyttsp5_core_wake(cd, 0);
 	if (rc < 0) {
 		dev_err(dev, "%s: Error on wake\n", __func__);
 		return -EAGAIN;
@@ -4699,71 +4897,28 @@ static int cyttsp5_core_rt_resume(struct device *dev)
 int cyttsp5_core_suspend(struct device *dev)
 {
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
+
 	dev_dbg(dev, "%s\n", __func__);
 
-	if (cd->irq_enabled) {
-		cd->irq_enabled = false;
-		disable_irq_nosync(cd->irq);
-	}
+	cyttsp5_core_sleep(cd, 1);
 
-	cyttsp5_core_sleep(cd);
-
-	if (!(cd->cpdata->flags & CY_CORE_FLAG_WAKE_ON_GESTURE))
-		return 0;
-
-	/*
-	 * This will not prevent resume
-	 * Required to prevent interrupts before i2c awake
-	 */
-	disable_irq(cd->irq);
-	cd->irq_disabled = 1;
-
-	if (device_may_wakeup(dev)) {
-		dev_dbg(dev, "%s Device MAY wakeup\n", __func__);
-		if (!enable_irq_wake(cd->irq))
-			cd->irq_wake = 1;
-	} else {
-		dev_dbg(dev, "%s Device NOT wakeup\n", __func__);
-	}
-
+	dev_dbg(dev, "%s: done\n", __func__);
 	return 0;
 }
 
 int cyttsp5_core_resume(struct device *dev)
 {
 	struct cyttsp5_core_data *cd = dev_get_drvdata(dev);
+
 	dev_dbg(dev, "%s\n", __func__);
-
-	if (!(cd->cpdata->flags & CY_CORE_FLAG_WAKE_ON_GESTURE))
-		goto exit;
-
-	/*
-	 * I2C bus pm does not call suspend if device runtime suspended
-	 * This flag is cover that case
-	 */
-	if (cd->irq_disabled) {
-		enable_irq(cd->irq);
-		cd->irq_disabled = 0;
+	if (!cd->probe_done) {
+		dev_dbg(dev, "%s probe is not done\n", __func__);
+		return 0;
 	}
 
-	if (device_may_wakeup(dev)) {
-		dev_dbg(dev, "%s Device MAY wakeup\n", __func__);
-		if (cd->irq_wake) {
-			disable_irq_wake(cd->irq);
-			cd->irq_wake = 0;
-		}
-	} else {
-		dev_dbg(dev, "%s Device NOT wakeup\n", __func__);
-	}
+	cyttsp5_core_wake(cd, 1);
 
-exit:
-	cyttsp5_core_wake(cd);
-
-	if (!cd->irq_enabled) {
-		cd->irq_enabled = true;
-		enable_irq(cd->irq);
-	}
-
+	dev_dbg(dev, "%s: done\n", __func__);
 	return 0;
 }
 #else
@@ -4772,7 +4927,9 @@ exit:
 #endif
 
 const struct dev_pm_ops cyttsp5_pm_ops = {
+#if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)
 	SET_SYSTEM_SLEEP_PM_OPS(cyttsp5_core_suspend, cyttsp5_core_resume)
+#endif	
 	SET_RUNTIME_PM_OPS(cyttsp5_core_rt_suspend, cyttsp5_core_rt_resume,
 			NULL)
 };
@@ -4950,9 +5107,29 @@ static ssize_t cyttsp5_drv_debug_store(struct device *dev,
 	}
 
 	switch (value) {
+	case 2:
+		dev_info(dev, "%s: SUSPEND (cd=%p)\n", __func__, cd);
+		rc = cyttsp5_core_suspend(cd->dev);
+		if (rc)
+			dev_err(dev, "%s: Suspend failed rc=%d\n",
+				__func__, rc);
+		else
+			dev_info(dev, "%s: Suspend succeeded\n", __func__);
+		break;
+
+	case 3:
+		dev_info(dev, "%s: RESUME (cd=%p)\n", __func__, cd);
+		rc = cyttsp5_core_resume(cd->dev);
+		if (rc)
+			dev_err(dev, "%s: Resume failed rc=%d\n",
+				__func__, rc);
+		else
+			dev_info(dev, "%s: Resume succeeded\n", __func__);
+		break;
+
 	case CY_DBG_SUSPEND:
 		dev_info(dev, "%s: SUSPEND (cd=%p)\n", __func__, cd);
-		rc = cyttsp5_core_sleep(cd);
+		rc = cyttsp5_core_sleep(cd, 0);
 		if (rc)
 			dev_err(dev, "%s: Suspend failed rc=%d\n",
 				__func__, rc);
@@ -4962,7 +5139,7 @@ static ssize_t cyttsp5_drv_debug_store(struct device *dev,
 
 	case CY_DBG_RESUME:
 		dev_info(dev, "%s: RESUME (cd=%p)\n", __func__, cd);
-		rc = cyttsp5_core_wake(cd);
+		rc = cyttsp5_core_wake(cd, 0);
 		if (rc)
 			dev_err(dev, "%s: Resume failed rc=%d\n",
 				__func__, rc);
@@ -5334,7 +5511,6 @@ int cyttsp5_probe(const struct cyttsp5_bus_ops *ops, struct device *dev,
 	enum cyttsp5_atten_type type;
 	unsigned long irq_flags;
 	int rc = 0;
-
 	if (!pdata || !pdata->core_pdata || !pdata->mt_pdata) {
 		dev_err(dev, "%s: Missing platform data\n", __func__);
 		rc = -ENODEV;
@@ -5396,6 +5572,7 @@ int cyttsp5_probe(const struct cyttsp5_bus_ops *ops, struct device *dev,
 	if (cd->cpdata->init) {
 		dev_dbg(cd->dev, "%s: Init HW\n", __func__);
 		rc = cd->cpdata->init(cd->cpdata, 1, cd->dev);
+		cd->hw_power_state = true;
 	} else {
 		dev_info(cd->dev, "%s: No HW INIT function\n", __func__);
 		rc = 0;
@@ -5446,27 +5623,14 @@ int cyttsp5_probe(const struct cyttsp5_bus_ops *ops, struct device *dev,
 	if (rc < 0) {
 		dev_err(cd->dev, "%s: Fail initial startup r=%d\n",
 			__func__, rc);
-		//goto error_start_up;
 	}
 
-	rc = cyttsp5_loader_probe(dev); // before other probe for corrupted f/w
+	rc = cyttsp5_loader_probe(dev); /* before other probe for corrupted fw */
 	if (rc < 0) {
 		dev_err(dev, "%s: Error, fail loader probe\n", __func__);
 		goto error_startup_loader;
 	}
 
-	if (!cd->sysinfo.ready) // previous startup() didn't get si because f/w corrupted
-	{
-		dev_dbg(dev, "%s: call startup again\n", __func__);
-		rc = cyttsp5_startup(cd);
-		if (rc < 0) {
-			dev_err(cd->dev, "%s: Fail 2nd startup r=%d\n",
-				__func__, rc);
-			cyttsp5_loader_release(dev);
-			goto error_start_up;
-		}
-	}
-	
 	rc = cyttsp5_mt_probe(dev);
 	if (rc < 0) {
 		dev_err(dev, "%s: Error, fail mt probe\n", __func__);
@@ -5502,7 +5666,10 @@ int cyttsp5_probe(const struct cyttsp5_bus_ops *ops, struct device *dev,
 		dev_err(dev, "%s: Error, fail debug probe\n", __func__);
 		goto error_startup_debug;
 	}
+	cd->probe_done = 1;
+	cyttsp5_start_wd_timer(cd);
 
+	dev_err(dev, "%s: success\n", __func__);
 	return 0;
 
 error_startup_debug:
@@ -5521,7 +5688,6 @@ error_startup_loader:
 	cancel_work_sync(&cd->startup_work);
 	cyttsp5_stop_wd_timer(cd);
 	cyttsp5_free_si_ptrs(cd);
-error_start_up:
 	remove_sysfs_interfaces(dev);
 error_attr_create:
 	del_timer(&cd->watchdog_timer);

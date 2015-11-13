@@ -31,11 +31,14 @@
 #include "ist30xx_update.h"
 #include "ist30xx_misc.h"
 
-static char IsfwUpdate[20] = { 0 };
-
 #define FW_DOWNLOADING "Downloading"
 #define FW_DOWNLOAD_COMPLETE "Complete"
 #define FW_DOWNLOAD_FAIL "FAIL"
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+#define FW_RELEASE_DATE "0528"
+#elif defined(CONFIG_SEC_KANAS_PROJECT)
+#define FW_RELEASE_DATE "0526"
+#endif
 
 #define FACTORY_BUF_SIZE    (1024)
 #define BUILT_IN            (0)
@@ -76,18 +79,18 @@ get_fw_ver_start:
 
 	ist30xx_disable_irq(data);
 	ret = ist30xx_cmd_reg(data->client, CMD_ENTER_REG_ACCESS);
-	if (ret) goto get_fw_ver_fail;
+	if (unlikely(ret)) goto get_fw_ver_fail;
 
 	ret = ist30xx_write_cmd(data->client, IST30XX_RX_CNT_ADDR, len);
-	if (ret) goto get_fw_ver_fail;
+	if (unlikely(ret)) goto get_fw_ver_fail;
 
 	ret = ist30xx_read_cmd(data->client, addr, &ver);
-	if (ret) goto get_fw_ver_fail;
+	if (unlikely(ret)) goto get_fw_ver_fail;
 
-	tsp_debug("Reg addr: %x, ver: %x\n", addr, ver);
+	tsp_debug("%s: Reg addr: %x, ver: %x\n", __func__, addr, ver);
 
 	ret = ist30xx_cmd_reg(data->client, CMD_EXIT_REG_ACCESS);
-	if (ret == 0)
+	if (likely(ret == 0))
 		goto get_fw_ver_end;
 
 get_fw_ver_fail:
@@ -109,14 +112,16 @@ int ist30xxb_get_key_sensitivity(struct ist30xx_data *data, int id)
 	u32 addr = IST30XXB_MEM_COUNT + 4 * sizeof(u32);
 	u32 val = 0;
 
-	if (id >= ist30xx_tkey_info.key_num)
+	if (unlikely(id >= ist30xx_tkey_info.key_num))
 		return 0;
 
+	if (ist30xx_intr_wait(30) < 0) return 0;
+
 	ist30xx_disable_irq(data);
-	ist30xx_read_cmd(ts_data->client, addr, &val);
+	ist30xx_read_cmd(data->client, addr, &val);
 	ist30xx_enable_irq(data);
 
-	tsp_debug("Reg addr: %x, val: %8x\n", addr, val);
+	tsp_debug("%s: Reg addr: %x, val: %8x\n", __func__, addr, val);
 
 	val >>= (16 * id);
 
@@ -148,12 +153,17 @@ static void not_support_cmd(void *dev_data)
 
 	set_default_result(sec);
 	snprintf(buf, sizeof(buf), "%s", "NA");
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_NA;
-	dev_info(&data->client->dev, "%s: \"%s(%d)\"\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
+
+	mutex_lock(&sec->cmd_lock);
+	sec->cmd_is_running = false;
+	mutex_unlock(&sec->cmd_lock);
+
+	sec->cmd_state = CMD_STATE_WAITING;
 	return;
 }
 
@@ -166,12 +176,11 @@ static void get_chip_vendor(void *dev_data)
 
 	set_default_result(sec);
 	snprintf(buf, sizeof(buf), "%s", TSP_CHIP_VENDOR);
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_chip_name(void *dev_data)
@@ -183,12 +192,11 @@ static void get_chip_name(void *dev_data)
 
 	set_default_result(sec);
 	snprintf(buf, sizeof(buf), "%s", TSP_CHIP_NAME);
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_chip_id(void *dev_data)
@@ -200,12 +208,11 @@ static void get_chip_id(void *dev_data)
 
 	set_default_result(sec);
 	snprintf(buf, sizeof(buf), "%#02x", data->chip_id);
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 extern const u8 *ts_fw;
@@ -267,7 +274,8 @@ static int read_data_from_file(unsigned char *fw_data)
 	pos = 0;
 	ret = vfs_read(filp, (char __user *)file_data, file_size, &pos);
 	if (ret != file_size) {
-		tsp_err("tsp fw. : failed to read file (ret = %d)\n", ret);
+		tsp_err("%s: tsp fw. : failed to read file (ret = %d)\n",
+			__func__, ret);
 		kfree(file_data);
 		filp_close(filp, current->files);
 		return -1;
@@ -296,7 +304,7 @@ static void fw_update(void *dev_data)
 	tsp_info("%s(), %d\n", __func__, sec->cmd_param[0]);
 
 	if(data->status.power == 0) {
-		tsp_warn("power off, fw_update stop, line %d\n", __LINE__);
+		tsp_warn("%s: power off, fw_update stop, line %d\n", __func__, __LINE__);
 		sec->cmd_state = CMD_STATE_FAIL;
 		goto set_fw_update_result;
 	}
@@ -316,7 +324,7 @@ static void fw_update(void *dev_data)
 
 		ret = read_data_from_file(fw_data);
 		if(ret < 0){
-			tsp_warn("read fw file error!");
+			tsp_warn("%s: read fw file error!", __func__);
 			sec->cmd_state = CMD_STATE_FAIL;
 			kfree(fw_data);
 			goto set_fw_update_result;
@@ -359,12 +367,11 @@ static void get_fw_ver_bin(void *dev_data)
 
 	ver = ist30xx_parse_ver(FLAG_PARAM, data->fw.buf);
 	snprintf(buf, sizeof(buf), "IM00%04x", ver);
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_fw_ver_ic(void *dev_data)
@@ -385,8 +392,8 @@ static void get_fw_ver_ic(void *dev_data)
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_config_ver(void *dev_data)
@@ -398,31 +405,48 @@ static void get_config_ver(void *dev_data)
 
 	set_default_result(sec);
 
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+	snprintf(buff, sizeof(buff), "%s_%s", "SM-G3559_IM", FW_RELEASE_DATE);
+#elif defined(CONFIG_MACH_KANAS3G_CMCC)
+	snprintf(buff, sizeof(buff), "%s_%s", "SM-G3558_IM", FW_RELEASE_DATE);
+#elif defined(CONFIG_MACH_KANAS3G_CU)
+	snprintf(buff, sizeof(buff), "%s_%s", "SM-G3556D_IM", FW_RELEASE_DATE);
+#else
 	snprintf(buff, sizeof(buff), "%s_%s", TSP_CHIP_VENDOR, TSP_CHIP_NAME);
+#endif
 
 	set_cmd_result(sec, buff, strnlen(buff, sizeof(buff)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-			buff, strnlen(buff, sizeof(buff)));
+	tsp_info("%s(): %s(%d)\n", __func__, buff,
+		strnlen(buff, sizeof(buff)));
 }
 
 static void get_threshold(void *dev_data)
 {
 	char buf[16] = { 0 };
 	int val = TSP_THRESHOLD;
+#if defined(CONFIG_SEC_KANAS_PROJECT)
+	u32 *cfg_buf;
+#endif
 
 	struct ist30xx_data *data = (struct ist30xx_data *)dev_data;
 	struct sec_factory *sec = (struct sec_factory *)&data->sec;
 
 	set_default_result(sec);
 
+#if defined(CONFIG_SEC_KANAS_PROJECT)
+	ist30xx_get_update_info(data, data->fw.buf, data->fw.buf_size);
+	cfg_buf = (u32 *)&data->fw.buf[data->tags.cfg_addr];
+
+	val = (int)(cfg_buf[0x108 / IST30XX_DATA_LEN] >> 16);
+#endif
+
 	snprintf(buf, sizeof(buf), "%d", val);
-	tsp_info("%s(), %s\n", __func__, buf);
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
 	sec->cmd_state = CMD_STATE_OK;
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__,
-		 buf, strnlen(buf, sizeof(buf)));
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_x_num(void *dev_data)
@@ -438,16 +462,14 @@ static void get_x_num(void *dev_data)
 	if (val >= 0) {
 		snprintf(buf, sizeof(buf), "%u", val);
 		sec->cmd_state = CMD_STATE_OK;
-		dev_info(&data->client->dev, "%s: %s(%d)\n", __func__, buf,
-			 strnlen(buf, sizeof(buf)));
 	} else {
 		snprintf(buf, sizeof(buf), "%s", "NG");
 		sec->cmd_state = CMD_STATE_FAIL;
-		dev_info(&data->client->dev,
-			 "%s: fail to read num of x (%d).\n", __func__, val);
+		tsp_err("%s: fail to read num of x (%d).\n", __func__, val);
 	}
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
-	tsp_info("%s(), %s\n", __func__, buf);
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 static void get_y_num(void *dev_data)
@@ -463,16 +485,14 @@ static void get_y_num(void *dev_data)
 	if (val >= 0) {
 		snprintf(buf, sizeof(buf), "%u", val);
 		sec->cmd_state = CMD_STATE_OK;
-		dev_info(&data->client->dev, "%s: %s(%d)\n", __func__, buf,
-			 strnlen(buf, sizeof(buf)));
 	} else {
 		snprintf(buf, sizeof(buf), "%s", "NG");
 		sec->cmd_state = CMD_STATE_FAIL;
-		dev_info(&data->client->dev,
-			 "%s: fail to read num of x (%d).\n", __func__, val);
+		tsp_err("%s: fail to read num of x (%d).\n", __func__, val);
 	}
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
-	tsp_info("%s(), %s\n", __func__, buf);
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
+		 strnlen(buf, sizeof(buf)));
 }
 
 int check_tsp_channel(void *dev_data)
@@ -485,11 +505,11 @@ int check_tsp_channel(void *dev_data)
 
 	if ((sec->cmd_param[0] < 0) || (sec->cmd_param[0] >= tsp->width) ||
 	    (sec->cmd_param[1] < 0) || (sec->cmd_param[1] >= tsp->height)) {
-		dev_info(&data->client->dev, "%s: parameter error: %u,%u\n",
+		tsp_info("%s: parameter error: %u,%u\n",
 			 __func__, sec->cmd_param[0], sec->cmd_param[1]);
 	} else {
 		node = sec->cmd_param[0] + sec->cmd_param[1] * tsp->width;
-		dev_info(&data->client->dev, "%s: node = %d\n", __func__, node);
+		tsp_info("%s: node = %d\n", __func__, node);
 	}
 
 	return node;
@@ -537,12 +557,12 @@ void run_raw_read(void *dev_data)
 		max_val = max(max_val, (int)node_value[i]);
 		min_val = min(min_val, (int)node_value[i]);
 	}
+	printk("\n");
 
 	snprintf(buf, sizeof(buf), "%d,%d", min_val, max_val);
-	tsp_info("%s(), %s\n", __func__, buf);
 	sec->cmd_state = CMD_STATE_OK;
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__, buf,
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
 		 strnlen(buf, sizeof(buf)));
 }
 
@@ -566,9 +586,7 @@ void get_raw_value(void *dev_data)
 	}
 
 	set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
-	tsp_info("%s(), [%d][%d]: %s\n", __func__,
-		 sec->cmd_param[0], sec->cmd_param[1], buf);
-	dev_info(&data->client->dev, "%s: %s(%d)\n", __func__, buf,
+	tsp_info("%s(): %s(%d)\n", __func__, buf,
 		 strnlen(buf, sizeof(buf)));
 }
 
@@ -587,7 +605,6 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute
 {
 	struct ist30xx_data *data = dev_get_drvdata(dev);
 	struct sec_factory *sec = (struct sec_factory *)&data->sec;
-	struct i2c_client *client = data->client;
 
 	char *cur, *start, *end;
 	char msg[SEC_CMD_STR_LEN] = { 0 };
@@ -599,8 +616,7 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute
 	int ret;
 
 	if (sec->cmd_is_running == true) {
-		dev_err(&client->dev, "tsp_cmd: other cmd is running.\n");
-		tsp_err("tsp_cmd: other cmd is running.\n");
+		tsp_err("%s: tsp_cmd: other cmd is running.\n", __func__);
 		goto err_out;
 	}
 
@@ -660,11 +676,10 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute
 			cur++;
 		} while (cur - buf <= len);
 	}
-	dev_info(&client->dev, "cmd = %s\n", tsp_cmd_ptr->cmd_name);
-	tsp_info("SEC CMD = %s\n", tsp_cmd_ptr->cmd_name);
+	tsp_info("tsp cmd: %s\n", buf);
 
 	for (i = 0; i < param_cnt; i++)
-		dev_info(&client->dev, "cmd param %d= %d\n", i, sec->cmd_param[i]);
+		tsp_info("tsp cmd param %d= %d\n", i, sec->cmd_param[i]);
 
 	tsp_cmd_ptr->cmd_func(data);
 
@@ -680,7 +695,7 @@ static ssize_t show_cmd_status(struct device *dev,
 	struct sec_factory *sec = (struct sec_factory *)&data->sec;
 	char msg[16] = { 0 };
 
-	dev_info(&data->client->dev, "tsp cmd: status:%d\n", sec->cmd_state);
+	tsp_info("tsp cmd: status:%d\n", sec->cmd_state);
 
 	if (sec->cmd_state == CMD_STATE_WAITING)
 		snprintf(msg, sizeof(msg), "WAITING");
@@ -707,7 +722,7 @@ static ssize_t show_cmd_result(struct device *dev, struct device_attribute
 	struct ist30xx_data *data = dev_get_drvdata(dev);
 	struct sec_factory *sec = (struct sec_factory *)&data->sec;
 
-	dev_info(&data->client->dev, "tsp cmd: result: %s\n", sec->cmd_result);
+	tsp_info("tsp cmd: result: %s\n", sec->cmd_result);
 
 	mutex_lock(&sec->cmd_lock);
 	sec->cmd_is_running = false;
@@ -719,69 +734,8 @@ static ssize_t show_cmd_result(struct device *dev, struct device_attribute
 }
 
 
-
-/* sysfs: /sys/class/sec/tsp/sec_touchscreen/tsp_firm_version_phone */
-static ssize_t phone_firmware_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	u32 ver = ist30xx_parse_ver(FLAG_PARAM, ts_data->fw.buf);
-
-	tsp_info("%s(), IM00%04x\n", __func__, ver);
-
-	return sprintf(buf, "IM00%04x", ver);
-}
-
-/* sysfs: /sys/class/sec/tsp/sec_touchscreen/tsp_firm_version_panel */
-static ssize_t part_firmware_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	u32 ver = 0;
-
-	if (ts_data->status.power == 1)
-		ver = ist30xxb_get_fw_ver(ts_data);
-
-	tsp_info("%s(), IM00%04x\n", __func__, ver);
-
-	return sprintf(buf, "IM00%04x", ver);
-}
-
-/* sysfs: /sys/class/sec/tsp/sec_touchscreen/tsp_threshold */
-static ssize_t threshold_firmware_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	int val = TSP_THRESHOLD;
-
-	tsp_info("%s(), %d\n", __func__, val);
-
-	return sprintf(buf, "%d", val);
-}
-
-/* sysfs: /sys/class/sec/tsp/sec_touchscreen/tsp_firm_update */
-static ssize_t firmware_update(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	bool ret;
-
-	sprintf(IsfwUpdate, "%s\n", FW_DOWNLOADING);
-	tsp_info("%s(), %s\n", __func__, IsfwUpdate);
-
-	ret = ist30xx_fw_recovery(ts_data);
-	ret = (ret == 0 ? 1 : -1);
-
-	sprintf(IsfwUpdate, "%s\n",
-		(ret > 0 ? FW_DOWNLOAD_COMPLETE : FW_DOWNLOAD_FAIL));
-	tsp_info("%s(), %s\n", __func__, IsfwUpdate);
-
-	return sprintf(buf, "%d", ret);
-}
-
-/* sysfs: /sys/class/sec/tsp/sec_touchscreen/tsp_firm_update_status */
-static ssize_t firmware_update_status(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	tsp_info("%s(), %s\n", __func__, IsfwUpdate);
-
-	return sprintf(buf, "%s\n", IsfwUpdate);
-}
-
-
-/* sysfs: /sys/class/sec/tsp/sec_touchkey/touchkey_menu */
-static ssize_t menu_sensitivity_show(struct device *dev, struct device_attribute *attr, char *buf)
+/* sysfs: /sys/class/sec/sec_touchkey/touchkey_recent */
+static ssize_t recent_sensitivity_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int sensitivity = ist30xxb_get_key_sensitivity(ts_data, 0);
 
@@ -804,6 +758,14 @@ static ssize_t back_sensitivity_show(struct device *dev, struct device_attribute
 static ssize_t touchkey_threshold_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	int val = TKEY_THRESHOLD;
+#if defined(CONFIG_SEC_KANAS_PROJECT)
+	u32 *cfg_buf;
+
+	ist30xx_get_update_info(ts_data, ts_data->fw.buf, ts_data->fw.buf_size);
+	cfg_buf = (u32 *)&ts_data->fw.buf[ts_data->tags.cfg_addr];
+
+	val = (int)(cfg_buf[0x134 / IST30XX_DATA_LEN] >> 16);
+#endif
 
 	tsp_info("%s(), %d\n", __func__, val);
 
@@ -832,21 +794,10 @@ struct tsp_cmd tsp_cmds[] = {
 
 
 #define SEC_DEFAULT_ATTR    (S_IRUGO | S_IWUSR | S_IWOTH | S_IXOTH)
-/* sysfs - touchscreen */
-static DEVICE_ATTR(tsp_firm_version_phone, S_IRUGO,
-		   phone_firmware_show, NULL);
-static DEVICE_ATTR(tsp_firm_version_panel, S_IRUGO,
-		   part_firmware_show, NULL);
-static DEVICE_ATTR(tsp_threshold, S_IRUGO,
-		   threshold_firmware_show, NULL);
-static DEVICE_ATTR(tsp_firm_update, S_IRUGO,
-		   firmware_update, NULL);
-static DEVICE_ATTR(tsp_firm_update_status, S_IRUGO,
-		   firmware_update_status, NULL);
 
 /* sysfs - touchkey */
-static DEVICE_ATTR(touchkey_menu, S_IRUGO,
-		   menu_sensitivity_show, NULL);
+static DEVICE_ATTR(touchkey_recent, S_IRUGO,
+		   recent_sensitivity_show, NULL);
 static DEVICE_ATTR(touchkey_back, S_IRUGO,
 		   back_sensitivity_show, NULL);
 static DEVICE_ATTR(touchkey_threshold, S_IRUGO,
@@ -858,17 +809,9 @@ static DEVICE_ATTR(cmd, S_IWUSR | S_IWGRP, NULL, store_cmd);
 static DEVICE_ATTR(cmd_status, S_IRUGO, show_cmd_status, NULL);
 static DEVICE_ATTR(cmd_result, S_IRUGO, show_cmd_result, NULL);
 
-static struct attribute *sec_tsp_attributes[] = {
-	&dev_attr_tsp_firm_version_phone.attr,
-	&dev_attr_tsp_firm_version_panel.attr,
-	&dev_attr_tsp_threshold.attr,
-	&dev_attr_tsp_firm_update.attr,
-	&dev_attr_tsp_firm_update_status.attr,
-	NULL,
-};
 
 static struct attribute *sec_tkey_attributes[] = {
-	&dev_attr_touchkey_menu.attr,
+	&dev_attr_touchkey_recent.attr,
 	&dev_attr_touchkey_back.attr,
 	&dev_attr_touchkey_threshold.attr,
 	NULL,
@@ -882,10 +825,6 @@ static struct attribute *sec_touch_facotry_attributes[] = {
 	NULL,
 };
 
-static struct attribute_group sec_tsp_attr_group = {
-	.attrs	= sec_tsp_attributes,
-};
-
 static struct attribute_group sec_tkey_attr_group = {
 	.attrs	= sec_tkey_attributes,
 };
@@ -894,8 +833,6 @@ static struct attribute_group sec_touch_factory_attr_group = {
 	.attrs	= sec_touch_facotry_attributes,
 };
 
-struct device *sec_touchscreen;
-EXPORT_SYMBOL(sec_touchscreen);
 struct device *sec_touchkey;
 EXPORT_SYMBOL(sec_touchkey);
 struct device *sec_fac_dev;
@@ -904,36 +841,27 @@ extern struct class *sec_class;
 int sec_touch_sysfs(struct ist30xx_data *data)
 {
 
-	printk("[TSP] %s\n", __func__);
-	/* /sys/class/sec/sec_touchscreen */
-	sec_touchscreen = device_create(sec_class, NULL, 0, NULL, "sec_touchscreen");
-	if (IS_ERR(sec_touchscreen)) {
-		tsp_err("Failed to create device (%s)!\n", "sec_touchscreen");
-		return -ENODEV;
-	}
-	/* /sys/class/sec/sec_touchscreen/... */
-	if (sysfs_create_group(&sec_touchscreen->kobj, &sec_tsp_attr_group))
-		tsp_err("Failed to create sysfs group(%s)!\n", "sec_touchscreen");
+	tsp_info("%s\n", __func__);
 
 	/* /sys/class/sec/sec_touchkey */
 	sec_touchkey = device_create(sec_class, NULL, 0, NULL, "sec_touchkey");
 	if (IS_ERR(sec_touchkey)) {
-		tsp_err("Failed to create device (%s)!\n", "sec_touchkey");
+		tsp_err("%s: Failed to create device (%s)!\n", __func__, "sec_touchkey");
 		return -ENODEV;
 	}
 	/* /sys/class/sec/sec_touchkey/... */
 	if (sysfs_create_group(&sec_touchkey->kobj, &sec_tkey_attr_group))
-		tsp_err("Failed to create sysfs group(%s)!\n", "sec_touchkey");
+		tsp_err("%s: Failed to create sysfs group(%s)!\n", __func__, "sec_touchkey");
 
 	/* /sys/class/sec/tsp */
 	sec_fac_dev = device_create(sec_class, NULL, 0, data, "tsp");
 	if (IS_ERR(sec_fac_dev)) {
-		tsp_err("Failed to create device (%s)!\n", "tsp");
+		tsp_err("%s: Failed to create device (%s)!\n", __func__, "tsp");
 		return -ENODEV;
 	}
 	/* /sys/class/sec/tsp/... */
 	if (sysfs_create_group(&sec_fac_dev->kobj, &sec_touch_factory_attr_group))
-		tsp_err("Failed to create sysfs group(%s)!\n", "tsp");
+		tsp_err("%s: Failed to create sysfs group(%s)!\n", __func__, "tsp");
 
 	return 0;
 }

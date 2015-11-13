@@ -152,10 +152,7 @@ static unsigned int es325_BWE_enable = ES325_MAX_INVALID_BWE;
 static unsigned int es325_BWE_enable_new = ES325_MAX_INVALID_BWE;
 static unsigned int es325_Tx_NS = ES325_MAX_INVALID_TX_NS;
 static unsigned int es325_Tx_NS_new = ES325_MAX_INVALID_TX_NS;
-#ifdef CONFIG_ARCH_MSM8226
-static struct regulator* es325_ldo;
-static int es325_2mic_core_power(int state);
-#endif
+
 /* codec private data */
 struct es325_priv {
 	struct snd_soc_codec *codec;
@@ -1474,6 +1471,9 @@ static ssize_t es325_route_status_show(struct device *dev, struct device_attribu
 
 	u8 ack_msg[4];
 
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
+
 	/* Read route status */
 	if (es325_request_response(es325, route_st_req_msg, 4, 1, ack_msg, 4, 1, 0, 0) < 0) {
 		rc = rc + snprintf(buf+rc, PAGE_SIZE - rc,
@@ -1658,6 +1658,9 @@ static ssize_t es325_route_config_set(struct device *dev, struct device_attribut
 {
 	long route_index;
 	int rc;
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	dev_info(dev, "=[ES325]=%s():buf = %s\n", __func__, buf);
 	rc = kstrtol(buf, 10, &route_index);
@@ -1690,6 +1693,9 @@ static ssize_t es325_fw_version_show(struct device *dev, struct device_attribute
 	char versionbuffer[SIZE_OF_VERBUF];
 	char *verbuf = versionbuffer;
 	char cmd[4];
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	memset(verbuf,0,SIZE_OF_VERBUF);
 	memcpy(cmd, first_char_msg, 4);
@@ -1732,6 +1738,9 @@ static ssize_t es325_txhex_set(struct device *dev, struct device_attribute *attr
 	int offset = 0;
 	u8 resp[4];
 	int rc;
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	dev_dbg(dev, "+[ES325]=%s()\n", __func__);
 	dev_dbg(dev, "=[ES325]=%s(): count=%i\n", __func__, count);
@@ -1768,6 +1777,9 @@ static DEVICE_ATTR(txhex, 0644, es325_txhex_show, es325_txhex_set);
 static ssize_t es325_clock_on_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	char status[4];
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	dev_dbg(dev, "=[ES325]=%s\n", __func__);
 	if(es325_priv.clock_on)
@@ -1786,6 +1798,9 @@ static ssize_t es325_slim_ch_show(struct device *dev, struct device_attribute *a
 	struct es325_slim_dai_data* dai = priv->dai;
 	int length = 0;
 	int i, j;
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	for(i = 0; i < ES325_NUM_CODEC_SLIM_DAIS; i++) {
 		length += sprintf(buf+length,"=dai[%d]=rate[%d]=ch_num=",i, dai[i].rate);
@@ -1804,6 +1819,9 @@ static ssize_t es325_reg_show(struct device *dev, struct device_attribute *attr,
 	int length = 0;
 	int i;
 	int size = 0;
+
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	length += sprintf(buf+length,"es325_reg : algo\n");
 	size = sizeof(es325_algo_paramid)/sizeof(unsigned short); /* 127 items */
@@ -1824,6 +1842,9 @@ static ssize_t es325_reg_write(struct device *dev,
 	char tempbuf[32];
 	char *start = tempbuf;
 	unsigned long reg, value;
+	
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
 
 	memcpy(tempbuf, buf, size);
 	tempbuf[size] = 0;
@@ -1849,6 +1870,9 @@ static ssize_t es325_cmd_reg_show(struct device *dev, struct device_attribute *a
 	int i;
 	int size = 0;
 
+	if (es325_priv.wakeup_cnt == 0)
+		return 0;
+	
 	/* removed 0x2001(first), 0x20d4(end) register read, because of error */
 	size = sizeof(es325_cmd_access)/sizeof(struct es325_cmd_access); /* 213 items */
 	for(i = ES325_POWER_STATE + 1; i < (size + ES325_POWER_STATE -1); i++)
@@ -3427,10 +3451,6 @@ static int es325_codec_suspend(struct snd_soc_codec *codec)
 {
 	struct es325_priv *es325 = snd_soc_codec_get_drvdata(codec);
 	es325_set_bias_level(codec, SND_SOC_BIAS_OFF);
-#ifdef CONFIG_ARCH_MSM8226
-	es325_2mic_core_power(0);
-#endif
-
 	es325_sleep(es325);
 	return 0;
 }
@@ -3438,9 +3458,6 @@ static int es325_codec_suspend(struct snd_soc_codec *codec)
 static int es325_codec_resume(struct snd_soc_codec *codec)
 {
 	struct es325_priv *es325 = snd_soc_codec_get_drvdata(codec);
-#ifdef CONFIG_ARCH_MSM8226
-	es325_2mic_core_power(1);
-#endif
 	es325_wakeup(es325);
 	es325_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	return 0;
@@ -3563,75 +3580,7 @@ alloc_err:
 err:
 	return NULL;
 }
-#ifdef CONFIG_ARCH_MSM8226
-static int es325_regulator_init(struct device *dev)
-{
-	int ret;
-	struct device_node *reg_node = NULL;
 
-	reg_node = of_parse_phandle(dev->of_node, "vdd-2mic-core-supply", 0);
-	if(reg_node)
-	{
-		es325_ldo = regulator_get(dev, "vdd-2mic-core");
-		if (IS_ERR(es325_ldo)) {
-				pr_err("[%s] could not get earjack_ldo, %ld\n", __func__, PTR_ERR(es325_ldo));
-		}
-		else
-		{
-			ret = regulator_enable(es325_ldo);
-			if(ret < 0) {
-				pr_err("%s: Failed to enable regulator.\n",
-					__func__);
-				goto err_reg_enable;
-			} else
-				regulator_set_mode(es325_ldo, REGULATOR_MODE_NORMAL);
-		}
-	}else
-		pr_err("%s Audience LDO node not available\n",__func__);
-
-err_reg_enable:
-	if(es325_ldo)
-		regulator_put(es325_ldo);
-
-	return ret;
-}
-
-static int es325_regulator_deinit(void)
-{
-	if(es325_ldo)
-		{
-			int ret;
-
-			ret = regulator_disable(es325_ldo);
-			if(ret < 0) {
-					pr_err("%s: Failed to disable regulator.\n",__func__);
-			}
-			regulator_put(es325_ldo);
-		}
-	return 0;
-}
-
-static int es325_2mic_core_power(int state)
-{
-	int ret;
-
-	if(state)
-	{
-		ret  = regulator_enable(es325_ldo);
-		if(ret < 0) {
-					pr_err("%s: Failed to enable regulator.\n",__func__);
-			}
-	}
-	else
-	{
-		ret  = regulator_disable(es325_ldo);
-		if(ret < 0) {
-					pr_err("%s: Failed to disable regulator.\n",__func__);
-			}
-	}
-	return 0;
-}
-#endif
 static int es325_slim_probe(struct slim_device *sbdev)
 {
 	struct esxxx_platform_data *pdata = NULL;
@@ -3640,9 +3589,7 @@ static int es325_slim_probe(struct slim_device *sbdev)
 	dev_dbg(&sbdev->dev, "+[ES325]=%s()\n", __func__);
 	dev_dbg(&sbdev->dev, "=[ES325]=%s(): sbdev->name = %s es325_priv = 0x%08x\n",
 		__func__, sbdev->name, (unsigned int)&es325_priv);
-#ifdef CONFIG_ARCH_MSM8226
-	es325_regulator_init(&sbdev->dev);
-#endif
+
 	mutex_lock(&es325_priv.wakeup_mutex);
 	if (sbdev->dev.of_node) {
 		dev_info(&sbdev->dev, "=[ES325]=%s(): Platform data from device tree\n", __func__);
@@ -3820,9 +3767,7 @@ static int es325_slim_remove(struct slim_device *sbdev)
 
 	dev_dbg(&sbdev->dev, "+[ES325]=%s()\n", __func__);
 	dev_dbg(&sbdev->dev, "=[ES325]=%s(): sbdev->name = %s\n", __func__, sbdev->name);
-#ifdef CONFIG_ARCH_MSM8226
-	es325_regulator_deinit();
-#endif
+
 	gpio_free(pdata->reset_gpio);
 	gpio_free(pdata->wakeup_gpio);
 	gpio_free(pdata->gpioa_gpio);
@@ -3936,7 +3881,7 @@ EXPORT_SYMBOL_GPL(es325_wrapper_wakeup);
 	es325_BWE_enable = ES325_MAX_INVALID_BWE;
 	es325_Tx_NS = ES325_MAX_INVALID_TX_NS;
 
-#if !defined(CONFIG_SEC_LOCALE_KOR)
+#if !(defined(CONFIG_SEC_LOCALE_KOR) || defined(CONFIG_SEC_HLTE_HKTW))
 	es325->new_internal_route_config = ES325_INTERNAL_ROUTE_MAX;
 #endif
 

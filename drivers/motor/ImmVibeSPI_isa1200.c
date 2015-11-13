@@ -62,7 +62,7 @@ int32_t vibe_set_pwm_freq(int nForce)
 #if defined (CONFIG_MACH_MATISSELTE_ATT)
 	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_DIV_VAL_BMSK,23 << HWIO_GP_SRC_DIV_VAL_SHFT); //SRC_DIV = 11111 (Div 12)
 #else
-#if defined CONFIG_MACH_MATISSE3G_OPEN || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined (CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON)
 	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_DIV_VAL_BMSK,29 << HWIO_GP_SRC_DIV_VAL_SHFT); //SRC_DIV = 11111 (Div 16)
 #else
 	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_DIV_VAL_BMSK,31 << HWIO_GP_SRC_DIV_VAL_SHFT); //SRC_DIV = 11111 (Div 16)
@@ -133,7 +133,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 	printk("[VIBETONZ] %s \n",__func__);
 	g_bAmpEnabled = false;
 	vib_isa1200_onoff(0);
-#if defined CONFIG_MACH_MATISSE3G_OPEN || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined (CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
 	vibrator_drvdata.power_onoff(0);
 #endif
 	gpio_set_value(vibrator_drvdata.motor_en, VIBRATION_OFF);
@@ -156,7 +156,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 	printk("[VIBETONZ] %s \n",__func__);
 	g_bAmpEnabled = true;
 
-#if defined CONFIG_MACH_MATISSE3G_OPEN || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined (CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
 	vibrator_drvdata.power_onoff(1);
 	gpio_tlmm_config(GPIO_CFG(vibrator_drvdata.vib_clk,  3, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
 #else
@@ -164,7 +164,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 #endif
 	gpio_set_value(vibrator_drvdata.vib_clk, VIBRATION_ON);
 	gpio_set_value(vibrator_drvdata.motor_en, VIBRATION_ON);
-#if defined CONFIG_MACH_MATISSE3G_OPEN || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined (CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON)
 	msleep(1);
 #endif
 	vib_isa1200_onoff(1);

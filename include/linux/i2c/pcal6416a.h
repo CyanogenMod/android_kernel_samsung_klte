@@ -41,6 +41,7 @@ struct pcal6416a_platform_data {
 	uint16_t init_data_out;
 	uint16_t init_en_pull;
 	uint16_t init_sel_pull;
+	const char *supply_name;
 };
 
 #ifdef CONFIG_SEC_PM_DEBUG

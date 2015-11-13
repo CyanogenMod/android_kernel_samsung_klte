@@ -34,7 +34,7 @@ extern "C" {
 	/* INTERFACE */
 #if defined(CONFIG_TDMB_SPI)
 #define FC8080_SPI
-#elif defined(CONFIG_TDMB_TSIF)
+#elif defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 #define FC8080_I2C
 #elif defined(CONFIG_TDMB_EBI)
 #define FC8080_PPI
@@ -209,19 +209,19 @@ extern "C" {
 #define FIC_BUF_THR     (FIC_BUF_LENGTH / 2 - 1)
 
 #define CH0_BUF_START   (FIC_BUF_START + FIC_BUF_LENGTH)
-#if defined(CONFIG_TDMB_TSIF)
+#if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 #define CH0_BUF_LENGTH  (188*2)
 #else
-#define CH0_BUF_LENGTH  (188*20*2)
+#define CH0_BUF_LENGTH  (188*40*2)
 #endif
 #define CH0_BUF_END     (CH0_BUF_START + CH0_BUF_LENGTH - 1)
 #define CH0_BUF_THR     (CH0_BUF_LENGTH / 2 - 1)
 
 #define CH1_BUF_START   (FIC_BUF_START + FIC_BUF_LENGTH)
-#if defined(CONFIG_TDMB_TSIF)
+#if defined(CONFIG_TDMB_TSIF_SLSI) || defined(CONFIG_TDMB_TSIF_QC)
 #define CH1_BUF_LENGTH  (188*2)
 #else
-#define CH1_BUF_LENGTH  (188*20*2)
+#define CH1_BUF_LENGTH  (188*40*2)
 #endif
 #define CH1_BUF_END     (CH1_BUF_START + CH1_BUF_LENGTH - 1)
 #define CH1_BUF_THR     (CH1_BUF_LENGTH / 2 - 1)

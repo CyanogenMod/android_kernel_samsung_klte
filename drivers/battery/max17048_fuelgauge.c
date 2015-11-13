@@ -18,6 +18,48 @@
 
 #include <linux/battery/sec_fuelgauge.h>
 extern int poweroff_charging;
+
+#if defined(CONFIG_SEC_K_PROJECT)
+u16 model_data_active_1[8] = {
+		0xAB40, 0xB640, 0xBAF0, 0xBC90,
+		0xBD00, 0xBE10,	0xBF40, 0xC230
+};
+u16 model_data_active_2[8] = {
+		0xC570, 0xC850, 0xCAB0, 0xCD20,
+		0xD110, 0xD510, 0xD6C0, 0xDA00
+};
+u16 model_data_active_3[8] = {
+		0x01C0, 0x19C0, 0x22E0, 0x7700,
+		0x3320, 0x3CC0, 0x1900, 0x0E20
+};
+u16 model_data_active_4[8] = {
+		0x1380, 0x1240, 0x1200, 0x0D40,
+		0x0D20, 0x0440,	0x10E0, 0x10E0
+};
+
+u16 model_rcomp_seg[8] = {0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080};
+#elif defined(CONFIG_SEC_S_PROJECT)
+u16 model_data_active_1[8] = {
+		0xA4F0, 0xB7A0, 0xB810, 0xB870,
+		0xBB20, 0xBB90, 0xBCA0, 0xBDF0
+};
+u16 model_data_active_2[8] = {
+		0xC010, 0xC330, 0xC610, 0xC930,
+		0xCCE0, 0xCFE0, 0xD320, 0xD9D0
+};
+u16 model_data_active_3[8] = {
+		0x0170, 0x44F0, 0x5940, 0x1200,
+		0x2320, 0x5180, 0x3DF0, 0x26D0
+};
+u16 model_data_active_4[8] = {
+		0x0FF0, 0x17E0, 0x10F0, 0x0F10,
+		0x0E00, 0x0E20, 0x0C00, 0x0C00
+};
+
+u16 model_rcomp_seg[8] = {0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080, 0x0080};
+#endif
+
+
 #if 0
 static int max17048_write_reg(struct i2c_client *client, int reg, u8 value)
 {
@@ -75,6 +117,175 @@ static void max17048_reset(struct i2c_client *client)
 
 	msleep(300);
 }
+
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_S_PROJECT)
+static bool max17048_set_modeldata(struct i2c_client *client)
+{
+	int temp, i = 0;
+	u16 data;
+	u16 read_ocv = 0;
+	u8 read_soc[2] = {0, 0};
+	u8 config[2];
+	u32 addr;
+	union power_supply_propval value;
+	struct sec_fuelgauge_info *fuelgauge =
+		i2c_get_clientdata(client);
+
+	do {
+		/* 1. Unlock Model Access */
+		addr = 0x3E;
+		data = 0x4A57; /* Send 0x4A, and then send 0x57*/
+		max17048_write_word(client, addr, swab16(data));
+
+		/* 2. Read Config and OCV */
+		addr = 0x0C;
+		temp = max17048_read_word(client, addr);
+		config[1] = temp & 0xff;
+		config[0] = (temp & 0xff00) >> 8;
+
+		pr_info("%s : fuelguage : OriginalRCOMP = 0x%x, OriginalAlert = 0x%x\n",
+			__func__, config[1], config[0]);
+
+		addr = 0x0E;
+		read_ocv = max17048_read_word(client, addr);
+		pr_info("%s : fuelguage : OCV_DATA = 0x%4x\n", __func__,  read_ocv);
+		/* 2-5. Verify Model Access unlocked */
+	} while((read_ocv == 0xFFFF) && (i++ < 10));
+
+	/* 3. Write OCV */
+	/* 4. Write RCOMP to a Maximum value of 0xFF00 */
+	/* 5. Write the Model */
+	/* Once the model is unlocked, the host s/w must write 64 bytes model to the max17048.
+	*		The model is located between locations 0x40 ~ 0x7F. */
+	for (i=0; i<8; i++) {
+		addr = 0x40 + i*2;
+		max17048_write_word(client, addr, swab16(model_data_active_1[i]));
+	}
+	for (i=0; i<8; i++) {
+		addr = 0x50 + i*2;
+		max17048_write_word(client, addr, swab16(model_data_active_2[i]));
+	}
+	for (i=0; i<8; i++) {
+		addr = 0x60 + i*2;
+		max17048_write_word(client, addr, swab16(model_data_active_3[i]));
+	}
+	for (i=0; i<8; i++) {
+		addr = 0x70 + i*2;
+		max17048_write_word(client, addr, swab16(model_data_active_4[i]));
+	}
+
+	/*overwrite RCOMP Seg to default values*/
+	for (i=0; i<8; i++) {
+		addr = 0x80 + i*2;
+		max17048_write_word(client, addr, swab16(model_rcomp_seg[i]));
+	}
+	for (i=0; i<8; i++) {
+		addr = 0x90 + i*2;
+		max17048_write_word(client, addr, swab16(model_rcomp_seg[i]));
+	}
+
+	/* 6. Delay at least 150msec */
+	/* 7. Write OCV */
+	addr = 0x0E;
+#if defined(CONFIG_SEC_K_PROJECT)
+	data = 0xE400;
+#elif defined(CONFIG_SEC_S_PROJECT)
+	data = 0xE3D0;
+#endif
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 7-1. Disable Hibernation */
+	addr = 0x0A;
+	data = 0x0000;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 7-2. Lock Model Acess */
+	addr = 0x3E;
+	data = 0x0000;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 8. Delay between 150msec and 600msec */
+	/* This delay must be between 150msec and 600msec.
+	*		Delaying beyond 600msec could cause the verification to fail. */
+	mdelay(200);
+
+	/* 9. Read SOC Register and Compare to expected result */
+	addr = 0x04;
+	temp = max17048_read_word(client, addr);
+	read_soc[1] = temp & 0xff;
+	read_soc[0] = (temp & 0xff00) >> 8;
+	pr_info("%s : reg = 0x%4x, SOC_DATA1 = 0x%x, SOC_DATA2 = 0x%x\n",
+		__func__, temp, read_soc[1], read_soc[0]);
+
+#if defined(CONFIG_SEC_K_PROJECT)
+	if ((read_soc[1] >= 0xF2) && (read_soc[1] <= 0xF4)) {
+#elif defined(CONFIG_SEC_S_PROJECT)
+	if ((read_soc[1] >= 0xE4) && (read_soc[1] <= 0xE6)) {
+#endif
+		pr_info("%s : model was loaded successful\n", __func__);
+	} else {
+		pr_err("%s : error! model was not loaded successful\n", __func__);
+		return false;
+	}
+
+	/* 9-1.  Unlock Model Access */
+	addr = 0x3E;
+	data = 0x4A57;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 10. Restore CONFIG and OCV */
+	addr = 0x0C;
+	psy_do_property("battery", get,
+		POWER_SUPPLY_PROP_STATUS, value);
+	if (value.intval == POWER_SUPPLY_STATUS_CHARGING) /* in charging */
+		config[1] = get_battery_data(fuelgauge).RCOMP_charging;
+	else
+		config[1] = get_battery_data(fuelgauge).RCOMP0;
+
+	data = (0x1C | (config[1] & 0xff) << 8);
+	pr_info("%s : RCOMP(0x%4x) is applied\n", __func__, data);
+	max17048_write_word(client, addr, swab16(data));
+
+	addr = 0x0E;
+	max17048_write_word(client, addr, swab16(read_ocv));
+
+	read_ocv = 0;
+	read_ocv = max17048_read_word(client, addr);
+	pr_info("%s : OCV_DATA = 0x%4x\n", __func__, read_ocv);
+
+	/* 11. Lock Model Acess */
+	addr = 0x3E;
+	data = 0x0000;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 11-1. Delay at least 150msec */
+	mdelay(200);
+
+	/* 12. Set Voltage Detector threshold */
+	addr = 0x18;
+	data = 0x7D7D;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 13. Set hibernation*/
+	addr = 0x0A;
+	data = 0x0000;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 14. Set vart */
+	addr = 0x14;
+	data = 0x00FF;
+	max17048_write_word(client, addr, swab16(data));
+
+	/* 15. Set Vreset */
+	addr = 0x18;
+	data = 0x7D7D;
+	max17048_write_word(client, addr, swab16(data));
+
+	pr_info("%s : load model data complete!\n", __func__);
+
+	return true;
+}
+#endif
 
 static int max17048_get_vcell(struct i2c_client *client)
 {
@@ -176,7 +387,7 @@ static int max17048_get_soc(struct i2c_client *client)
 		soc = (data[0] * 100) + (data[1] * 100 / 256);
 	}
 
-	dev_dbg(&client->dev,
+	dev_info(&client->dev,
 		"%s : raw capacity (%d), data(0x%04x)\n",
 		__func__, soc, (data[0]<<8) | data[1]);
 
@@ -185,9 +396,10 @@ static int max17048_get_soc(struct i2c_client *client)
 
 static int max17048_get_current(struct i2c_client *client)
 {
+	struct sec_fuelgauge_info *fuelgauge = i2c_get_clientdata(client);
 	union power_supply_propval value;
 
-	psy_do_property("sec-charger", get,
+	psy_do_property(fuelgauge->pdata->charger_name, get,
 		POWER_SUPPLY_PROP_CURRENT_NOW, value);
 
 	return value.intval;
@@ -226,12 +438,13 @@ static int sec_bat_check_discharge(int vcell)
 /* judge power off or not by current_avg */
 static int max17048_get_current_average(struct i2c_client *client)
 {
+	struct sec_fuelgauge_info *fuelgauge = i2c_get_clientdata(client);
 	union power_supply_propval value_bat;
 	union power_supply_propval value_chg;
 	int vcell, soc, curr_avg;
 	int check_discharge;
 
-	psy_do_property("sec-charger", get,
+	psy_do_property(fuelgauge->pdata->charger_name, get,
 		POWER_SUPPLY_PROP_CURRENT_NOW, value_chg);
 	psy_do_property("battery", get,
 		POWER_SUPPLY_PROP_HEALTH, value_bat);
@@ -276,6 +489,33 @@ static void max17048_get_version(struct i2c_client *client)
 	dev_info(&client->dev,
 		"MAX17048 Fuel-Gauge Ver 0x%04x\n", w_data);
 }
+
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_S_PROJECT)
+static bool max17048_check_fg_validity(struct i2c_client *client)
+{
+	int temp;
+	u8 data;
+	u16 w_data = 0;
+
+	/* check status register Reset indicator bit*/
+	temp = max17048_read_word(client, 0x1A);
+	data = temp & 0xff;
+
+	if (0/* data & 0x01 */) {
+		dev_err(&client->dev,
+			"%s : IC is not configured. init modeldata reg(0x%x)\n", __func__, data);
+		if (!max17048_set_modeldata(client)) {
+			dev_err(&client->dev,
+				"%s : fail to set modeldata\n", __func__);
+			return false;
+		}
+		w_data = data & 0xfe;
+		max17048_write_word(client, 0x1A, swab16(w_data));
+	}
+
+	return true;
+}
+#endif
 
 static u16 max17048_get_rcomp(struct i2c_client *client)
 {
@@ -570,6 +810,10 @@ bool sec_hal_fg_init(struct i2c_client *client)
 #endif
 	max17048_get_version(client);
 
+#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_S_PROJECT)
+	if (!max17048_check_fg_validity(client))
+		return false;
+#endif
 	return true;
 }
 

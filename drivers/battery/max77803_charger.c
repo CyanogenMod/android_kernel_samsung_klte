@@ -57,6 +57,7 @@ struct max77803_charger_data {
 	/* wakelock */
 	struct wake_lock recovery_wake_lock;
 	struct wake_lock wpc_wake_lock;
+	struct wake_lock chgin_wake_lock;
 
 	unsigned int	is_charging;
 	unsigned int	charging_type;
@@ -576,7 +577,7 @@ static void max77803_recovery_work(struct work_struct *work)
 				(chg_data->soft_reg_recovery_cnt + 1));
 		if (chg_data->siop_level < 100 &&
 			chg_data->cable_type == POWER_SUPPLY_TYPE_MAINS) {
-			pr_info("%s : LCD on status and revocer current\n", __func__);
+			pr_info("%s : LCD on status and recover current\n", __func__);
 			max77803_set_input_current(chg_data,
 					SIOP_INPUT_LIMIT_CURRENT);
 		} else {
@@ -916,7 +917,6 @@ static int sec_chg_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		/* check and unlock */
 		check_charger_unlock_state(charger);
-
 		if (val->intval == POWER_SUPPLY_TYPE_POWER_SHARING) {
 			psy_do_property("ps", get,
 				POWER_SUPPLY_PROP_STATUS, value);
@@ -1433,6 +1433,8 @@ static void max77803_chgin_isr_work(struct work_struct *work)
 	union power_supply_propval value;
 	int stable_count = 0;
 
+	wake_lock(&charger->chgin_wake_lock);
+
 	while (1) {
 		psy_do_property("battery", get,
 				POWER_SUPPLY_PROP_HEALTH, value);
@@ -1476,7 +1478,9 @@ static void max77803_chgin_isr_work(struct work_struct *work)
 					value.intval = POWER_SUPPLY_HEALTH_UNDERVOLTAGE;
 					psy_do_property("battery", set,
 							POWER_SUPPLY_PROP_HEALTH, value);
-				} else if ((battery_health == \
+				}
+			} else {
+				if ((battery_health == \
 							POWER_SUPPLY_HEALTH_OVERVOLTAGE) &&
 						(chgin_dtls != 0x02)) {
 					pr_info("%s: vbus_state : 0x%d, chg_state : 0x%d\n", __func__, chgin_dtls, chg_dtls);
@@ -1511,6 +1515,7 @@ static void max77803_chgin_isr_work(struct work_struct *work)
 	reg_data = (0 << CHGIN_SHIFT);
 	max77803_update_reg(charger->max77803->i2c, MAX77803_CHG_REG_CHG_INT_MASK, reg_data,
 			CHGIN_MASK);
+	wake_unlock(&charger->chgin_wake_lock);
 }
 
 static irqreturn_t max77803_chgin_irq(int irq, void *data)
@@ -1712,6 +1717,8 @@ static __devinit int max77803_charger_probe(struct platform_device *pdev)
 		pr_err("%s: Fail to Create Workqueue\n", __func__);
 		goto err_free;
 	}
+	wake_lock_init(&charger->chgin_wake_lock, WAKE_LOCK_SUSPEND,
+			            "charger-chgin");
 	INIT_WORK(&charger->chgin_work, max77803_chgin_isr_work);
 	INIT_DELAYED_WORK(&charger->chgin_init_work, max77803_chgin_init_work);
 	wake_lock_init(&charger->recovery_wake_lock, WAKE_LOCK_SUSPEND,

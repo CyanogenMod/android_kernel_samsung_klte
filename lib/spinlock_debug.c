@@ -13,6 +13,9 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/bug.h>
+#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+#include <mach/msm_watchdog_v2.h>
+#endif
 
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key)
@@ -70,10 +73,15 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 		owner ? owner->comm : "<none>",
 		owner ? task_pid_nr(owner) : -1,
 		lock->owner_cpu);
+#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+		msm_cause_bite();
+		dump_stack();
+#else
 #ifdef CONFIG_SEC_DEBUG_SPINLOCK_PANIC
 		panic("spinlock bug");
 #else
 	dump_stack();
+#endif
 #endif
 }
 

@@ -33,9 +33,9 @@
 #include <linux/input.h>
 #include <linux/workqueue.h>
 #include <linux/uaccess.h>
-#include <linux/i2c/taos_tmd3782.h>
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/i2c/taos_tmd3782.h>
 #include "sensors_core.h"
 
 /* Note about power vs enable/disable:
@@ -53,8 +53,6 @@
  */
 
 /* taos debug */
-/*#define DEBUG 1*/
-/*#define TAOS_DEBUG*/
 #define MODULE_NAME_PROX "proximity_sensor"
 #define taos_dbgmsg(str, args...) pr_info("%s: " str, __func__, ##args)
 #define TAOS_DEBUG
@@ -69,134 +67,97 @@
 #define CHIP_NAME       "TMD3782"
 #define CHIP_ID			0x69
 
-#define OFFSET_FILE_PATH	"/efs/prox_cal"
-
-/* TMD3782 register offsets */
-#define CNTRL				0x00
-#define ALS_TIME			0X01
-#define PRX_TIME			0x02
-#define WAIT_TIME			0x03
-#define ALS_MINTHRESHLO			0X04
-#define ALS_MINTHRESHHI			0X05
-#define ALS_MAXTHRESHLO			0X06
-#define ALS_MAXTHRESHHI			0X07
-#define PRX_MINTHRESHLO			0X08
-#define PRX_MINTHRESHHI			0X09
-#define PRX_MAXTHRESHLO			0X0A
-#define PRX_MAXTHRESHHI			0X0B
-#define INTERRUPT			0x0C
-#define PRX_CFG				0x0D
-#define PRX_COUNT			0x0E
-#define GAIN				0x0F
-#define REVID				0x11
-#define CHIPID				0x12
-#define STATUS				0x13
-#define CLR_CHAN0LO			0x14
-#define CLR_CHAN0HI			0x15
-#define RED_CHAN1LO			0x16
-#define RED_CHAN1HI			0x17
-#define GRN_CHAN1LO			0x18
-#define GRN_CHAN1HI			0x19
-#define BLU_CHAN1LO			0x1A
-#define BLU_CHAN1HI			0x1B
-#define PRX_LO				0x1C
-#define PRX_HI				0x1D
-#define PRX_OFFSET			0x1E
-#define TEST_STATUS			0x1F
-
-/*TMD3782 cmd reg masks*/
-#define CMD_REG					0X80
-#define CMD_BYTE_RW				0x00
-#define CMD_WORD_BLK_RW			0x20
-#define CMD_SPL_FN				0x60
-#define CMD_PROX_INTCLR			0X05
-#define CMD_ALS_INTCLR			0X06
-#define CMD_PROXALS_INTCLR		0X07
-#define CMD_TST_REG				0X08
-#define CMD_USER_REG			0X09
-
-/* TMD3782 cntrl reg masks */
-#define CNTL_REG_CLEAR			0x00
-#define CNTL_PROX_INT_ENBL		0X20
-#define CNTL_ALS_INT_ENBL		0X10
-#define CNTL_WAIT_TMR_ENBL		0X08
-#define CNTL_PROX_DET_ENBL		0X04
-#define CNTL_ADC_ENBL			0x02
-#define CNTL_PWRON				0x01
-#define CNTL_ALSPON_ENBL		0x03
-#define CNTL_INTALSPON_ENBL		0x13
-#define CNTL_PROXPON_ENBL		0x0F
-#define CNTL_INTPROXPON_ENBL		0x2F
-
-/* TMD3782 status reg masks */
-#define STA_ADCVALID			0x01
-#define STA_PRXVALID			0x02
-#define STA_ADC_PRX_VALID		0x03
-#define STA_ADCINTR				0x10
-#define STA_PRXINTR				0x20
-
-#define	MAX_ALS				0xffff
-#define	MIN_ALS				10
-/* power control */
-#define ON				1
-#define OFF				0
-
 /* sensor type */
 #define LIGHT			0
 #define PROXIMITY		1
 #define ALL				2
-
-//#define ALS_GAIN			4
-#define Atime_ms			504 // 50.4 ms
-#define DGF				475
-#define R_Coef1			535
-#define G_Coef1			1000
-#define B_Coef1			795
-#define CT_Coef1			(2855)
-#define CT_Offset1			(1973)
-#define INTEGRATION_CYCLE	240
-
-#define ADC_BUFFER_NUM	6
-
-#define PROX_AVG_COUNT	40
-
-#define MAX_LUX		39768
 
 enum {
 	LIGHT_ENABLED = BIT(0),
 	PROXIMITY_ENABLED = BIT(1),
 };
 
+enum {
+	STATE_CLOSE = 0,
+	STATE_FAR = 1,
+};
+
+enum {
+	OFF = 0,
+	ON = 1,
+};
+#define Atime_ms		504 //50.4 ms
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+#define DGF				600
+#define R_Coef1			(260)
+#define G_Coef1			(1000)
+#define B_Coef1			(20)
+#define CT_Coef1			(3200)
+#define CT_Offset1			(1840)
+#elif defined(CONFIG_SEC_S_PROJECT)
+#define Atime_ms		504 //50.4 ms
+#define DGF				642
+#define R_Coef1			(330)
+#define G_Coef1			(1000)
+#define B_Coef1			(150)
+#define CT_Coef1			(3210)
+#define CT_Offset1			(1788)
+#else
+#define DGF				625
+#define R_Coef1			(-580)
+#define G_Coef1			(1010)
+#define B_Coef1			(80)
+#define CT_Coef1			(2855)
+#define CT_Offset1			(1973)
+#endif
+
+#define IR_R_Coef1			(-1)
+#define IR_G_Coef1			(109)
+#define IR_B_Coef1			(-29)
+#define IR_C_Coef1			(57)
+#define IR_Coef1			(38)
+#define INTEGRATION_CYCLE	240
+
+#define ADC_BUFFER_NUM	6
+#define PROX_AVG_COUNT	40
+#define MAX_LUX		150000
 #define TAOS_PROX_MAX			1023
 #define TAOS_PROX_MIN			0
+
 #define OFFSET_ARRAY_LENGTH		10
+#define OFFSET_FILE_PATH	"/efs/prox_cal"
+#define CAL_SKIP_ADC	325
+#define CAL_FAIL_ADC	400
+
+#ifdef CONFIG_PROX_WINDOW_TYPE
 #define WINDOW_TYPE_FILE_PATH "/sys/class/sec/sec_touch_ic/window_type"
+#endif
+
 /* driver data */
 struct taos_data {
+	struct i2c_client *i2c_client;
+	struct taos_platform_data *pdata;
 	struct input_dev *proximity_input_dev;
 	struct input_dev *light_input_dev;
-	struct taos_platform_data *pdata;
-	struct i2c_client *i2c_client;
 	struct device *light_dev;
 	struct device *proximity_dev;
-	int irq;
 	struct work_struct work_light;
 	struct work_struct work_prox;
 	struct work_struct work_prox_avg;
 	struct mutex prox_mutex;
-/*	TAOS_PRX_DISTANCE_STATUS taos_prox_dist;*/
-	struct hrtimer timer;
-	struct hrtimer prox_avg_timer;
-	ktime_t light_poll_delay;
-	ktime_t prox_polling_time;
-	int adc_value_buf[ADC_BUFFER_NUM];
-	int adc_index_count;
-	bool adc_buf_initialized;
-	u8 power_state;
 	struct mutex power_lock;
 	struct wake_lock prx_wake_lock;
+	struct hrtimer timer;
+	struct hrtimer prox_avg_timer;
 	struct workqueue_struct *wq;
 	struct workqueue_struct *wq_avg;
+	ktime_t light_poll_delay;
+	ktime_t prox_polling_time;
+	u8 power_state;
+	int irq;
+	bool adc_buf_initialized;
+	int adc_value_buf[ADC_BUFFER_NUM];
+	int adc_index_count;
 	int avg[3];
 	int prox_avg_enable;
 	s32 clrdata;
@@ -204,6 +165,7 @@ struct taos_data {
 	s32 grndata;
 	s32 bludata;
 	s32 irdata;
+	int lux;
 /* Auto Calibration */
 	u16 offset_value;
 	int cal_result;
@@ -211,18 +173,49 @@ struct taos_data {
 	int threshold_low;
 	int proximity_value;
 	bool set_manual_thd;
+#ifdef CONFIG_PROX_WINDOW_TYPE
 	char windowtype[2];
+#endif
+#ifdef CONFIG_SEC_S_PROJECT
+/* Regulator */
+	struct regulator *vdd_3p3;
+#else
 	struct regulator *vdd_2p85;
 	struct regulator *leda_2p8;
 	struct regulator *lvs1_1p8;
+#endif
 };
-
+static void taos_thresh_set(struct taos_data *taos);
+static int proximity_get_adc(struct taos_data *taos);
 static int lightsensor_get_adcvalue(struct taos_data *taos);
 static int proximity_open_offset(struct taos_data *data);
 static int proximity_adc_read(struct taos_data *taos);
+#ifdef CONFIG_PROX_WINDOW_TYPE
 static int proximity_open_window_type(struct taos_data *data);
+#endif
 static void sensor_power_on_vdd(struct taos_data *info, int onoff)
 {
+#ifdef CONFIG_SEC_S_PROJECT
+	info->vdd_3p3 = regulator_get(&info->i2c_client->dev, "max77826_ldo12");
+	if (IS_ERR(info->vdd_3p3)) {
+		pr_err("%s - regulator_get fail\n", __func__);
+		return ;
+	}
+
+	pr_info("%s - onoff = %d\n", __func__, onoff);
+
+	if (onoff) {
+		gpio_set_value(info->pdata->enable,1);
+		regulator_set_voltage(info->vdd_3p3, 3300000, 3300000);
+		regulator_enable(info->vdd_3p3);
+	} else {
+		regulator_disable(info->vdd_3p3);
+		gpio_set_value(info->pdata->enable,0);
+	}
+	regulator_put(info->vdd_3p3);
+	msleep(30);
+	return ;
+#else
 	int ret;
 	if (info->vdd_2p85 == NULL) {
 		info->vdd_2p85 =regulator_get(&info->i2c_client->dev, "8226_l19");
@@ -281,6 +274,7 @@ static void sensor_power_on_vdd(struct taos_data *info, int onoff)
 	}
 	msleep(30);
 	return;
+#endif
 }
 
 
@@ -315,23 +309,50 @@ static int opt_i2c_write_command(struct taos_data *taos, u8 val)
 	return ret;
 }
 
+static int proximity_get_adc(struct taos_data *taos)
+{
+	int adc = 0;
+
+	adc = i2c_smbus_read_word_data(taos->i2c_client,
+			CMD_REG | PRX_LO);
+
+	if (adc < taos->pdata->prox_rawdata_trim)
+		return TAOS_PROX_MIN;
+	if (adc > TAOS_PROX_MAX)
+		adc = TAOS_PROX_MAX;
+
+	return adc - taos->pdata->prox_rawdata_trim;
+}
+
+static int taos_proximity_get_threshold(struct taos_data *taos, u8 buf)
+{
+	u16 threshold;
+	threshold = i2c_smbus_read_word_data(taos->i2c_client,(CMD_REG | buf));
+
+	if ((threshold == 0xFFFF) || (threshold == 0))
+		return (int)threshold;
+
+	return (int)threshold - taos->pdata->prox_rawdata_trim;
+}
+
 static void taos_thresh_set(struct taos_data *taos)
 {
 	int i = 0;
 	int ret = 0;
 	u8 prox_int_thresh[4] = {0,};
+	u16 trim = (u16)taos->pdata->prox_rawdata_trim;
 
 	/* Setting for proximity interrupt */
-	if (taos->proximity_value == 1) {
-		prox_int_thresh[0] = (taos->threshold_low) & 0xFF;
-		prox_int_thresh[1] = (taos->threshold_low >> 8) & 0xFF;
+	if (taos->proximity_value == STATE_CLOSE) {
+		prox_int_thresh[0] = ((u16)taos->threshold_low+trim) & 0xFF;
+		prox_int_thresh[1] = ((taos->threshold_low+trim) >> 8) & 0xFF;
 		prox_int_thresh[2] = (0xFFFF) & 0xFF;
 		prox_int_thresh[3] = (0xFFFF >> 8) & 0xFF;
-	} else if (taos->proximity_value == 0) {
+	} else {
 		prox_int_thresh[0] = (0x0000) & 0xFF;
 		prox_int_thresh[1] = (0x0000 >> 8) & 0xFF;
-		prox_int_thresh[2] = (taos->threshold_high) & 0xff;
-		prox_int_thresh[3] = (taos->threshold_high >> 8) & 0xff;
+		prox_int_thresh[2] = ((u16)taos->threshold_high+trim) & 0xff;
+		prox_int_thresh[3] = (((u16)taos->threshold_high+trim) >> 8) & 0xff;
 	}
 
 	for (i = 0; i < 4; i++) {
@@ -345,94 +366,60 @@ static void taos_thresh_set(struct taos_data *taos)
 
 static int taos_chip_on(struct taos_data *taos)
 {
-	int i = 0;
 	int ret = 0;
-	int num_try_init = 0;
-	int fail_num = 0;
 	u8 temp_val;
 	u8 reg_cntrl;
-	u8 prox_int_thresh[4];
 
+	sensor_power_on_vdd(taos,ON);
 
-	for (num_try_init = 0; num_try_init < 3 ; num_try_init++) {
-		fail_num = 0;
-
-		temp_val = CNTL_PWRON;
-		ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to clr ctrl reg failed\n");
-			fail_num++;
-		}
-
-		temp_val = taos->pdata->als_time;
-		ret = opt_i2c_write(taos, (CMD_REG|ALS_TIME), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to als time reg failed\n");
-			fail_num++;
-		}
-
-		temp_val = 0xff;
-		ret = opt_i2c_write(taos, (CMD_REG|WAIT_TIME), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to wait time reg failed\n");
-			fail_num++;
-		}
-
-		temp_val = taos->pdata->intr_filter;
-		ret = opt_i2c_write(taos, (CMD_REG|INTERRUPT), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to interrupt reg failed\n");
-			fail_num++;
-		}
-
-		temp_val = 0x0;
-		ret = opt_i2c_write(taos, (CMD_REG|PRX_CFG), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to prox cfg reg failed\n");
-			fail_num++;
-		}
-
-		temp_val = taos->pdata->prox_pulsecnt;
-		ret = opt_i2c_write(taos, (CMD_REG|PRX_COUNT), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to prox cnt reg failed\n");
-			fail_num++;
-		}
-		temp_val = taos->pdata->als_gain;
-		ret = opt_i2c_write(taos, (CMD_REG|GAIN), &temp_val);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to prox gain reg failed\n");
-			fail_num++;
-		}
-
-		/* Setting for proximity interrupt */
-		prox_int_thresh[0] = 0;
-		prox_int_thresh[1] = 0;
-		prox_int_thresh[2] = (taos->threshold_high) & 0xff;
-		prox_int_thresh[3] = (taos->threshold_high >> 8) & 0xff;
-
-		for (i = 0; i < 4; i++) {
-			ret = opt_i2c_write(taos,
-				(CMD_REG|(PRX_MINTHRESHLO + i)),
-				&prox_int_thresh[i]);
-			if (ret < 0) {
-				gprintk("opt_i2c_write failed, err = %d\n",
-					ret);
-				fail_num++;
-			}
-		}
-
-		reg_cntrl = CNTL_INTPROXPON_ENBL;
-		ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &reg_cntrl);
-		if (ret < 0) {
-			gprintk("opt_i2c_write to ctrl reg failed\n");
-			fail_num++;
-		}
-		msleep(60); /*more than 58 ms*/
-
-		if (fail_num == 0)
-			break;
+	temp_val = CNTL_PWRON;
+	ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to clr ctrl reg failed\n");
 	}
+
+	temp_val = taos->pdata->als_time;
+	ret = opt_i2c_write(taos, (CMD_REG|ALS_TIME), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to als time reg failed\n");
+	}
+
+	temp_val = 0xff;
+	ret = opt_i2c_write(taos, (CMD_REG|WAIT_TIME), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to wait time reg failed\n");
+	}
+
+	temp_val = taos->pdata->intr_filter;
+	ret = opt_i2c_write(taos, (CMD_REG|INTERRUPT), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to interrupt reg failed\n");
+	}
+
+	temp_val = 0x0;
+	ret = opt_i2c_write(taos, (CMD_REG|PRX_CFG), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to prox cfg reg failed\n");
+	}
+
+	temp_val = taos->pdata->prox_pulsecnt;
+	ret = opt_i2c_write(taos, (CMD_REG|PRX_COUNT), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to prox cnt reg failed\n");
+	}
+
+	temp_val = taos->pdata->als_gain;
+	ret = opt_i2c_write(taos, (CMD_REG|GAIN), &temp_val);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to prox gain reg failed\n");
+	}
+
+	reg_cntrl = CNTL_INTPROXPON_ENBL;
+	ret = opt_i2c_write(taos, (CMD_REG|CNTRL), &reg_cntrl);
+	if (ret < 0) {
+		gprintk("opt_i2c_write to ctrl reg failed\n");
+	}
+
 	return ret;
 }
 
@@ -441,13 +428,14 @@ static int taos_chip_off(struct taos_data *taos)
 	int ret = 0;
 	u8 reg_cntrl;
 
-
 	reg_cntrl = CNTL_REG_CLEAR;
 	ret = opt_i2c_write(taos, (CMD_REG | CNTRL), &reg_cntrl);
 	if (ret < 0) {
 		gprintk("opt_i2c_write to ctrl reg failed\n");
 		return ret;
 	}
+
+	sensor_power_on_vdd(taos,OFF);
 
 	return ret;
 }
@@ -463,9 +451,10 @@ static int taos_get_cct(struct taos_data *taos)
 
 	return cct;
 }
+
 static int taos_get_lux(struct taos_data *taos)
 {
-	s32 rp1, gp1, bp1, cp1;
+	s32 rp1, gp1, bp1;
 	s32 clrdata = 0;
 	s32 reddata = 0;
 	s32 grndata = 0;
@@ -478,8 +467,8 @@ static int taos_get_lux(struct taos_data *taos)
 
 	temp_gain = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | GAIN));
-
 	reg_gain = temp_gain & 0xff;
+
 	clrdata = i2c_smbus_read_word_data(taos->i2c_client,
 		(CMD_REG | CLR_CHAN0LO));
 	reddata = i2c_smbus_read_word_data(taos->i2c_client,
@@ -496,9 +485,9 @@ static int taos_get_lux(struct taos_data *taos)
 
 	switch(reg_gain & 0x03)
 	{
-/*		case 0x00:
+		case 0x00:
 			gain = 1;
-			break;*/
+			break;
 		case 0x01:
 			gain = 4;
 			break;
@@ -512,35 +501,44 @@ static int taos_get_lux(struct taos_data *taos)
 			break;
 	}
 
-	if (clrdata >= 18500)
-	{
-		calculated_lux = MAX_LUX;
-		return calculated_lux;
-	}
-
-	if(gain ==4 && clrdata < 100)
+	if(gain == 1 && clrdata < 25)
 	{
 		reg_gain = 0x22;
 		ret = opt_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
+		return taos->lux;
 	}
 	else if(gain ==16 && clrdata > 15000)
 	{
-		reg_gain = 0x21;
+		reg_gain = 0x20;
 		ret = opt_i2c_write(taos, (CMD_REG | GAIN), &reg_gain);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
+		return taos->lux;
+	}
+
+	if ((clrdata >= 18500) && (gain == 1))
+	{
+		calculated_lux = MAX_LUX;
+		return calculated_lux;
 	}
 
 	/* calculate lux */
+#if defined(CONFIG_SEC_RUBENS_PROJECT) || defined(CONFIG_SEC_S_PROJECT)
 	taos->irdata = (reddata + grndata + bludata - clrdata)/2;
+	if(taos->irdata < 0)
+	{
+		taos->irdata=0;
+	}
+#else
+	taos->irdata = (reddata*IR_R_Coef1 + grndata*IR_G_Coef1 + bludata*IR_B_Coef1 - clrdata*IR_C_Coef1) / IR_Coef1;
+#endif
 
 	/* remove ir from counts*/
 	rp1 = taos->reddata - taos->irdata;
 	gp1 = taos->grndata - taos->irdata;
 	bp1 = taos->bludata - taos->irdata;
-	cp1 = taos->clrdata - taos->irdata;
 
 	calculated_lux = (rp1 * R_Coef1 + gp1 * G_Coef1 + bp1 * B_Coef1) /1000;
 
@@ -554,8 +552,8 @@ static int taos_get_lux(struct taos_data *taos)
 		calculated_lux /= gain;
 	}
 
-	printk("lux : %d, gain : %x, r : %d, g : %d, b : %d, c : %d\n", calculated_lux, reg_gain, rp1, gp1, bp1, cp1 );
-	return (int)calculated_lux;
+	taos->lux = (int)calculated_lux;
+	return taos->lux;
 }
 
 static void taos_light_enable(struct taos_data *taos)
@@ -646,10 +644,8 @@ static ssize_t light_enable_store(struct device *dev,
 		    new_value, (taos->power_state & LIGHT_ENABLED) ? 1 : 0);
 	if (new_value && !(taos->power_state & LIGHT_ENABLED)) {
 		if (!taos->power_state) {
-			//taos->pdata->power(true);
-			sensor_power_on_vdd(taos,1);
-			msleep(20);
 			taos_chip_on(taos);
+                	msleep(60); /*more than 58 ms*/
 		}
 		taos->power_state |= LIGHT_ENABLED;
 		taos_light_enable(taos);
@@ -658,8 +654,6 @@ static ssize_t light_enable_store(struct device *dev,
 		taos->power_state &= ~LIGHT_ENABLED;
 		if (!taos->power_state) {
 			taos_chip_off(taos);
-			//taos->pdata->power(false);
-			sensor_power_on_vdd(taos,0);
 		}
 	}
 	mutex_unlock(&taos->power_lock);
@@ -674,7 +668,6 @@ static ssize_t proximity_enable_store(struct device *dev,
 	bool new_value;
 	int temp = 0, ret = 0;
 
-
 	if (sysfs_streq(buf, "1")) {
 		new_value = true;
 	} else if (sysfs_streq(buf, "0")) {
@@ -688,35 +681,38 @@ static ssize_t proximity_enable_store(struct device *dev,
 	taos_dbgmsg("new_value = %d, old state = %d\n",
 		    new_value, (taos->power_state & PROXIMITY_ENABLED) ? 1 : 0);
 	if (new_value && !(taos->power_state & PROXIMITY_ENABLED)) {
-		if (!taos->power_state)
-		{
-			//taos->pdata->power(true);
-			sensor_power_on_vdd(taos,1);
-		}
-		usleep_range(5000, 6000);
 		if(taos->set_manual_thd == false) {
 			ret = proximity_open_offset(taos);
 			if (ret < 0 && ret != -ENOENT)
 				pr_err("%s: proximity_open_offset() failed\n",
 				__func__);
+#ifdef CONFIG_PROX_WINDOW_TYPE
 			ret = proximity_open_window_type(taos);
-			/* set prox_threshold from board file */
+#endif
 			taos->threshold_high= taos->pdata->prox_thresh_hi + taos->offset_value;
 			taos->threshold_low = taos->pdata->prox_thresh_low + taos->offset_value;
 			pr_err("%s: th_hi = %d, th_low = %d\n", __func__,
 				taos->threshold_high, taos->threshold_low);
 		}
+
+		if (!taos->power_state) {
+			taos_chip_on(taos);
+		}
+
 		taos->power_state |= PROXIMITY_ENABLED;
+		taos->proximity_value = STATE_FAR;
+		taos_thresh_set(taos);
 
 		/* interrupt clearing */
 		temp = (CMD_REG|CMD_SPL_FN|CMD_PROXALS_INTCLR);
 		ret = opt_i2c_write_command(taos, temp);
 		if (ret < 0)
 			gprintk("opt_i2c_write failed, err = %d\n", ret);
-		taos_chip_on(taos);
-		//taos->pdata->led_on(true);
-		sensor_power_on_vdd(taos,1);
+#if defined(CONFIG_SEC_S_PROJECT) && defined(CONFIG_INV_MPU_IIO_PRIMARY)
+		input_report_rel(taos->proximity_input_dev, REL_MISC, 1+1);
+#else
 		input_report_abs(taos->proximity_input_dev, ABS_DISTANCE, 1);
+#endif
 		input_sync(taos->proximity_input_dev);
 
 		enable_irq(taos->irq);
@@ -726,14 +722,9 @@ static ssize_t proximity_enable_store(struct device *dev,
 		disable_irq_wake(taos->irq);
 		disable_irq(taos->irq);
 
-		//taos->pdata->led_on(false);
-		sensor_power_on_vdd(taos,0);
-
 		taos->power_state &= ~PROXIMITY_ENABLED;
 		if (!taos->power_state) {
 			taos_chip_off(taos);
-			//taos->pdata->power(false); /*taos_chip_off(taos);*/
-			sensor_power_on_vdd(taos,0);
 		}
 	}
 	mutex_unlock(&taos->power_lock);
@@ -747,31 +738,32 @@ static ssize_t proximity_state_show(struct device *dev,
 	struct taos_data *taos = dev_get_drvdata(dev);
 	int adc = 0;
 
-	adc = i2c_smbus_read_word_data(taos->i2c_client,
-			CMD_REG | PRX_LO);
-	if (adc > TAOS_PROX_MAX)
-		adc = TAOS_PROX_MAX;
+	adc = proximity_get_adc(taos);
 
 	return sprintf(buf, "%d\n", adc);
 
 }
+
+#ifdef CONFIG_PROX_WINDOW_TYPE
 static void change_proximity_default_threshold(struct taos_data *data)
 {
+	int trim = data->pdata->prox_rawdata_trim;
 	switch (data->windowtype[1]) {
 	case WINTYPE_WHITE:
-		data->pdata->prox_thresh_hi = WHITEWINDOW_HI_THRESHOLD;
-		data->pdata->prox_thresh_low = WHITEWINDOW_LOW_THRESHOLD;
+		data->pdata->prox_thresh_hi = WHITEWINDOW_HI_THRESHOLD-trim;
+		data->pdata->prox_thresh_low = WHITEWINDOW_LOW_THRESHOLD-trim;
 		break;
 	case WINTYPE_OTHERS:
-		data->pdata->prox_thresh_hi = BLACKWINDOW_HI_THRESHOLD;
-		data->pdata->prox_thresh_low = BLACKWINDOW_LOW_THRESHOLD;
+		data->pdata->prox_thresh_hi = BLACKWINDOW_HI_THRESHOLD-trim;
+		data->pdata->prox_thresh_low = BLACKWINDOW_LOW_THRESHOLD-trim;
 		break;
 	default:
-		data->pdata->prox_thresh_hi = BLACKWINDOW_HI_THRESHOLD;
-		data->pdata->prox_thresh_low = BLACKWINDOW_LOW_THRESHOLD;
+		data->pdata->prox_thresh_hi = data->pdata->prox_thresh_hi;
+		data->pdata->prox_thresh_low = data->pdata->prox_thresh_low;
 		break;
 	}
 }
+
 static int proximity_open_window_type(struct taos_data *data)
 {
 	struct file *wintype_filp = NULL;
@@ -809,6 +801,8 @@ exit:
 	change_proximity_default_threshold(data);
 	return err;
 }
+#endif
+
 static int proximity_open_offset(struct taos_data *data)
 {
 	struct file *offset_filp = NULL;
@@ -855,8 +849,7 @@ static int proximity_adc_read(struct taos_data *taos)
 	mutex_lock(&taos->prox_mutex);
 	for (i = 0; i < OFFSET_ARRAY_LENGTH; i++) {
 		usleep_range(11000, 11000);
-		sum[i] = i2c_smbus_read_word_data(taos->i2c_client,
-			CMD_REG | PRX_LO);
+		sum[i] = proximity_get_adc(taos);
 		if (i == 0) {
 			min = sum[i];
 			max = sum[i];
@@ -881,33 +874,45 @@ static int proximity_store_offset(struct device *dev, bool do_calib)
 	struct file *offset_filp = NULL;
 	mm_segment_t old_fs;
 	int err = 0;
-	u16 max_ct = taos->pdata->prox_thresh_low /2;
 	u16 abnormal_ct = proximity_adc_read(taos);
 	u16 offset = 0;
 
 	if(do_calib) {
-		pr_err("%s: calibration start ", __func__);
-		if(abnormal_ct >500) {
-			pr_err("%s: crosstalk is lager than 500, this chip is bad smaple ", __func__);
+		/* tap offset button */
+		pr_info("[SENSOR] %s: calibration start \n", __func__);
+		if(abnormal_ct < CAL_SKIP_ADC)
+		{
+			taos->offset_value = 0;
+			taos->threshold_high= taos->pdata->prox_thresh_hi;
+			taos->threshold_low = taos->pdata->prox_thresh_low;
+			taos_thresh_set(taos);
+			taos->set_manual_thd = false;
+			taos->cal_result = 2;
+			pr_info("%s: crosstalk < %d, skip calibration\n", __func__, CAL_SKIP_ADC);
 		}
-
-		if(abnormal_ct > max_ct) {
-			offset = abnormal_ct - max_ct;
-
-			if((taos->pdata->prox_thresh_hi + offset) > 900)
-				pr_err("%s: detect threshold is lager than 900, this chip is bad smaple ", __func__);
+		else if((abnormal_ct >=CAL_SKIP_ADC) && (abnormal_ct <=CAL_FAIL_ADC))
+		{
+			offset = abnormal_ct / 2;
+			taos->offset_value = offset;
+			taos->threshold_high= taos->pdata->prox_thresh_hi + offset;
+			taos->threshold_low = taos->pdata->prox_thresh_low+ offset;
+			taos_thresh_set(taos);
+			taos->set_manual_thd = false;
+			taos->cal_result = 1;
 		}
-
-		taos->offset_value = offset;
-		taos->threshold_high= taos->pdata->prox_thresh_hi + offset;
-		taos->threshold_low = taos->pdata->prox_thresh_low+ offset;
-
-		taos_thresh_set(taos);
-		taos->set_manual_thd = false;
-		taos->cal_result = 1;
+		else
+		{
+			taos->offset_value = 0;
+			taos->threshold_high= taos->pdata->prox_thresh_hi;
+			taos->threshold_low = taos->pdata->prox_thresh_low;
+			taos_thresh_set(taos);
+			taos->set_manual_thd = false;
+			taos->cal_result = 0;
+			pr_info("%s: crosstalk > %d, calibration failed \n", __func__, CAL_FAIL_ADC);
+		}
 	} else {
-	/* tap reset button */
-		pr_err("%s: reset\n", __func__);
+		/* tap reset button */
+		pr_info("%s: reset\n", __func__);
 		taos->threshold_high= taos->pdata->prox_thresh_hi;
 		taos->threshold_low = taos->pdata->prox_thresh_low;
 		taos_thresh_set(taos);
@@ -915,8 +920,8 @@ static int proximity_store_offset(struct device *dev, bool do_calib)
 		taos->cal_result = 2;
 		taos->set_manual_thd = false;
 	}
-	printk("max_ct : %d, abnormal_ct : %d, offset : %d\n", max_ct, abnormal_ct, taos->offset_value);
-	// store offset in file
+	printk("%s: abnormal_ct : %d, offset : %d\n", __func__, abnormal_ct, taos->offset_value);
+	/* store offset in file */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
@@ -933,7 +938,6 @@ static int proximity_store_offset(struct device *dev, bool do_calib)
 		(char *)&taos->offset_value, sizeof(u16), &offset_filp->f_pos);
 	if (err != sizeof(u16)) {
 		pr_err("%s: Can't write the offset data to file\n", __func__);
-		err = -EIO;
 	}
 
 	filp_close(offset_filp, current->files);
@@ -971,9 +975,8 @@ static ssize_t proximity_cal_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	struct taos_data *taos = dev_get_drvdata(dev);
-	int ret = 0;
 
-	ret = proximity_open_offset(taos);
+	proximity_open_offset(taos);
 
 	return sprintf(buf, "%d,%d,%d\n",
 		taos->offset_value, taos->threshold_high, taos->threshold_low);
@@ -1036,8 +1039,7 @@ static ssize_t proximity_thresh_show(struct device *dev,
 	int thresh_hi = 0;
 
 	msleep(20);
-	thresh_hi = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MAXTHRESHLO));
+	thresh_hi = taos_proximity_get_threshold(taos, PRX_MAXTHRESHLO);
 
 	pr_err("%s: THRESHOLD = %d\n", __func__, thresh_hi);
 
@@ -1052,6 +1054,7 @@ static ssize_t proximity_thresh_store(struct device *dev,
 	int err = 0;
 
 	err = kstrtoint(buf, 10, &thresh_value);
+	pr_err( "%s, value = %d\n",__func__,thresh_value);
 	if (err < 0)
 		pr_err("%s, kstrtoint failed.", __func__);
 
@@ -1068,10 +1071,8 @@ static ssize_t thresh_high_show(struct device *dev,
 	int thresh_hi = 0,thresh_low = 0;
 
 	msleep(20);
-	thresh_low = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MINTHRESHLO));
-	thresh_hi = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MAXTHRESHLO));
+	thresh_low = taos_proximity_get_threshold(taos, PRX_MINTHRESHLO);
+	thresh_hi = taos_proximity_get_threshold(taos, PRX_MAXTHRESHLO);
 
 	pr_err("%s: thresh_hi = %d, thresh_low = %d\n", __func__, thresh_hi,thresh_low);
 
@@ -1104,10 +1105,8 @@ static ssize_t thresh_low_show(struct device *dev,
 	int thresh_hi = 0,thresh_low = 0;
 
 	msleep(20);
-	thresh_hi = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MAXTHRESHLO));
-	thresh_low = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MINTHRESHLO));
+	thresh_hi = taos_proximity_get_threshold(taos, PRX_MAXTHRESHLO);
+	thresh_low = taos_proximity_get_threshold(taos, PRX_MINTHRESHLO);
 
 	pr_err("%s: thresh_hi = %d, thresh_low = %d\n", __func__, thresh_hi,thresh_low);
 
@@ -1173,7 +1172,6 @@ static struct device_attribute dev_attr_light_raw_data =
 
 static DEVICE_ATTR(adc, S_IRUGO, lightsensor_file_state_show, NULL);
 static DEVICE_ATTR(lux, S_IRUGO, lightsensor_file_state_show, NULL);
-
 static DEVICE_ATTR(poll_delay, S_IRUGO | S_IWUSR | S_IWGRP,
 		   poll_delay_show, poll_delay_store);
 
@@ -1221,9 +1219,8 @@ static DEVICE_ATTR(prox_cal, S_IRUGO | S_IWUSR, proximity_cal_show,
 	proximity_cal_store);
 static DEVICE_ATTR(prox_avg, S_IRUGO|S_IWUSR, proximity_avg_show,
 	proximity_avg_store);
-static DEVICE_ATTR(state, S_IRUGO|S_IWUSR, proximity_state_show, NULL);
-
-static DEVICE_ATTR(prox_offset_pass, S_IRUGO|S_IWUSR,
+static DEVICE_ATTR(state, S_IRUGO, proximity_state_show, NULL);
+static DEVICE_ATTR(prox_offset_pass, S_IRUGO,
 	prox_offset_pass_show, NULL);
 static DEVICE_ATTR(prox_thresh, 0644, proximity_thresh_show,
 	proximity_thresh_store);
@@ -1306,16 +1303,16 @@ static void taos_work_func_prox(struct work_struct *work)
 {
 	struct taos_data *taos =
 		container_of(work, struct taos_data, work_prox);
-	u16 adc_data;
-	u16 threshold_high;
-	u16 threshold_low;
-	u8 prox_int_thresh[4];
+	int adc_data;
+	int threshold_high;
+	int threshold_low;
 	u8 chipid = 0x69;
-	int ret;
+	int ret =0;
 	int i =0;
 	int proximity_value = 0;
 
-	/* change Threshold */
+	/* disable INT */
+	disable_irq_nosync(taos->irq);
 
 	while(chipid != 0x69 && i < 10)
 	{
@@ -1323,55 +1320,54 @@ static void taos_work_func_prox(struct work_struct *work)
 		ret = opt_i2c_read(taos, CHIPID, &chipid);
 		i++;
 	}
+	if (ret < 0)
+		gprintk("opt_i2c_read failed, err = %d\n", ret);
 
+	/* change Threshold */
 	mutex_lock(&taos->prox_mutex);
-	adc_data = i2c_smbus_read_word_data(taos->i2c_client, CMD_REG | PRX_LO);
+	adc_data = proximity_get_adc(taos);
 	mutex_unlock(&taos->prox_mutex);
-	threshold_high = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MAXTHRESHLO));
-	threshold_low = i2c_smbus_read_word_data(taos->i2c_client,
-		(CMD_REG | PRX_MINTHRESHLO));
+
+	threshold_high = taos_proximity_get_threshold(taos, PRX_MAXTHRESHLO);
+	threshold_low = taos_proximity_get_threshold(taos, PRX_MINTHRESHLO);
 
 	pr_err("%s: hi = %d, low = %d, adc_data = %d\n", __func__,
 		taos->threshold_high, taos->threshold_low, adc_data);
 
 	if ((threshold_high ==  (taos->threshold_high)) &&
 		(adc_data >=  (taos->threshold_high))) {
-		proximity_value = 1;
+		proximity_value = STATE_CLOSE;
+#if defined(CONFIG_SEC_S_PROJECT) && defined(CONFIG_INV_MPU_IIO_PRIMARY)
+		input_report_rel(taos->proximity_input_dev,
+			REL_MISC, proximity_value+1);
+#else
 		input_report_abs(taos->proximity_input_dev,
-			ABS_DISTANCE, !proximity_value);
+			ABS_DISTANCE, proximity_value);
+#endif
 		input_sync(taos->proximity_input_dev);
-		pr_err("[%s] prox value = %d\n", __func__, !proximity_value);
-		prox_int_thresh[0] = (taos->threshold_low) & 0xFF;
-		prox_int_thresh[1] = (taos->threshold_low >> 8) & 0xFF;
-		prox_int_thresh[2] = (0xFFFF) & 0xFF;
-		prox_int_thresh[3] = (0xFFFF >> 8) & 0xFF;
-		for (i = 0; i < 4; i++)
-			opt_i2c_write(taos, (CMD_REG|(PRX_MINTHRESHLO + i)),
-			&prox_int_thresh[i]);
+		pr_info("[%s] prox value = %d\n", __func__, proximity_value);
 	} else if ((threshold_high == (0xFFFF)) &&
 	(adc_data <= (taos->threshold_low))) {
-		proximity_value = 0;
+		proximity_value = STATE_FAR;
+#if defined(CONFIG_SEC_S_PROJECT) && defined(CONFIG_INV_MPU_IIO_PRIMARY)
+		input_report_rel(taos->proximity_input_dev,
+			REL_MISC, proximity_value+1);
+#else
 		input_report_abs(taos->proximity_input_dev,
-			ABS_DISTANCE, !proximity_value);
+			ABS_DISTANCE, proximity_value);
+#endif
 		input_sync(taos->proximity_input_dev);
-		pr_err("[%s] prox value = %d\n", __func__, !proximity_value);
-		prox_int_thresh[0] = (0x0000) & 0xFF;
-		prox_int_thresh[1] = (0x0000 >> 8) & 0xFF;
-		prox_int_thresh[2] = (taos->threshold_high) & 0xFF;
-		prox_int_thresh[3] = (taos->threshold_high >> 8) & 0xFF;
-		for (i = 0; i < 4; i++)
-			opt_i2c_write(taos, (CMD_REG|(PRX_MINTHRESHLO + i)),
-			&prox_int_thresh[i]);
-
+		pr_info("[%s] prox value = %d\n", __func__, proximity_value);
 	} else {
 		pr_err("[%s]Error Case!adc=[%X], th_high=[%d], th_min=[%d]\n",
 			__func__, adc_data, threshold_high, threshold_low);
+		goto exit;
 	}
-
 	taos->proximity_value = proximity_value;
+	taos_thresh_set(taos);
 	/* reset Interrupt pin */
 	/* to active Interrupt, TMD2771x Interuupt pin shoud be reset. */
+exit:
 	i2c_smbus_write_byte(taos->i2c_client,
 	(CMD_REG|CMD_SPL_FN|CMD_PROXALS_INTCLR));
 
@@ -1383,18 +1379,16 @@ static void taos_work_func_prox_avg(struct work_struct *work)
 {
 	struct taos_data *taos = container_of(work, struct taos_data,
 		work_prox_avg);
-	u16 proximity_value = 0;
+	int proximity_value = 0;
 	int min = 0, max = 0, avg = 0;
 	int i = 0;
 
 	for (i = 0; i < PROX_AVG_COUNT; i++) {
 		mutex_lock(&taos->prox_mutex);
-		proximity_value = i2c_smbus_read_word_data(taos->i2c_client,
-			CMD_REG | PRX_LO);
+
+		proximity_value = proximity_get_adc(taos);
 		mutex_unlock(&taos->prox_mutex);
 		if (proximity_value > TAOS_PROX_MIN) {
-			if (proximity_value > TAOS_PROX_MAX)
-				proximity_value = TAOS_PROX_MAX;
 			avg += proximity_value;
 			if (!i)
 				min = proximity_value;
@@ -1442,11 +1436,11 @@ irqreturn_t taos_irq_handler(int irq, void *data)
 {
 	struct taos_data *ip = data;
 
+	if (ip->irq != -1) {
+		wake_lock_timeout(&ip->prx_wake_lock, 3*HZ);
+		queue_work(ip->wq, &ip->work_prox);
+	}
 	pr_err("taos interrupt handler is called\n");
-	wake_lock_timeout(&ip->prx_wake_lock, 3*HZ);
-	disable_irq_nosync(ip->irq);
-	queue_work(ip->wq, &ip->work_prox);
-
 	return IRQ_HANDLED;
 }
 
@@ -1506,11 +1500,6 @@ static int taos_get_initial_offset(struct taos_data *taos)
 	int ret = 0;
 	u8 p_offset = 0;
 
-	if (taos->pdata->power) {
-		//taos->pdata->power(true);
-		sensor_power_on_vdd(taos,1);
-	}
-
 	ret = proximity_open_offset(taos);
 	if(ret < 0) {
 		p_offset = 0;
@@ -1520,41 +1509,56 @@ static int taos_get_initial_offset(struct taos_data *taos)
 
 	pr_err("%s: initial offset = %d\n", __func__, p_offset);
 
-	if (taos->pdata->power) {
-		//taos->pdata->power(false);
-		sensor_power_on_vdd(taos,0);
-	}
-
 	return p_offset;
 }
 
 #ifdef CONFIG_OF
-
 /* device tree parsing function */
 static int taos_parse_dt(struct device *dev,
 			struct  taos_platform_data *pdata)
 {
 
 	struct device_node *np = dev->of_node;
-	int enable;
+
 	pdata->als_int = of_get_named_gpio_flags(np, "taos,irq_gpio",
 	0, &pdata->als_int_flags);
-	enable = of_get_named_gpio(np, "taos,en", 0);
-	pdata->prox_thresh_hi = 750,
-	pdata->prox_thresh_low = 580,
-	pdata->prox_th_hi_cal = 530,
-	pdata->prox_th_low_cal = 400,
-	pdata->als_time = 0xED,
+
+#if defined(CONFIG_SEC_S_PROJECT)
+	pdata->enable = of_get_named_gpio(np, "taos,en", 0);
+#endif
+
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+	//set trim
+	pdata->prox_rawdata_trim=130;
+	// set threshold - prox_rawdata_trim value
+	pdata->prox_thresh_hi = 480,
+	pdata->prox_thresh_low = 340,
+	pdata->prox_pulsecnt = 0x06,
+#else
+	pdata->prox_rawdata_trim=150;
+	pdata->prox_thresh_hi = 650,
+	pdata->prox_thresh_low = 470,
+	pdata->prox_pulsecnt = 0x08,
+#endif
+	pdata->prox_th_hi_cal = 380,
+	pdata->prox_th_low_cal = 250,
+	//set offset- prox_rawdata_trim value
+	pdata->crosstalk_max_offset = 350,
+	pdata->thresholed_max_offset = 750,
+	pdata->als_time = 0xEB,
 	pdata->intr_filter = 0x33,
-	pdata->prox_pulsecnt = 0x0c,
-	pdata->als_gain = 0x28,
+	pdata->als_gain = 0x22,
 	pdata->coef_atime = 50,
 	pdata->ga = 97,
 	pdata->coef_a = 1000,
 	pdata->coef_b = 1880,
 	pdata->coef_c = 642,
 	pdata->coef_d = 1140,
-	printk(KERN_INFO "%s irq_gpio:%d and enable gpio %d  \n", __func__, pdata->als_int, enable);
+#if defined(CONFIG_SEC_S_PROJECT)
+	printk(KERN_INFO "%s irq_gpio:%d and enable gpio %d  \n", __func__, pdata->als_int, pdata->enable);
+#else
+	printk(KERN_INFO "%s irq_gpio:%d\n", __func__, pdata->als_int);
+#endif
 	return 0;
 }
 #else
@@ -1564,6 +1568,7 @@ struct  taos_platform_data)
 	return -ENODEV;
 }
 #endif
+
 static int taos_i2c_probe(struct i2c_client *client,
 			  const struct i2c_device_id *id)
 {
@@ -1579,7 +1584,6 @@ static int taos_i2c_probe(struct i2c_client *client,
 		pr_err("%s: i2c functionality check failed!\n", __func__);
 		return ret;
 	}
-
 	taos = kzalloc(sizeof(struct taos_data), GFP_KERNEL);
 	if (!taos) {
 		pr_err("%s: failed to alloc memory for module data\n",
@@ -1611,9 +1615,11 @@ static int taos_i2c_probe(struct i2c_client *client,
 	taos->pdata = pdata;
 	taos->i2c_client = client;
 	i2c_set_clientdata(client, taos);
+	taos->lux = 0;
 	taos->offset_value = taos_get_initial_offset(taos);
+#ifdef CONFIG_PROX_WINDOW_TYPE
 	proximity_open_window_type(taos);
-
+#endif
 	taos->set_manual_thd = false;
 	sensor_power_on_vdd(taos,1);
 	/* ID Check */
@@ -1642,7 +1648,11 @@ static int taos_i2c_probe(struct i2c_client *client,
 	taos->proximity_input_dev = input_dev;
 	input_set_drvdata(input_dev, taos);
 	input_dev->name = "proximity_sensor";
+#if defined(CONFIG_SEC_S_PROJECT) && defined(CONFIG_INV_MPU_IIO_PRIMARY)
+	input_set_capability(input_dev, EV_REL, REL_MISC);
+#else
 	input_set_capability(input_dev, EV_ABS, ABS_DISTANCE);
+#endif
 	input_set_abs_params(input_dev, ABS_DISTANCE, 0, 1, 0, 0);
 
 	taos_dbgmsg("registering proximity input device\n");
@@ -1686,7 +1696,6 @@ static int taos_i2c_probe(struct i2c_client *client,
 		pr_err("%s: could not create workqueue\n", __func__);
 		goto err_create_workqueue;
 	}
-
 
 	taos->wq_avg = create_singlethread_workqueue("taos_wq_avg");
 	if (!taos->wq_avg) {
@@ -1751,6 +1760,9 @@ static int taos_i2c_probe(struct i2c_client *client,
 		pr_err("%s: could not setup irq\n", __func__);
 		goto err_setup_irq;
 	}
+#ifndef CONFIG_SEC_RUBENS_PROJECT
+	sensor_power_on_vdd(taos,0);
+#endif
 	goto done;
 	/* error, unwind it all */
 err_devicetree:
@@ -1785,17 +1797,16 @@ static int taos_suspend(struct device *dev)
 	/* We disable power only if proximity is disabled.  If proximity
 	   is enabled, we leave power on because proximity is allowed
 	   to wake up device.  We remove power without changing
-	   gp2a->power_state because we use that state in resume.
+	   taos->power_state because we use that state in resume.
 	*/
 	struct i2c_client *client = to_i2c_client(dev);
 	struct taos_data *taos = i2c_get_clientdata(client);
 
-	if (taos->power_state & LIGHT_ENABLED)
+	if (taos->power_state & LIGHT_ENABLED){
 		taos_light_disable(taos);
+	}
 	if (taos->power_state == LIGHT_ENABLED) {
 		taos_chip_off(taos);
-		//taos->pdata->power(false);
-		sensor_power_on_vdd(taos,0);
 	}
 	return 0;
 }
@@ -1807,13 +1818,12 @@ static int taos_resume(struct device *dev)
 	struct taos_data *taos = i2c_get_clientdata(client);
 
 	if (taos->power_state == LIGHT_ENABLED) {
-		//taos->pdata->power(true);
-		sensor_power_on_vdd(taos,1);
-		msleep(20);
 		taos_chip_on(taos);
 	}
-	if (taos->power_state & LIGHT_ENABLED)
+	if (taos->power_state & LIGHT_ENABLED){
 		taos_light_enable(taos);
+	}
+
 	return 0;
 }
 
@@ -1892,5 +1902,3 @@ module_exit(taos_exit);
 MODULE_AUTHOR("SAMSUNG");
 MODULE_DESCRIPTION("Optical Sensor driver for taos");
 MODULE_LICENSE("GPL");
-
-

@@ -358,8 +358,13 @@ static struct dsi_cmd_desc samsung_panel_elvss_update_cmds_4_8[] = {
 
 
 static struct dsi_cmd_desc samsung_panel_acl_on_cmds[] = {
+#if defined(CONFIG_MACH_S3VE3G_EUR)
+	{{DTYPE_DCS_LWRITE, 0, 0, 0, 0,
+		sizeof(acl_set_zero)}, acl_set_zero},
+#else
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
 		sizeof(acl_set_zero)}, acl_set_zero},
+#endif
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 0,
 		sizeof(acl_on)}, acl_on}
 };
@@ -1306,8 +1311,9 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	flag = CMD_REQ_SINGLE_TX;
-
+#if !defined(CONFIG_MACH_S3VE3G_EUR)
+	 flag = CMD_REQ_SINGLE_TX;
+#endif
 	switch (enable) {
 
 		case PANEL_ACL_ON:
@@ -1463,8 +1469,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	int i,j;
 #endif
 
-	printk("CALL mdss_dsi_panel_bl_ctrl backlight = %d\n", bl_level);
-
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return;
@@ -1524,11 +1528,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 #endif
 #endif
 	}
-
-	if( msd.mfd->panel_power_on == false){
-		pr_err("%s: panel power off no bl ctrl\n", __func__);
-		return;
-	}
 	
 #if defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	if (err_fg_working) {
@@ -1537,8 +1536,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	}
 #endif
 
-
-
+	if(bl_level)
+	msd.mfd->bl_previous = bl_level;
+	
 	switch (ctrl_pdata->bklt_ctrl) {
 
 	case BL_DCS_CMD:
@@ -1581,7 +1581,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 end:
 	return;
 }
-
+int bl_first_update=0;
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
@@ -1599,46 +1599,21 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	msd.mpd = pdata;
 	
 	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-
-#if 0
-	if (!msd.dstat.is_elvss_loaded) {
-			mpd.lcd_elvss_data[0] = lcd_id3;
-			msd.dstat.is_elvss_loaded = true;
-	}
 	
-	if (!msd.dstat.is_smart_dim_loaded) {
-         	char pBuffer[256] = {0,};
-        	int i;
-        	char *mtp_data;
-        	int mtp_cnt;
-
-		psmart = &(mpd.smart_s6e8aa0x01);
-                mtp_data = (char *)&(mpd.smart_s6e8aa0x01.MTP);
-		mtp_cnt = find_mtp(msd.mfd, mtp_data);
-
-		for (i = 0; i < MTP_DATA_SIZE; i++)
-			snprintf(pBuffer + strnlen(pBuffer, 256), 256, " %02x",
-				mtp_data[i]);
-			pr_debug("MTP: %s", pBuffer);
-
-			psmart->plux_table = mpd.lux_table;
-			psmart->lux_table_max = mpd.lux_table_max_cnt;
-			psmart->ldi_revision = 0x60;
-	
-			smart_dimming_init(psmart);
-	
-			msd.dstat.is_smart_dim_loaded = true;
-
-		}
-#endif
-
 			get_min_lux_table(&(mpd.gamma_initial[2]),
 						GAMMA_SET_MAX);
 			reset_gamma_level();
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
-
+		
+#if defined(CONFIG_MACH_S3VE3G_EUR)	
+	if(bl_first_update== 0)
+		pr_err("to maintain ddefault brightness \n");
+	else
+		mdss_dsi_panel_bl_ctrl(pdata,msd.mfd->bl_previous);
+#endif
+	
 	panel_state = MIPI_RESUME_STATE;
 #if defined(CONFIG_LCD_CLASS_DEVICE)
 	mdss_dsi_panel_cabc_dcs(ctrl, msd.dstat.siop_status);

@@ -337,6 +337,34 @@ static int eeprom_config_read_cal_data(struct msm_eeprom_ctrl_t *e_ctrl,
 
 	return rc;
 }
+
+static int32_t msm_eeprom_read_eeprom_data(struct msm_eeprom_ctrl_t *e_ctrl)
+{
+	int32_t rc = 0;
+
+	CDBG("%s:%d Enter\n", __func__, __LINE__);
+	/* check eeprom id */
+	rc = msm_eeprom_match_id(e_ctrl);
+	if (rc < 0) {
+		CDBG("%s: eeprom not matching %d\n", __func__, rc);
+		return rc;
+	}
+	/* read eeprom */
+	if (e_ctrl->cal_data.map) {
+		rc = read_eeprom_memory(e_ctrl, &e_ctrl->cal_data);
+		if (rc < 0) {
+			pr_err("%s: read cal data failed\n", __func__);
+			return rc;
+		}
+		e_ctrl->is_supported |= msm_eeprom_match_crc(
+						&e_ctrl->cal_data);
+	}
+
+	e_ctrl->is_supported = (e_ctrl->is_supported << 1) | 1;
+	CDBG("%s:%d Exit\n", __func__, __LINE__);
+	return rc;
+}
+
 static int eeprom_config_read_data(struct msm_eeprom_ctrl_t *e_ctrl,
 				   struct msm_eeprom_cfg_data *cdata)
 {
@@ -512,6 +540,8 @@ static int eeprom_config_write_data(struct msm_eeprom_ctrl_t *e_ctrl,
 		pr_err("%s: failed to power on eeprom\n", __func__);
 		goto FREE;
 	}
+	usleep_range(10*1000, 11*1000);
+	
 	if (cdata->cfg.write_data.compress) {
 		rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(
 			&(e_ctrl->i2c_client), cdata->cfg.write_data.addr,
@@ -553,6 +583,7 @@ static int eeprom_config_erase(struct msm_eeprom_ctrl_t *e_ctrl,
 		pr_err("%s: failed to power on eeprom\n", __func__);
 		return rc;
 	}
+	usleep_range(10*1000, 11*1000);
 	rc = msm_camera_spi_erase(&e_ctrl->i2c_client,
 				  cdata->cfg.erase_data.addr, cdata->cfg.erase_data.num_bytes);
 	if (rc < 0)
@@ -598,6 +629,20 @@ static int msm_eeprom_config(struct msm_eeprom_ctrl_t *e_ctrl,
 	case CFG_EEPROM_WRITE_DATA:
 		pr_warn("%s E CFG_EEPROM_WRITE_DATA\n", __func__);
 		rc = eeprom_config_write_data(e_ctrl, cdata);
+		break;
+	case CFG_EEPROM_READ_DATA_FROM_HW:
+		e_ctrl->is_supported = 0x01;
+ 		pr_err ("kernel is supported before%X\n",e_ctrl->is_supported);
+		rc = msm_eeprom_read_eeprom_data(e_ctrl);
+ 		pr_err ("kernel is supported after%X\n",e_ctrl->is_supported);
+		cdata->is_supported = e_ctrl->is_supported;
+		if (rc < 0) {
+			pr_err("%s:%d failed rc %d\n", __func__, __LINE__,  rc);
+			break;
+		}
+		rc = copy_to_user(cdata->cfg.read_data.dbuffer,
+			e_ctrl->cal_data.mapdata,
+			cdata->cfg.read_data.num_bytes);
 		break;
 	case CFG_EEPROM_GET_ERASESIZE:
 		CDBG("%s E CFG_EEPROM_GET_ERASESIZE\n", __func__);
@@ -1257,6 +1302,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	e_ctrl->is_supported = 0;
 	if (!of_node) {
 		pr_err("%s dev.of_node NULL\n", __func__);
+		kfree(e_ctrl);
 		return -EINVAL;
 	}
 
@@ -1265,6 +1311,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	CDBG("cell-index %d, rc %d\n", pdev->id, rc);
 	if (rc < 0) {
 		pr_err("failed rc %d\n", rc);
+		kfree(e_ctrl);
 		return rc;
 	}
 	e_ctrl->subdev_id = pdev->id;
@@ -1274,12 +1321,14 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	CDBG("qcom,cci-master %d, rc %d\n", e_ctrl->cci_master, rc);
 	if (rc < 0) {
 		pr_err("%s failed rc %d\n", __func__, rc);
+		kfree(e_ctrl);
 		return rc;
 	}
 	rc = of_property_read_u32(of_node, "qcom,slave-addr",
 				  &temp);
 	if (rc < 0) {
 		pr_err("%s failed rc %d\n", __func__, rc);
+		kfree(e_ctrl);
 		return rc;
 	}
 
@@ -1292,6 +1341,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 							struct msm_camera_cci_client), GFP_KERNEL);
 	if (!e_ctrl->i2c_client.cci_client) {
 		pr_err("%s failed no memory\n", __func__);
+		kfree(e_ctrl);
 		return -ENOMEM;
 	}
 

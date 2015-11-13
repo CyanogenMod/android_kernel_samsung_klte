@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1808,12 +1808,12 @@ static void free_commit_data(void *cdata)
 static void bke_switch(
 	void __iomem *baddr, uint32_t mas_index, bool req, int mode)
 {
-	uint32_t reg_val, val;
+	uint32_t reg_val, val, cur_val;
 
 	val = req << M_BKE_EN_EN_SHFT;
-	reg_val = readl_relaxed(M_BKE_EN_ADDR(baddr, mas_index)) &
-		M_BKE_EN_RMSK;
-	if (val == reg_val)
+	reg_val = readl_relaxed(M_BKE_EN_ADDR(baddr, mas_index)); 
+	cur_val = reg_val & M_BKE_EN_RMSK;
+	if (val == cur_val)
 		return;
 
 	if (!req && mode == BIMC_QOS_MODE_FIXED)
@@ -1882,7 +1882,7 @@ static void msm_bus_bimc_config_master(
 {
 	int mode, i, ports;
 	struct msm_bus_bimc_info *binfo;
-	uint64_t bw;
+	uint64_t bw = 0;
 
 	binfo = (struct msm_bus_bimc_info *)fab_pdata->hw_data;
 	ports = info->node_info->num_mports;
@@ -1891,7 +1891,7 @@ static void msm_bus_bimc_config_master(
 	 * Here check the details of dual configuration.
 	 * Take actions based on different modes.
 	 * Check for threshold if limiter mode, etc.
-	 */
+	*/
 
 	if (req_clk <= info->node_info->th[0]) {
 		mode = info->node_info->mode;
@@ -1986,23 +1986,14 @@ static void msm_bus_bimc_update_bw(struct msm_bus_inode_info *hop,
 			qbw.thm = bw;
 			/* Threshold high = 10% more than bw */
 			qbw.thh = div_s64((110 * bw), 100);
-#ifdef CONFIG_BW_LIMITER_FIX
 			/* Check if info is a shared master.
-			* If it is, mark it dirty
-			* If it isn't, then set QOS Bandwidth.
-			* Also if dual-conf is set, don't program bw regs.
-			**/
+			 * If it is, mark it dirty
+			 * If it isn't, then set QOS Bandwidth.
+			 * Also if dual-conf is set, don't program bw regs.
+			 **/
 			if (!info->node_info->dual_conf)
 				msm_bus_bimc_set_qos_bw(binfo,
 					info->node_info->qport[i], &qbw);
-#else
-			/* Check if info is a shared master.
-			 * If it is, mark it dirty
-			 * If it isn't, then set QOS Bandwidth
-			 **/
-			msm_bus_bimc_set_qos_bw(binfo,
-				info->node_info->qport[i], &qbw);
-#endif
 		}
 	}
 
@@ -2041,6 +2032,7 @@ static int msm_bus_bimc_commit(struct msm_bus_fabric_registration
 	msm_bus_remote_hw_commit(fab_pdata, hw_data, cdata);
 	return 0;
 }
+
 
 static void bimc_init_mas_reg(struct msm_bus_bimc_info *binfo,
 	struct msm_bus_inode_info *info,

@@ -87,9 +87,13 @@ enum {
 	ADC_DOCK_VOL_UP		= 0x0b, /* 0x01011 17.26K ohm */
 	ADC_DOCK_PLAY_PAUSE_KEY = 0x0d,
 	ADC_VZW_USB_DOCK	= 0x0e, /* 0x01110 28.7K ohm VZW Dock */
+	ADC_INCOMPATIBLE	= 0x0f, /* 0x01111 34K ohm */
 	ADC_SMARTDOCK		= 0x10, /* 0x10000 40.2K ohm */
 	ADC_INCOMPATIBLE2_CHG	= 0x11, /* 0x10001 49.9K ohm */
 	ADC_AUDIODOCK		= 0x12, /* 0x10010 64.9K ohm */
+	ADC_LANHUB		= 0x13, /* 0x10011 80.07K ohm */
+	ADC_CHARGING_CABLE	= 0x14, /* 0x10100 102K ohm */
+	ADC_HMT			= 0x15, /* 0x10101 121K ohm */
 	ADC_CEA936ATYPE1_CHG	= 0x17,	/* 0x10111 200K ohm */
 	ADC_JIG_USB_OFF		= 0x18, /* 0x11000 255K ohm */
 	ADC_JIG_USB_ON		= 0x19, /* 0x11001 301K ohm */
@@ -101,6 +105,7 @@ enum {
 #if defined(CONFIG_MUIC_DET_JACK)
 	ADC_EARJACK			= 0x1e, /* 0x11110 1000 or 1002 ohm */
 #endif
+	ADC_CHARGER		= 0x1e, /* 0x11110 1000 ohm*/
 	ADC_OPEN		= 0x1f
 };
 
@@ -696,6 +701,7 @@ static ssize_t max77803_muic_show_charger_type(struct device *dev,
 	case ADC_AUDIODOCK:
 	case ADC_DESKDOCK:
 	case ADC_CARDOCK:
+	case ADC_CHARGER:
 	case ADC_OPEN:
 		dev_info(info->dev, "%s: Dedicated Charger State\n", __func__);
 		return snprintf(buf, 4, "%d\n", 0);
@@ -1002,8 +1008,8 @@ static int max77803_muic_set_charging_type(struct max77803_muic_info *info,
 	int ret = 0;
 	u8 val;
 
-	dev_info(info->dev, "func:%s force_disable:%d\n",
-		 __func__, force_disable);
+	dev_info(info->dev, "func:%s cable_type:%d: force_disable:%d\n",
+		 __func__, info->cable_type, force_disable);
 	if (mdata->charger_cb) {
 		if (force_disable) {
 			if ((system_rev == 0)
@@ -1213,6 +1219,7 @@ static int max77803_muic_attach_usb_type(struct max77803_muic_info *info,
 		break;
 	case ADC_CEA936ATYPE1_CHG:
 	case ADC_CEA936ATYPE2_CHG:
+	case ADC_CHARGER:
 	case ADC_OPEN:
 		if (info->cable_type == CABLE_TYPE_USB_MUIC) {
 			dev_info(info->dev, "%s: duplicated(USB)\n", __func__);
@@ -1659,7 +1666,8 @@ void max77803_otg_control(struct max77803_muic_info *info, int enable)
 	|| defined(CONFIG_MACH_FLTEKTT) || defined(CONFIG_MACH_FLTELGT) \
 	|| defined(CONFIG_MACH_H3GDUOS_CTC) || defined(CONFIG_MACH_LT03SKT) \
 	|| defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)\
-	|| defined(CONFIG_MACH_FRESCOLTESKT)||defined(CONFIG_MACH_FRESCOLTEKTT)||defined(CONFIG_MACH_FRESCOLTELGT)
+	|| defined(CONFIG_MACH_FRESCOLTESKT)||defined(CONFIG_MACH_FRESCOLTEKTT)||defined(CONFIG_MACH_FRESCOLTELGT) \
+	|| defined(CONFIG_MACH_JACTIVESKT)
 		/* [MAX77804] Workaround to get rid of reading dummy(0x00) */
 		/* disable charger detection again */
 		max77803_read_reg(info->max77803->muic,
@@ -2103,6 +2111,10 @@ static int max77803_muic_handle_attach(struct max77803_muic_info *info,
 			ret = max77803_muic_set_charging_type(info, !vbvolt);
 		}
 		break;
+	case ADC_CHARGING_CABLE:
+		info->cable_type = CABLE_TYPE_CHARGING_CABLE_MUIC;
+		max77803_muic_set_charging_type(info, false);
+		break;
 	case ADC_SMARTDOCK:
 		max77803_muic_attach_smart_dock(info, adc, vbvolt, chgtyp);
 		break;
@@ -2197,6 +2209,7 @@ static int max77803_muic_handle_attach(struct max77803_muic_info *info,
 		break;
 	case ADC_CEA936ATYPE1_CHG:
 	case ADC_CEA936ATYPE2_CHG:
+	case ADC_CHARGER:
 	case ADC_OPEN:
 		switch (chgtyp) {
 		case CHGTYP_USB:
@@ -2236,14 +2249,22 @@ static int max77803_muic_handle_attach(struct max77803_muic_info *info,
 			break;
 		}
 		break;
+	case ADC_INCOMPATIBLE:
+		if (vbvolt) {
+			info->cable_type = CABLE_TYPE_INCOMPATIBLE_MUIC;
+			ret = max77803_muic_set_charging_type(info, !vbvolt);
+		}
+		break;
 	default:
-		dev_warn(info->dev, "%s: unsupported adc=0x%x\n", __func__, adc);
-
-		info->cable_type = CABLE_TYPE_INCOMPATIBLE_MUIC;
-
-		ret = max77803_muic_set_charging_type(info, !vbvolt);
-		if (ret)
-			info->cable_type = CABLE_TYPE_NONE_MUIC;
+		if (vbvolt) {
+			dev_warn(info->dev, "%s: unsupported adc=0x%x\n", __func__, adc);
+			info->cable_type = CABLE_TYPE_TA_MUIC;
+			ret = max77803_muic_set_charging_type(info, !vbvolt);
+			if (ret)
+				info->cable_type = CABLE_TYPE_NONE_MUIC;
+		} else {
+			dev_warn(info->dev, "%s: unsupported adc=0x%x\n", __func__, adc);
+		}
 		break;
 	}
 	return ret;
@@ -2292,6 +2313,11 @@ static int max77803_muic_handle_detach(struct max77803_muic_info *info, int irq)
 	}
 
 	switch (info->cable_type) {
+	case CABLE_TYPE_CHARGING_CABLE_MUIC:
+		dev_info(info->dev, "%s: CHARGING CABLE\n", __func__);
+		info->cable_type = CABLE_TYPE_NONE_MUIC;
+		max77803_muic_set_charging_type(info, true);
+		break;
 	case CABLE_TYPE_OTG_MUIC:
 		dev_info(info->dev, "%s: OTG\n", __func__);
 		info->cable_type = CABLE_TYPE_NONE_MUIC;
@@ -2475,12 +2501,11 @@ static int max77803_muic_filter_dev(struct max77803_muic_info *info,
 			pr_info("%s:%s ADC_GND & !adclow = OTG\n", DEV_NAME,
 					__func__);
 		break;
-	case (ADC_CEA936ATYPE1_CHG) ... (ADC_JIG_UART_ON):
-		if(info->cable_type != CABLE_TYPE_NONE_MUIC
-			&& chgtyp == CHGTYP_NO_VOLTAGE
-			&& info->chgtyp != chgtyp) {
-			intr = INT_DETACH;
-		}
+	case ADC_VZW_USB_DOCK:
+	case ADC_INCOMPATIBLE2_CHG:
+	case ADC_LANHUB:
+	case ADC_HMT:
+		intr = INT_DETACH;
 		break;
 	case ADC_OPEN:
 		if (!adcerr) {
@@ -2496,6 +2521,7 @@ static int max77803_muic_filter_dev(struct max77803_muic_info *info,
 				 chgtyp == CHGTYP_1A) {
 				switch (info->cable_type) {
 				case CABLE_TYPE_OTG_MUIC:
+				case CABLE_TYPE_CHARGING_CABLE_MUIC:
 				case CABLE_TYPE_DESKDOCK_MUIC:
 				case CABLE_TYPE_CARDOCK_MUIC:
 				case CABLE_TYPE_SMARTDOCK_MUIC:

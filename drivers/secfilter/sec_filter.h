@@ -15,6 +15,7 @@
 
 #ifndef SEC_FILTER_H_
 #define SEC_FILTER_H_
+#include    <linux/version.h>
 #include    <linux/init.h>
 #include    <linux/kernel.h>
 #include    <linux/module.h>
@@ -30,7 +31,19 @@
 #include    <linux/spinlock.h>
 #include    <net/netfilter/nf_queue.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)  // from 3.8, nf_queue functions does not use protocol family
+#define     _PF_DEFINED
+#endif
+
+#ifdef CONFIG_SEC_NET_FILTER
+int nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum);
+#endif
+
+void    clean_Managers(void);
+
+
 #define     PREPACKET_BUFFER_SIZE		11
+#define     ALLOWED_ID                  5001
 
 //  NOTIFICATION INFO.S START
 #define FILTER_VERSION  0
@@ -44,11 +57,12 @@
 #define SET_USER_SELECT     1
 #define SET_EXCEPTION_URL   2
 #define SET_ERROR_MSG       3
-#define MAX_CMDS            4
+#define SET_CLOSING_TIME    4
+#define MAX_CMDS            5
 //  USER COMMANDS END
 
 #define FILTER_MODE_OFF                 0
-#define	FILTER_MODE_CLOSING             100
+#define	FILTER_MODE_CLOSING             -1
 #define FILTER_MODE_ON_BLOCK            1
 #define FILTER_MODE_ON_RESPONSE         2
 #define FILTER_MODE_ON_BLOCK_REFER      11
@@ -57,7 +71,7 @@
 #define	SEC_MODULE_NAME "Samsung_URL_Filter"
 //  MACRO FUNCTION START
 #define SEC_FREE(x)                         if((x)!=NULL){kfree(x);(x)=NULL;}
-#define	USE_ATOMIC
+//#define	USE_ATOMIC
 #ifdef USE_ATOMIC
 #define SEC_MALLOC(x)                       kzalloc((x),(in_atomic()==0)?GFP_KERNEL:GFP_ATOMIC)
 #define SEC_spin_lock_irqsave(x, y)         spin_lock_irqsave((x), (y))
@@ -69,5 +83,8 @@
 #endif
 //  MACRO FUNCTION END
 
-extern  int filterMode;
+extern  int     filterMode;
+extern  char    *errorMsg;
+extern  int     errMsgSize;
+
 #endif /* SEC_FILTER_H_ */

@@ -44,8 +44,7 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 	pte = pte_offset_kernel(pmd, addr);
 	
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
-		do_lazy_mmu = 1;
+	do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
 		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
@@ -132,8 +131,7 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		return -ENOMEM;
 
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
-		do_lazy_mmu = 1;
+	do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
 		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);

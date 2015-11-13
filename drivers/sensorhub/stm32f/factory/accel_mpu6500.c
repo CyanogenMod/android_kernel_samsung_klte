@@ -123,19 +123,19 @@ int set_accel_cal(struct ssp_data *data)
 
 static int enable_accel_for_cal(struct ssp_data *data)
 {
-	u8 uBuf[4] = { 0, };
+	u8 uBuf[9] = { 0, };
 	s32 dMsDelay = get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]);
 	memcpy(&uBuf[0], &dMsDelay, 4);
 
 	if (atomic_read(&data->aSensorEnable) & (1 << ACCELEROMETER_SENSOR)) {
 		if (get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]) != 10) {
 			send_instruction(data, CHANGE_DELAY,
-				ACCELEROMETER_SENSOR, uBuf, 4);
+				ACCELEROMETER_SENSOR, uBuf, 9);
 			return SUCCESS;
 		}
 	} else {
 		send_instruction(data, ADD_SENSOR,
-			ACCELEROMETER_SENSOR, uBuf, 4);
+			ACCELEROMETER_SENSOR, uBuf, 9);
 	}
 
 	return FAIL;
@@ -143,14 +143,14 @@ static int enable_accel_for_cal(struct ssp_data *data)
 
 static void disable_accel_for_cal(struct ssp_data *data, int iDelayChanged)
 {
-	u8 uBuf[4] = { 0, };
+	u8 uBuf[9] = { 0, };
 	s32 dMsDelay = get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]);
 	memcpy(&uBuf[0], &dMsDelay, 4);
 
 	if (atomic_read(&data->aSensorEnable) & (1 << ACCELEROMETER_SENSOR)) {
 		if (iDelayChanged)
 			send_instruction(data, CHANGE_DELAY,
-				ACCELEROMETER_SENSOR, uBuf, 4);
+				ACCELEROMETER_SENSOR, uBuf, 9);
 	} else {
 		send_instruction(data, REMOVE_SENSOR,
 			ACCELEROMETER_SENSOR, uBuf, 4);

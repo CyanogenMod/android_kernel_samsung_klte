@@ -21,6 +21,14 @@ config WTL_ENCRYPTION_FILTER
 	help
 	Modification of encrypted filesystem for SD card encryption
 
+config ECRYPT_FS_VIRTUAL_FAT_XATTR
+	bool "eCryptfs support on virtual FAT xattr"
+	default n
+	depends on ECRYPT_FS
+	help
+	  Modification of encrypted filesystem for virtual FAT xattr
+
+	  
 config SDP
 	bool "Enables SDP"
 	default n

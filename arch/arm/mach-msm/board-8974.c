@@ -78,6 +78,10 @@ extern int msm_show_resume_irq_mask;
 #include <linux/leds-max77804k.h>
 #endif
 
+#ifdef CONFIG_LEDS_MAX77888
+#include <linux/leds-max77888.h>
+#endif
+
 #ifdef CONFIG_LEDS_MAX77828
 #include <linux/leds-max77828.h>
 #include <linux/leds.h>
@@ -95,7 +99,35 @@ extern int msm_show_resume_irq_mask;
 #include <mach/msm8974-thermistor.h>
 #endif
 
+#ifdef CONFIG_SEC_PATEK_PROJECT
+#include "board-patek-keypad.c"
+#endif
+
 extern int poweroff_charging;
+
+#ifdef CONFIG_SEC_S_PROJECT
+static struct regulator *vsensor_1p8;
+static int __init sensor_init(void)
+{
+	int ret;
+
+	if(poweroff_charging)
+		return 0;
+
+	vsensor_1p8 = regulator_get(NULL, "8084_lvs1");
+	if (IS_ERR(vsensor_1p8))
+		pr_err("[SENSOR] could not get 8084_lvs1, %ld\n",
+			PTR_ERR(vsensor_1p8));
+
+
+	ret = regulator_enable(vsensor_1p8);
+	if (ret)
+		pr_err("%s: error enabling regulator 1p8\n", __func__);
+
+	pr_info("%s: power on\n", __func__);
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_SENSORS_SSP
 static struct regulator *vsensor_2p85, *vsensor_1p8;
@@ -156,6 +188,24 @@ struct max77804k_led_platform_data max77804k_led_pdata = {
 	.leds[1].name = "torch-sec1",
 	.leds[1].id = MAX77804K_TORCH_LED_1,
 	.leds[1].cntrl_mode = MAX77804K_LED_CTRL_BY_FLASHSTB,
+	.leds[1].brightness = 0x06,
+};
+#endif
+
+#ifdef CONFIG_LEDS_MAX77888
+struct max77888_led_platform_data max77888_led_pdata = {
+	.num_leds = 2,
+
+	.leds[0].name = "leds-sec1",
+	.leds[0].id = MAX77888_FLASH_LED_1,
+	.leds[0].timer = MAX77888_FLASH_TIME_187P5MS,
+	.leds[0].timer_mode = MAX77888_TIMER_MODE_MAX_TIMER,
+	.leds[0].cntrl_mode = MAX77888_LED_CTRL_BY_FLASHSTB,
+	.leds[0].brightness = 0x3D,
+
+	.leds[1].name = "torch-sec1",
+	.leds[1].id = MAX77888_TORCH_LED_1,
+	.leds[1].cntrl_mode = MAX77888_LED_CTRL_BY_FLASHSTB,
 	.leds[1].brightness = 0x06,
 };
 #endif
@@ -282,21 +332,56 @@ MAX77826_VREG_CONSUMERS(BUCK1) = {
 MAX77826_VREG_CONSUMERS(BUCK2) = {
 	REGULATOR_SUPPLY("max77826_buck2",	NULL),
 };
-
+#if defined(CONFIG_SEC_S_PROJECT)
+MAX77826_VREG_INIT(LDO1, 1100000, 1100000, 0); /* ES705 VDD_CORE 1.1V */
+#else
 MAX77826_VREG_INIT(LDO1, 1200000, 1200000, 0);
+#endif
 MAX77826_VREG_INIT(LDO2, 1000000, 1000000, 0);
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO3, 1800000, 1800000, 0);
+MAX77826_VREG_INIT(LDO4, 1800000, 2950000, 0);
+#else
 MAX77826_VREG_INIT(LDO3, 1200000, 1200000, 0);
 MAX77826_VREG_INIT(LDO4, 1800000, 1800000, 0);
+#endif
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO5, 2800000, 2800000, 0);
+#else
 MAX77826_VREG_INIT(LDO5, 1800000, 1800000, 0);
-MAX77826_VREG_INIT(LDO6, 1800000, 1800000, 0);
+#endif
+MAX77826_VREG_INIT(LDO6, 1800000, 3300000, 0);
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO7, 2500000, 2500000, 0);
+#else
 MAX77826_VREG_INIT(LDO7, 1800000, 1800000, 0);
-MAX77826_VREG_INIT(LDO8, 1800000, 1800000, 0);
+#endif
+MAX77826_VREG_INIT(LDO8, 1800000, 3300000, 0);
+#if defined(CONFIG_SEC_PATEK_PROJECT)
 MAX77826_VREG_INIT(LDO9, 1800000, 1800000, 0);
-MAX77826_VREG_INIT(LDO10, 2800000, 2800000, 0);
+MAX77826_VREG_INIT(LDO10, 2950000, 2950000, 0);
+#else
+MAX77826_VREG_INIT(LDO9, 1800000, 1800000, 0);
+MAX77826_VREG_INIT(LDO10, 2800000, 2950000, 0);
+#endif
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO11, 1800000, 3000000, 0);
+#else
 MAX77826_VREG_INIT(LDO11, 2700000, 2950000, 0);
-MAX77826_VREG_INIT(LDO12, 3300000, 3300000, 0);
+#endif
+MAX77826_VREG_INIT(LDO12, 2500000, 3300000, 0);
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO13, 3000000, 3000000, 0);
+#else
 MAX77826_VREG_INIT(LDO13, 3300000, 3300000, 0);
+#endif
+#if defined(CONFIG_SEC_S_PROJECT)
+MAX77826_VREG_INIT(LDO14, 2800000, 2800000, 0); /* EAR MICBIAS 2.8V */
+#elif defined(CONFIG_SEC_PATEK_PROJECT)
+MAX77826_VREG_INIT(LDO14, 1800000, 3300000, 0);
+#else
 MAX77826_VREG_INIT(LDO14, 3300000, 3300000, 0);
+#endif
 MAX77826_VREG_INIT(LDO15, 1800000, 3300000, 0);
 MAX77826_VREG_INIT(BUCK1, 1225000, 1225000, 0);
 MAX77826_VREG_INIT(BUCK2, 3400000, 3400000, 0);
@@ -475,8 +560,6 @@ static struct of_dev_auxdata msm8974_auxdata_lookup[] __initdata = {
 			"msm-tsens", NULL),
 	OF_DEV_AUXDATA("qcom,qcedev", 0xFD440000, \
 			"qcedev.0", NULL),
-	OF_DEV_AUXDATA("qcom,qcrypto", 0xFD440000, \
-			"qcrypto.0", NULL),
 	OF_DEV_AUXDATA("qcom,hsic-host", 0xF9A00000, \
 			"msm_hsic_host", NULL),
 	OF_DEV_AUXDATA("qcom,hsic-smsc-hub", 0, "msm_smsc_hub",
@@ -520,8 +603,15 @@ void __init msm8974_init(void)
 	i2c_register_board_info(MAX77826_I2C_BUS_ID, max77826_pmic_info,
 		ARRAY_SIZE(max77826_pmic_info));
 #endif
+#ifdef CONFIG_SEC_S_PROJECT
+	sensor_init();
+#endif
 #ifdef CONFIG_SENSORS_SSP
 	sensor_hub_init();
+#endif
+
+#ifdef CONFIG_SEC_PATEK_PROJECT
+	platform_device_register(&folder_keypad_device);
 #endif
 
 #ifdef CONFIG_SEC_PM_DEBUG

@@ -473,7 +473,7 @@ static DEVICE_ATTR(vendor, S_IRUGO, magnetic_vendor_show, NULL);
 static DEVICE_ATTR(raw_data, S_IRUGO | S_IWUSR | S_IWGRP,
 	raw_data_show, raw_data_store);
 static DEVICE_ATTR(adc, S_IRUGO, adc_data_read, NULL);
-static DEVICE_ATTR(selftest, S_IRUGO, magnetic_get_selftest, NULL);
+static DEVICE_ATTR(selftest, S_IRUSR|S_IRGRP, magnetic_get_selftest, NULL);
 static DEVICE_ATTR(hw_offset, S_IRUGO, hw_offset_show, NULL);
 
 static struct device_attribute *mag_attrs[] = {

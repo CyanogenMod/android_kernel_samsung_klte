@@ -21,7 +21,7 @@
 #define LOW_BRIGHTNESS_LEVEL 20
 #define DIM_BRIGHTNESS_LEVEL 30
 #if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL)
-#if defined(CONFIG_MACH_MATISSELTE_VZW)
+#if defined(CONFIG_MACH_MATISSELTE_VZW) || defined(CONFIG_MACH_MATISSELTE_USC)  
 #define BL_MIN_BRIGHTNESS			1
 #define BL_MAX_BRIGHTNESS_LEVEL		101
 #define BL_MID_BRIGHTNESS_LEVEL		46
@@ -54,7 +54,6 @@
 
 #if defined(CONFIG_FB_MSM_MDSS_CPT_QHD_PANEL)
 #define SINGLE_WIRE_BL_CTRL 1
-#define DDI_VIDEO_ENHANCE_TUNING
 #define DT_CMD_HDR 6
 #endif
 
@@ -83,9 +82,11 @@ enum {
 	int bl_ldi_en;
 	int bl_sda;
 	int bl_scl;
+	int bl_ap_pwm;
 #elif defined(CONFIG_FB_MSM_MDSS_CPT_QHD_PANEL)
 	int lcd_en_gpio;
 	int lcd_on_gpio;
+	int lcd_io_1p8_en_gpio;
 #elif defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL)
 	int lcd_en_gpio;
 	int bl_ap_pwm;

@@ -1336,6 +1336,9 @@ static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 			SYNAPTICS_RMI4_PRODUCT_ID_SIZE);
 	fwu->product_id[SYNAPTICS_RMI4_PRODUCT_ID_SIZE] = 0;
 
+#if defined(CONFIG_MACH_JACTIVESKT)
+        /* Fortius Use only B Type. So read and use ic_revision_of_ic from IC */
+#else
 	/* Check the IC revision from product ID value
 	 * we can check the ic revision with f34_ctrl_3 but to read production
 	 * ID is more safity. because it is non-user writerble area.
@@ -1349,6 +1352,7 @@ static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 		} else
 		rmi4_data->ic_revision_of_ic = 0xA1;
 	}
+#endif
 
 	dev_info(&rmi4_data->i2c_client->dev, "%s: [IC] [F01 product info, ID(revision)] [0x%04X 0x%04X, %s(0X%X)]\n",
 			__func__, fwu->productinfo1,

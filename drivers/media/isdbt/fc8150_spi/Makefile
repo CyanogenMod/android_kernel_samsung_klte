@@ -1,11 +1,11 @@
-ifeq ($(CONFIG_ISDBT_FC8150_SPI),y)
+ifneq (,$(filter y, $(CONFIG_ISDBT_FC8150_SPI) $(CONFIG_ISDBT_FC8150_HKDI)))
 
 DRV_NAME = isdbt_fc8150
 
 #EXTRA_CFLAGS += -DDLOG
 
 
-obj-$(CONFIG_ISDBT_FC8150_SPI) += bbm.o \
+obj-y += bbm.o \
 							fc8150.o \
 							fc8150_bb.o \
 							fc8150_hpi.o \

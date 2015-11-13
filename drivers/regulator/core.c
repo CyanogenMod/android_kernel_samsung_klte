@@ -1989,7 +1989,7 @@ static int _regulator_do_set_voltage(struct regulator_dev *rdev,
 int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 {
 	struct regulator_dev *rdev = regulator->rdev;
-	int prev_min_uV, prev_max_uV;
+	int old_min_uV, old_max_uV;
 	int ret = 0;
 
 	mutex_lock(&rdev->mutex);
@@ -2012,23 +2012,26 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 	ret = regulator_check_voltage(rdev, &min_uV, &max_uV);
 	if (ret < 0)
 		goto out;
-
-	prev_min_uV = regulator->min_uV;
-	prev_max_uV = regulator->max_uV;
+	/* restore original values in case of error */
+	old_min_uV = regulator->min_uV;
+	old_max_uV = regulator->max_uV;
 
 	regulator->min_uV = min_uV;
 	regulator->max_uV = max_uV;
 
 	ret = regulator_check_consumers(rdev, &min_uV, &max_uV);
-	if (ret < 0) {
-		regulator->min_uV = prev_min_uV;
-		regulator->max_uV = prev_max_uV;
-		goto out;
-	}
+	if (ret < 0)
+		goto out2;
 
 	ret = _regulator_do_set_voltage(rdev, min_uV, max_uV);
-
+	if(ret < 0)
+		goto out2;
 out:
+	mutex_unlock(&rdev->mutex);
+	return ret;
+out2:
+	regulator->min_uV = old_min_uV;
+	regulator->max_uV = old_max_uV;
 	mutex_unlock(&rdev->mutex);
 	return ret;
 }
@@ -3773,6 +3776,17 @@ static int __init regulator_init_complete(void)
 
 		if (!enabled)
 			goto unlock;
+
+		/* Do not disable lod13, ldo14 for continuous splash booting (LCD driver)
+		 * kr0124.cho@samsung.com
+		 */
+		if (rdev_get_id(rdev) == 12 || rdev_get_id(rdev) == 13)
+			goto unlock;
+
+#if defined(CONFIG_MACH_CHAGALL_KDI)	// LCD power(ldo4)
+		if (rdev_get_id(rdev) == 3) 
+			goto unlock;
+#endif
 
 		if (has_full_constraints) {
 			/* We log since this may kill the system if it

@@ -9,3 +9,4 @@ obj-$(CONFIG_ADIS16400) += adis16400.o
 obj-y += mpu/
 obj-y += mpu_primary/
 obj-y += inv_mpu/
+obj-y += inv_sensors/

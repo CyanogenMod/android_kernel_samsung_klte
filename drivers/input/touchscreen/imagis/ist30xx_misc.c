@@ -43,11 +43,11 @@ int ist30xx_tkey_update_info(void)
 	TKEY_INFO *tkey = &ist30xx_tkey_info;
 
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_KEY_INFO1, &tkey_info1);
-	if (ret) return ret;
+	if (unlikely(ret)) return ret;
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_KEY_INFO2, &tkey_info2);
-	if (ret) return ret;
+	if (unlikely(ret)) return ret;
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_KEY_INFO3, &tkey_info3);
-	if (ret) return ret;
+	if (unlikely(ret)) return ret;
 
 	tkey->enable = ((tkey_info1 & (0xFF << 24)) ? true : false);
 	tkey->key_num = (tkey_info1 >> 16) & 0xFF;
@@ -71,13 +71,13 @@ int ist30xx_tsp_update_info(void)
 	TSP_INFO *tsp = &ist30xx_tsp_info;
 
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_TSP_SWAP_INFO, &tsp_swap);
-	if (ret) return ret;
+	if (unlikely(ret)) return ret;
 
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_TSP_DIRECTION, &tsp_dir);
-	if (ret) return ret;
+	if (unlikely(ret)) return ret;
 
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_TSP_CHNUM1, &tsp_ch_num);
-	if (ret || !tsp_ch_num) return ret;
+	if (unlikely(ret || !tsp_ch_num)) return ret;
 
 	tsp->finger_num = IST30XX_MAX_MT_FINGERS;
 
@@ -101,14 +101,14 @@ int ist30xx_check_valid_ch(int ch_tx, int ch_rx)
 	TKEY_INFO *tkey = &ist30xx_tkey_info;
 	TSP_INFO *tsp = &ist30xx_tsp_info;
 
-	if ((ch_tx > tsp->ch_num.tx) || (ch_rx > tsp->ch_num.rx))
+	if (unlikely((ch_tx > tsp->ch_num.tx) || (ch_rx > tsp->ch_num.rx)))
 		return 0;
 
 	if (tkey->enable) {
 		if (tkey->axis_rx) {
-			tsp_verb("tx: %d, rx: %d\n", ch_tx, ch_rx);
+			tsp_verb("%s: tx: %d, rx: %d\n", __func__, ch_tx, ch_rx);
 			if (ch_rx == tsp->ch_num.rx - 1) {
-				tsp_verb("ch_tx: %d\n", ch_tx);
+				tsp_verb("%s: ch_tx: %d\n", __func__, ch_tx);
 				if ((ch_tx == tkey->ch_num[0]) || (ch_tx == tkey->ch_num[1]) ||
 				    (ch_tx == tkey->ch_num[2]) || (ch_tx == tkey->ch_num[3]) ||
 				    (ch_tx == tkey->ch_num[4]))
@@ -142,34 +142,36 @@ int ist30xx_parse_touch_node(u8 flag, struct TSP_NODE_BUF *node)
 	u16 *raw = (u16 *)&node->raw;
 	u16 *base = (u16 *)&node->base;
 	u16 *filter = (u16 *)&node->filter;
+	u32 *tmp_rawbuf = ist30xx_frame_rawbuf;
+	u32 *tmp_fltbuf = ist30xx_frame_fltbuf;
 
 	for (i = 0; i < node->len; i++) {
 		if (flag & (NODE_FLAG_RAW | NODE_FLAG_BASE)) {
-			*raw++ = *ist30xx_frame_rawbuf & 0xFFF;
-			*base++ = (*ist30xx_frame_rawbuf >> 16) & 0xFFF;
+			*raw++ = *tmp_rawbuf & 0xFFF;
+			*base++ = (*tmp_rawbuf >> 16) & 0xFFF;
 
-			ist30xx_frame_rawbuf++;
+			tmp_rawbuf++;
 		}
 		if (flag & NODE_FLAG_FILTER)
-			*filter++ = *ist30xx_frame_fltbuf++ & 0xFFF;
+			*filter++ = *tmp_fltbuf++ & 0xFFF;
 	}
 
 #if TOUCH_NODE_PARSING_DEBUG
-	tsp_info("RAW - %d * %d\n", tsp->ch_num.tx, tsp->ch_num.rx);
+	tsp_info("%s: RAW - %d * %d\n", __func__, tsp->ch_num.tx, tsp->ch_num.rx);
 	for (i = 0; i < tsp->ch_num.tx; i++) {
 		printk("\n[ TSP ] ");
 		for (j = 0; j < tsp->ch_num.rx; j++)
 			printk("%4d ", node->raw[i][j]);
 	}
 
-	tsp_info("BASE - %d * %d\n", tsp->ch_num.tx, tsp->ch_num.rx);
+	tsp_info("%s: BASE - %d * %d\n", __func__, tsp->ch_num.tx, tsp->ch_num.rx);
 	for (i = 0; i < tsp->ch_num.tx; i++) {
 		printk("\n[ TSP ] ");
 		for (j = 0; j < tsp->ch_num.rx; j++)
 			printk("%4d ", node->base[i][j]);
 	}
 
-	tsp_info("FILTER - %d * %d\n", tsp->ch_num.tx, tsp->ch_num.rx);
+	tsp_info("%s: FILTER - %d * %d\n", __func__, tsp->ch_num.tx, tsp->ch_num.rx);
 	for (i = 0; i < tsp->ch_num.tx; i++) {
 		printk("\n[ TSP ] ");
 		for (j = 0; j < tsp->ch_num.rx; j++)
@@ -227,8 +229,8 @@ int parse_tsp_node(u8 flag, struct TSP_NODE_BUF *node, s16 *buf16)
 	s16 val = 0;
 	TSP_INFO *tsp = &ist30xx_tsp_info;
 
-	if ((flag != NODE_FLAG_RAW) && (flag != NODE_FLAG_BASE) &&
-	    (flag != NODE_FLAG_FILTER) && (flag != NODE_FLAG_DIFF))
+	if (unlikely((flag != NODE_FLAG_RAW) && (flag != NODE_FLAG_BASE) &&
+		     (flag != NODE_FLAG_FILTER) && (flag != NODE_FLAG_DIFF)))
 		return -EPERM;
 
 	if (tsp->dir.swap_xy) {
@@ -267,32 +269,45 @@ int parse_tsp_node(u8 flag, struct TSP_NODE_BUF *node, s16 *buf16)
 int ist30xx_read_touch_node(u8 flag, struct TSP_NODE_BUF *node)
 {
 	int ret = 0;
+	u32 addr = IST30XXB_RAW_ADDR;
+
+	if (ts_data->chip_id == IST3038_CHIP_ID)
+		addr = 0x401002D4;
 
 	ist30xx_disable_irq(ts_data);
+
+	if (flag & NODE_FLAG_NO_CCP) {
+		ret = ist30xx_cmd_run_device(ts_data->client, true);
+		if (unlikely(ret)) goto read_tsp_node_end;
+
+		ret = ist30xx_write_cmd(ts_data->client, CMD_USE_CORRECT_CP, 0);
+		if (unlikely(ret)) goto read_tsp_node_end;
+	}
+
 	ret = ist30xx_cmd_reg(ts_data->client, CMD_ENTER_REG_ACCESS);
-	if (ret) goto read_tsp_node_end;
+	if (unlikely(ret)) goto read_tsp_node_end;
 
 	ret = ist30xx_write_cmd(ts_data->client, IST30XX_RX_CNT_ADDR, node->len);
-	if (ret) goto read_tsp_node_end;
+	if (unlikely(ret)) goto read_tsp_node_end;
 
 	if (flag & (NODE_FLAG_RAW | NODE_FLAG_BASE)) {
-		tsp_debug("Reg addr: %x, size: %d\n", IST30XXB_RAW_ADDR, node->len);
-		ret = ist30xx_read_buf(ts_data->client, IST30XXB_RAW_ADDR,
+		tsp_debug("%s: Reg addr: %x, size: %d\n", __func__, addr, node->len);
+		ret = ist30xx_read_buf(ts_data->client, addr,
 				       ist30xx_frame_rawbuf, node->len);
-		if (ret) goto read_tsp_node_end;
+		if (unlikely(ret)) goto read_tsp_node_end;
 	}
 	if (flag & NODE_FLAG_FILTER) {
-		tsp_debug("Reg addr: %x, size: %d\n", IST30XXB_FILTER_ADDR, node->len);
+		tsp_debug("%s: Reg addr: %x, size: %d\n", __func__, IST30XXB_FILTER_ADDR, node->len);
 		ret = ist30xx_read_buf(ts_data->client, IST30XXB_FILTER_ADDR,
 				       ist30xx_frame_fltbuf, node->len);
-		if (ret) goto read_tsp_node_end;
+		if (unlikely(ret)) goto read_tsp_node_end;
 	}
 
 	ret = ist30xx_cmd_reg(ts_data->client, CMD_EXIT_REG_ACCESS);
-	if (ret) goto read_tsp_node_end;
+	if (unlikely(ret)) goto read_tsp_node_end;
 
 	ret = ist30xx_cmd_start_scan(ts_data->client);
-	if (ret) goto read_tsp_node_end;
+	if (unlikely(ret)) goto read_tsp_node_end;
 
 read_tsp_node_end:
 	ist30xx_enable_irq(ts_data);
@@ -310,7 +325,26 @@ ssize_t ist30xx_frame_refresh(struct device *dev, struct device_attribute *attr,
 	u8 flag = NODE_FLAG_RAW | NODE_FLAG_BASE | NODE_FLAG_FILTER;
 
 	ret = ist30xx_read_touch_node(flag, &tsp->node);
-	if (ret)
+	if (unlikely(ret))
+		ret = sprintf(buf, "cmd 1frame raw update fail\n");
+
+	ret = ist30xx_parse_touch_node(flag, &tsp->node);
+
+	return ret;
+}
+
+
+/* sysfs: /sys/class/touch/node/read_nocp */
+ssize_t ist30xx_frame_nocp(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	int ret = 0;
+	TSP_INFO *tsp = &ist30xx_tsp_info;
+	u8 flag = NODE_FLAG_RAW | NODE_FLAG_BASE | NODE_FLAG_FILTER |
+		  NODE_FLAG_NO_CCP;
+
+	ret = ist30xx_read_touch_node(flag, &tsp->node);
+	if (unlikely(ret))
 		ret = sprintf(buf, "cmd 1frame raw update fail\n");
 
 	ret = ist30xx_parse_touch_node(flag, &tsp->node);
@@ -396,11 +430,11 @@ ssize_t ist30xx_calib_store(struct device *dev, struct device_attribute *attr,
 	if (ms_delay > 10 && ms_delay < 1000) // 1sec ~ 100sec
 		calib_ms_delay = ms_delay;
 
-	tsp_info("Calibration wait time %dsec\n", calib_ms_delay / 10);
+	tsp_info("%s: Calibration wait time %dsec\n", __func__, calib_ms_delay / 10);
 
 	ist30xx_disable_irq(ts_data);
 	ret = ist30xx_cmd_run_device(ts_data->client, true);
-	if (ret) {
+	if (unlikely(ret)) {
 		ist30xx_enable_irq(ts_data);
 		return size;
 	}
@@ -421,11 +455,11 @@ ssize_t ist30xx_calib_show(struct device *dev, struct device_attribute *attr,
 	mutex_lock(&ist30xx_mutex);
 	ist30xx_disable_irq(ts_data);
 	ret = ist30xx_cmd_run_device(ts_data->client, true);
-	if (ret)
+	if (unlikely(ret))
 		goto calib_show_end;
 
 	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_CALIB_RESULT, &value);
-	if (ret) {
+	if (unlikely(ret)) {
 		count = sprintf(buf, "Error Read Calibration Result\n");
 		goto calib_show_end;
 	}
@@ -451,9 +485,9 @@ ssize_t ist30xx_power_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%d", &power_en);
 
-	tsp_info("Power enable: %d\n", power_en);
-	if (power_en > 1) {
-		tsp_err("Unknown argument value, %d\n", power_en);
+	tsp_info("%s: Power enable: %d\n", __func__, power_en);
+	if (unlikely(power_en > 1)) {
+		tsp_err("%s: Unknown argument value, %d\n", __func__, power_en);
 		return size;
 	}
 
@@ -483,9 +517,9 @@ ssize_t ist30xx_errcnt_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%d", &err_cnt);
 
-	if (err_cnt < 0) return size;
+	if (unlikely(err_cnt < 0)) return size;
 
-	tsp_info("Request reset error count: %d\n", err_cnt);
+	tsp_info("%s: Request reset error count: %d\n", __func__, err_cnt);
 
 	ist30xx_max_error_cnt = err_cnt;
 
@@ -502,9 +536,9 @@ ssize_t ist30xx_scancnt_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%d", &retry);
 
-	if (retry < 0) return size;
+	if (unlikely(retry < 0)) return size;
 
-	tsp_info("Timer scan count retry: %d\n", retry);
+	tsp_info("%s: Timer scan count retry: %d\n", __func__, retry);
 
 	ist30xx_max_scan_retry = retry;
 
@@ -520,9 +554,9 @@ ssize_t ist30xx_timerms_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%d", &ms);
 
-	if ((ms < 0) || (ms > 10000)) return size;
+	if (unlikely((ms < 0) || (ms > 10000))) return size;
 
-	tsp_info("Timer period ms: %dms\n", ms);
+	tsp_info("%s: Timer period ms: %dms\n", __func__, ms);
 
 	timer_period_ms = ms;
 
@@ -539,9 +573,9 @@ ssize_t ist30xx_printk_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%d", &level);
 
-	if ((level < DEV_ERR) || (level > DEV_VERB)) return size;
+	if (unlikely((level < DEV_ERR) || (level > DEV_VERB))) return size;
 
-	tsp_info("prink log level: %d\n", level);
+	tsp_info("%s: prink log level: %d\n", __func__, level);
 
 	ist30xx_dbg_level = level;
 
@@ -554,25 +588,93 @@ ssize_t ist30xx_printk_show(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "prink log level: %d\n", ist30xx_dbg_level);
 }
 
-/* sysfs: /sys/class/touch/sys/dummy */
-ssize_t ist30xx_dummy_show(struct device *dev, struct device_attribute *attr,
-			   char *buf)
+extern void ist30xx_scheduled_reset(void);
+extern int ist30xx_report_rate;
+/* sysfs: /sys/class/touch/sys/touch_rate */
+ssize_t ist30xx_touch_rate_store(struct device *dev, struct device_attribute *attr,
+				 const char *buf, size_t size)
 {
-	int ret;
-	int count = 0;
-	u32 value;
+	int rate;
 
-	ist30xx_disable_irq(ts_data);
-	ret = ist30xx_read_cmd(ts_data->client, CMD_GET_COORD, &value);
-	if (ret)
-		count = sprintf(buf, "Error Read Calibration Result\n");
-	ist30xx_enable_irq(ts_data);
+	sscanf(buf, "%d", &rate);                       // us
 
-	count = sprintf(buf,
-			"Calibration Status : %d, Max raw gap : %d - (raw: %08x)\n",
-			CALIB_TO_STATUS(value), CALIB_TO_GAP(value), value);
+	if (unlikely(rate > 0xFFFF)) return size;       // over 65.5ms
 
-	return count;
+	tsp_info("touch reporting rate: %d\n", rate);
+
+	ist30xx_report_rate = rate;
+
+	ist30xx_scheduled_reset();
+
+	return size;
+}
+
+extern int ist30xx_idle_rate;
+/* sysfs: /sys/class/touch/sys/idle_rate */
+ssize_t ist30xx_idle_scan_rate_store(struct device *dev, struct device_attribute *attr,
+				     const char *buf, size_t size)
+{
+	int rate;
+
+	sscanf(buf, "%d", &rate);                       // us
+
+	if (unlikely(rate > 0xFFFF)) return size;       // over 65.5ms
+
+	tsp_info("touch idle scan rate: %d\n", rate);
+
+	ist30xx_idle_rate = rate;
+
+	ist30xx_scheduled_reset();
+
+	return size;
+}
+
+extern void ist30xx_set_ta_mode(bool charging);
+/* sysfs: /sys/class/touch/sys/mode_ta */
+ssize_t ist30xx_ta_mode_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t size)
+{
+	int mode;
+
+	sscanf(buf, "%d", &mode);
+
+	if (unlikely((mode != 0) && (mode != 1))) return size;  // enable/disable
+
+	ist30xx_set_ta_mode(mode);
+
+	return size;
+}
+
+extern void ist30xx_set_call_mode(int mode);
+/* sysfs: /sys/class/touch/sys/mode_call */
+ssize_t ist30xx_call_mode_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	int mode;
+
+	sscanf(buf, "%d", &mode);
+
+	if (unlikely((mode != 0) && (mode != 1))) return size;  // enable/disable
+
+	ist30xx_set_call_mode(mode);
+
+	return size;
+}
+
+extern void ist30xx_set_cover_mode(int mode);
+/* sysfs: /sys/class/touch/sys/mode_cover */
+ssize_t ist30xx_cover_mode_store(struct device *dev, struct device_attribute *attr,
+				 const char *buf, size_t size)
+{
+	int mode;
+
+	sscanf(buf, "%d", &mode);
+
+	if (unlikely((mode != 0) && (mode != 1))) return size;  // enable/disable
+
+	ist30xx_set_cover_mode(mode);
+
+	return size;
 }
 
 
@@ -616,22 +718,27 @@ ssize_t ist30xxb_direct_store(struct device *dev, struct device_attribute *attr,
 
 	sscanf(buf, "%c %x %x", &direct->cmd, &direct->addr, &direct->val);
 
-	tsp_debug("Direct cmd: %c, addr: %x, val: %x\n",
-		  direct->cmd, direct->addr, direct->val);
+	tsp_debug("%s: Direct cmd: %c, addr: %x, val: %x\n",
+		  __func__, direct->cmd, direct->addr, direct->val);
 
-	if ((direct->cmd != DIRECT_CMD_WRITE) && (direct->cmd != DIRECT_CMD_READ)) {
-		tsp_warn("Direct cmd is not correct!\n");
+	if (unlikely((direct->cmd != DIRECT_CMD_WRITE) &&
+		     (direct->cmd != DIRECT_CMD_READ))) {
+		tsp_warn("%s: Direct cmd is not correct!\n", __func__);
 		return size;
 	}
 
+	if (ist30xx_intr_wait(30) < 0) return size;
+	
+	ts_data->status.event_mode = false;
 	if (direct->cmd == DIRECT_CMD_WRITE) {
 		ret = ist30xx_write_cmd(ts_data->client, DIRECT_ADDR(direct->addr),
 					direct->val);
 		ret = ist30xx_read_cmd(ts_data->client, DIRECT_ADDR(direct->addr),
 				       &direct->val);
-		tsp_debug("Direct write addr: %x, val: %x\n",
-			  direct->addr, direct->val);
+		tsp_debug("%s: Direct write addr: %x, val: %x\n",
+			  __func__, direct->addr, direct->val);
 	}
+	ts_data->status.event_mode = true;
 
 	return size;
 }
@@ -650,20 +757,20 @@ ssize_t ist30xxb_direct_show(struct device *dev, struct device_attribute *attr,
 
 	DIRECT_INFO *direct = (DIRECT_INFO *)&ist30xx_direct;
 
-	if (direct->cmd != DIRECT_CMD_READ)
+	if (unlikely(direct->cmd != DIRECT_CMD_READ))
 		return sprintf(buf, "ex) echo r addr len > direct\n");
 
 	len = direct->val;
 	addr = DIRECT_ADDR(direct->addr);
 
+	if (ist30xx_intr_wait(30) < 0) return 0;
 	ts_data->status.event_mode = false;
-	ist30xx_disable_irq(ts_data);
 	while (len > 0) {
 		if (len < max_len) max_len = len;
 
 		memset(buf32, 0, sizeof(buf32));
 		ret = ist30xxb_burst_read(ts_data->client, addr, buf32, max_len);
-		if (ret) {
+		if (unlikely(ret)) {
 			count = sprintf(buf, "I2C Burst read fail, addr: %x\n", addr);
 			break;
 		}
@@ -678,10 +785,9 @@ ssize_t ist30xxb_direct_show(struct device *dev, struct device_attribute *attr,
 		addr += max_len * IST30XX_DATA_LEN;
 		len -= max_len;
 	}
-	ist30xx_enable_irq(ts_data);
 	ts_data->status.event_mode = true;
 
-	tsp_debug("%s", buf);
+	tsp_debug("%s: %s", __func__, buf);
 
 	return count;
 }
@@ -707,13 +813,11 @@ ssize_t tunes_regcmd_store(struct device *dev, struct device_attribute *attr,
 	case TUNES_CMD_REG_ENTER:
 		ist30xx_disable_irq(ts_data);
 		ret = ist30xx_cmd_run_device(ts_data->client, true);
-		if (ret)
-			goto regcmd_fail;
+		if (unlikely(ret)) goto regcmd_fail;
 
 		/* enter reg access mode */
 		ret = ist30xx_cmd_reg(ts_data->client, CMD_ENTER_REG_ACCESS);
-		if (ret)
-			goto regcmd_fail;
+		if (unlikely(ret)) goto regcmd_fail;
 
 		ist30xx_reg_mode = true;
 
@@ -721,12 +825,10 @@ ssize_t tunes_regcmd_store(struct device *dev, struct device_attribute *attr,
 	case TUNES_CMD_REG_EXIT:
 		/* exit reg access mode */
 		ret = ist30xx_cmd_reg(ts_data->client, CMD_EXIT_REG_ACCESS);
-		if (ret)
-			goto regcmd_fail;
+		if (unlikely(ret)) goto regcmd_fail;
 
 		ret = ist30xx_cmd_start_scan(ts_data->client);
-		if (ret)
-			goto regcmd_fail;
+		if (unlikely(ret)) goto regcmd_fail;
 
 		ist30xx_reg_mode = false;
 
@@ -741,7 +843,7 @@ ssize_t tunes_regcmd_store(struct device *dev, struct device_attribute *attr,
 	return size;
 
 regcmd_fail:
-	tsp_err("Tunes regcmd i2c_fail, ret=%d\n", ret);
+	tsp_err("%s: Tunes regcmd i2c_fail, ret=%d\n", __func__, ret);
 	return size;
 }
 
@@ -765,18 +867,18 @@ ssize_t tunes_reg_store(struct device *dev, struct device_attribute *attr,
 	u32 *buf32 = (u32 *)buf;
 	int waddr, wcnt = 0, len = 0;
 
-	if (ist30xx_tunes.cmd != TUNES_CMD_WRITE) {
-		tsp_err("error, IST30XX_REG_CMD is not correct!\n");
+	if (unlikely(ist30xx_tunes.cmd != TUNES_CMD_WRITE)) {
+		tsp_err("%s: error, IST30XX_REG_CMD is not correct!\n", __func__);
 		return size;
 	}
 
-	if (!ist30xx_reg_mode) {
-		tsp_err("error, IST30XX_REG_CMD is not ready!\n");
+	if (unlikely(!ist30xx_reg_mode)) {
+		tsp_err("%s: error, IST30XX_REG_CMD is not ready!\n", __func__);
 		return size;
 	}
 
-	if (!tunes_cmd_done) {
-		tsp_err("error, IST30XX_REG_CMD is not ready!\n");
+	if (unlikely(!tunes_cmd_done)) {
+		tsp_err("%s: error, IST30XX_REG_CMD is not ready!\n", __func__);
 		return size;
 	}
 
@@ -788,8 +890,8 @@ ssize_t tunes_reg_store(struct device *dev, struct device_attribute *attr,
 
 	while (wcnt < ist30xx_tunes.len) {
 		ret = ist30xx_write_buf(ts_data->client, waddr, buf32, len);
-		if (ret) {
-			tsp_err("Tunes regstore i2c_fail, ret=%d\n", ret);
+		if (unlikely(ret)) {
+			tsp_err("%s: Tunes regstore i2c_fail, ret=%d\n", __func__, ret);
 			return size;
 		}
 
@@ -818,20 +920,20 @@ ssize_t tunes_reg_show(struct device *dev, struct device_attribute *attr,
 	unsigned long flags;
 #endif
 
-	if (ist30xx_tunes.cmd != TUNES_CMD_READ) {
-		tsp_err("error, IST30XX_REG_CMD is not correct!\n");
+	if (unlikely(ist30xx_tunes.cmd != TUNES_CMD_READ)) {
+		tsp_err("%s: error, IST30XX_REG_CMD is not correct!\n", __func__);
 		return 0;
 	}
 
-	if (!tunes_cmd_done) {
-		tsp_err("error, IST30XX_REG_CMD is not ready!\n");
+	if (unlikely(!tunes_cmd_done)) {
+		tsp_err("%s: error, IST30XX_REG_CMD is not ready!\n", __func__);
 		return 0;
 	}
 
 	size = ist30xx_tunes.len;
 	ret = ist30xx_write_cmd(ts_data->client, IST30XX_RX_CNT_ADDR, size);
-	if (ret) {
-		tsp_err("Tunes regshow i2c_fail, ret=%d\n", ret);
+	if (unlikely(ret)) {
+		tsp_err("%s: Tunes regshow i2c_fail, ret=%d\n", __func__, ret);
 		return 0;
 	}
 
@@ -842,8 +944,8 @@ ssize_t tunes_reg_show(struct device *dev, struct device_attribute *attr,
 #if I2C_MONOPOLY_MODE
 	local_irq_restore(flags);       // Activated only when the GPIO I2C is used
 #endif
-	if (ret) {
-		tsp_err("Tunes regshow i2c_fail, ret=%d\n", ret);
+	if (unlikely(ret)) {
+		tsp_err("%s: Tunes regshow i2c_fail, ret=%d\n", __func__, ret);
 		return size;
 	}
 
@@ -895,8 +997,8 @@ ssize_t tunes_adb_store(struct device *dev, struct device_attribute *attr,
 			token[8] = 0;
 			val = simple_strtoul(token, &tmp, 16);
 			ret = ist30xx_write_buf(ts_data->client, addr, &val, 1);
-			if (ret) {
-				tsp_err("Tunes regstore i2c_fail, ret=%d\n", ret);
+			if (unlikely(ret)) {
+				tsp_err("%s: Tunes regstore i2c_fail, ret=%d\n", __func__, ret);
 				return size;
 			}
 
@@ -915,24 +1017,20 @@ ssize_t tunes_adb_store(struct device *dev, struct device_attribute *attr,
 	case TUNES_CMD_REG_ENTER:   /* enter */
 		ist30xx_disable_irq(ts_data);
 		ret = ist30xx_cmd_run_device(ts_data->client, true);
-		if (ret < 0)
-			goto cmd_fail;
+		if (unlikely(ret < 0)) goto cmd_fail;
 
 		ret = ist30xx_cmd_reg(ts_data->client, CMD_ENTER_REG_ACCESS);
-		if (ret < 0)
-			goto cmd_fail;
+		if (unlikely(ret < 0)) goto cmd_fail;
 		ist30xx_reg_mode = true;
 		break;
 
 	case TUNES_CMD_REG_EXIT:   /* exit */
 		if (ist30xx_reg_mode == true) {
 			ret = ist30xx_cmd_reg(ts_data->client, CMD_EXIT_REG_ACCESS);
-			if (ret < 0)
-				goto cmd_fail;
+			if (unlikely(ret < 0)) goto cmd_fail;
 
 			ret = ist30xx_cmd_start_scan(ts_data->client);
-			if (ret < 0)
-				goto cmd_fail;
+			if (unlikely(ret < 0)) goto cmd_fail;
 			ist30xx_reg_mode = false;
 			ist30xx_enable_irq(ts_data);
 		}
@@ -945,7 +1043,7 @@ ssize_t tunes_adb_store(struct device *dev, struct device_attribute *attr,
 	return size;
 
 cmd_fail:
-	tsp_err("Tunes adb i2c_fail\n");
+	tsp_err("%s: Tunes adb i2c_fail\n", __func__);
 	return size;
 }
 
@@ -961,8 +1059,8 @@ ssize_t tunes_adb_show(struct device *dev, struct device_attribute *attr,
 #endif
 
 	ret = ist30xx_write_cmd(ts_data->client, IST30XX_RX_CNT_ADDR, ist30xx_tunes.len);
-	if (ret) {
-		tsp_err("Tunes regshow i2c_fail, ret=%d\n", ret);
+	if (unlikely(ret)) {
+		tsp_err("%s: Tunes regshow i2c_fail, ret=%d\n", __func__, ret);
 		return size;
 	}
 
@@ -974,8 +1072,8 @@ ssize_t tunes_adb_show(struct device *dev, struct device_attribute *attr,
 #if I2C_MONOPOLY_MODE
 	local_irq_restore(flags);
 #endif
-	if (ret) {
-		tsp_err("Tunes regshow i2c_fail, ret=%d\n", ret);
+	if (unlikely(ret)) {
+		tsp_err("%s: Tunes regshow i2c_fail, ret=%d\n", __func__, ret);
 		return size;
 	}
 
@@ -1000,8 +1098,8 @@ ssize_t ist30xx_algr_store(struct device *dev, struct device_attribute *attr,
 			   const char *buf, size_t size)
 {
 	sscanf(buf, "%x %d", &ist30xx_algr_addr, &ist30xx_algr_size);
-	tsp_info("Algorithm addr: 0x%x, count: %d\n",
-		 ist30xx_algr_addr, ist30xx_algr_size);
+	tsp_info("%s: Algorithm addr: 0x%x, count: %d\n",
+		 __func__, ist30xx_algr_addr, ist30xx_algr_size);
 
 	ist30xx_algr_addr |= IST30XXB_ACCESS_ADDR;
 
@@ -1016,12 +1114,12 @@ ssize_t ist30xx_algr_show(struct device *dev, struct device_attribute *attr,
 	int count = 0;
 
 	ret = ist30xx_read_cmd(ts_data->client, IST30XXB_MEM_ALGORITHM, &algr_addr);
-	if (ret) {
-		tsp_warn("Algorithm mem addr read fail!\n");
+	if (unlikely(ret)) {
+		tsp_warn("%s: Algorithm mem addr read fail!\n", __func__);
 		return 0;
 	}
 
-	tsp_info("algr_addr(0x%x): 0x%x\n", IST30XXB_MEM_ALGORITHM, algr_addr);
+	tsp_info("%s: algr_addr(0x%x): 0x%x\n", __func__, IST30XXB_MEM_ALGORITHM, algr_addr);
 
 	count = sprintf(buf, "Algorithm addr : 0x%x\n", algr_addr);
 
@@ -1029,26 +1127,60 @@ ssize_t ist30xx_algr_show(struct device *dev, struct device_attribute *attr,
 }
 #endif // IST30XX_ALGORITHM_MODE
 
+/* sysfs: /sys/class/touch/tunes/intr_debug */
+extern u32 intr_debug_addr, intr_debug_size;
+ssize_t intr_debug_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t size)
+{
+	sscanf(buf, "%x %d", &intr_debug_addr, &intr_debug_size);
+	tsp_info("Interrupt debug addr: 0x%x, count: %d\n",
+		 intr_debug_addr, intr_debug_size);
+
+	intr_debug_addr |= IST30XXB_ACCESS_ADDR;
+
+	return size;
+}
+
+ssize_t intr_debug_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	int count = 0;
+
+	tsp_info("intr_debug_addr(0x%x): %d\n", intr_debug_addr, intr_debug_size);
+
+	count = sprintf(buf, "intr_debug_addr(0x%x): %d\n",
+			intr_debug_addr, intr_debug_size);
+
+	return count;
+}
+
 #define MISC_DEFAULT_ATTR	(0644)
 
-/* sysfs  */
+/* sysfs : node */
 static DEVICE_ATTR(refresh, MISC_DEFAULT_ATTR, ist30xx_frame_refresh, NULL);
+static DEVICE_ATTR(nocp, MISC_DEFAULT_ATTR, ist30xx_frame_nocp, NULL);
 static DEVICE_ATTR(filter, MISC_DEFAULT_ATTR, ist30xx_filter_show, NULL);
 static DEVICE_ATTR(raw, MISC_DEFAULT_ATTR, ist30xx_raw_show, NULL);
 static DEVICE_ATTR(base, MISC_DEFAULT_ATTR, ist30xx_base_show, NULL);
 static DEVICE_ATTR(diff, MISC_DEFAULT_ATTR, ist30xx_diff_show, NULL);
 
+/* sysfs : sys */
 static DEVICE_ATTR(printk, MISC_DEFAULT_ATTR, ist30xx_printk_show, ist30xx_printk_store);
 static DEVICE_ATTR(direct, MISC_DEFAULT_ATTR, ist30xxb_direct_show, ist30xxb_direct_store);
 static DEVICE_ATTR(clb, MISC_DEFAULT_ATTR, ist30xx_calib_show, ist30xx_calib_store);
 static DEVICE_ATTR(tsp_power, MISC_DEFAULT_ATTR, NULL, ist30xx_power_store);
 static DEVICE_ATTR(errcnt, MISC_DEFAULT_ATTR, NULL, ist30xx_errcnt_store);
-static DEVICE_ATTR(dummy, MISC_DEFAULT_ATTR, ist30xx_dummy_show, NULL);
 #if IST30XX_EVENT_MODE
 static DEVICE_ATTR(scancnt, MISC_DEFAULT_ATTR, NULL, ist30xx_scancnt_store);
 static DEVICE_ATTR(timerms, MISC_DEFAULT_ATTR, NULL, ist30xx_timerms_store);
 #endif
+static DEVICE_ATTR(report_rate, MISC_DEFAULT_ATTR, NULL, ist30xx_touch_rate_store);
+static DEVICE_ATTR(idle_rate, MISC_DEFAULT_ATTR, NULL, ist30xx_idle_scan_rate_store);
+static DEVICE_ATTR(mode_ta, MISC_DEFAULT_ATTR, NULL, ist30xx_ta_mode_store);
+static DEVICE_ATTR(mode_call, MISC_DEFAULT_ATTR, NULL, ist30xx_call_mode_store);
+static DEVICE_ATTR(mode_cover, MISC_DEFAULT_ATTR, NULL, ist30xx_cover_mode_store);
 
+/* sysfs : tunes */
 static DEVICE_ATTR(regcmd, MISC_DEFAULT_ATTR, tunes_regcmd_show, tunes_regcmd_store);
 static DEVICE_ATTR(reg, MISC_DEFAULT_ATTR, tunes_reg_show, tunes_reg_store);
 static DEVICE_ATTR(tunes_fw, MISC_DEFAULT_ATTR, NULL, tunes_fw_store);
@@ -1056,9 +1188,11 @@ static DEVICE_ATTR(adb, MISC_DEFAULT_ATTR, tunes_adb_show, tunes_adb_store);
 #if IST30XX_ALGORITHM_MODE
 static DEVICE_ATTR(algorithm, MISC_DEFAULT_ATTR, ist30xx_algr_show, ist30xx_algr_store);
 #endif
+static DEVICE_ATTR(intr_debug, MISC_DEFAULT_ATTR, intr_debug_show, intr_debug_store);
 
 static struct attribute *node_attributes[] = {
 	&dev_attr_refresh.attr,
+	&dev_attr_nocp.attr,
 	&dev_attr_filter.attr,
 	&dev_attr_raw.attr,
 	&dev_attr_base.attr,
@@ -1072,11 +1206,15 @@ static struct attribute *sys_attributes[] = {
 	&dev_attr_clb.attr,
 	&dev_attr_tsp_power.attr,
 	&dev_attr_errcnt.attr,
-	&dev_attr_dummy.attr,
 #if IST30XX_EVENT_MODE
 	&dev_attr_scancnt.attr,
 	&dev_attr_timerms.attr,
 #endif
+	&dev_attr_report_rate.attr,
+	&dev_attr_idle_rate.attr,
+	&dev_attr_mode_ta.attr,
+	&dev_attr_mode_call.attr,
+	&dev_attr_mode_cover.attr,
 	NULL,
 };
 
@@ -1088,6 +1226,7 @@ static struct attribute *tunes_attributes[] = {
 #if IST30XX_ALGORITHM_MODE
 	&dev_attr_algorithm.attr,
 #endif
+	&dev_attr_intr_debug.attr,
 	NULL,
 };
 
@@ -1115,21 +1254,24 @@ int ist30xx_init_misc_sysfs(void)
 	ist30xx_sys_dev = device_create(ist30xx_class, NULL, 0, NULL, "sys");
 
 	/* /sys/class/touch/sys/... */
-	if (sysfs_create_group(&ist30xx_sys_dev->kobj, &sys_attr_group))
+	if (unlikely(sysfs_create_group(&ist30xx_sys_dev->kobj,
+					&sys_attr_group)))
 		tsp_err("Failed to create sysfs group(%s)!\n", "sys");
 
 	/* /sys/class/touch/tunes */
 	ist30xx_tunes_dev = device_create(ist30xx_class, NULL, 0, NULL, "tunes");
 
 	/* /sys/class/touch/tunes/... */
-	if (sysfs_create_group(&ist30xx_tunes_dev->kobj, &tunes_attr_group))
+	if (unlikely(sysfs_create_group(&ist30xx_tunes_dev->kobj,
+					&tunes_attr_group)))
 		tsp_err("Failed to create sysfs group(%s)!\n", "tunes");
 
 	/* /sys/class/touch/node */
 	ist30xx_node_dev = device_create(ist30xx_class, NULL, 0, NULL, "node");
 
 	/* /sys/class/touch/node/... */
-	if (sysfs_create_group(&ist30xx_node_dev->kobj, &node_attr_group))
+	if (unlikely(sysfs_create_group(&ist30xx_node_dev->kobj,
+					&node_attr_group)))
 		tsp_err("Failed to create sysfs group(%s)!\n", "node");
 
 	ist30xx_frame_buf = kmalloc(4096, GFP_KERNEL);

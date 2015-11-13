@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_roam.c 464529 2014-03-25 06:02:53Z $
+ * $Id: wl_roam.c 459591 2014-03-04 08:53:45Z $
  */
 
 #include <typedefs.h>

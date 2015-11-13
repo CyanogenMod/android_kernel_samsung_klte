@@ -47,6 +47,10 @@ struct vibrator_platform_data {
 #if defined(CONFIG_MOTOR_DRV_DRV2603)
 	unsigned int drv2603_en_gpio;
 #endif
+#if defined(CONFIG_MOTOR_DRV_MAX77888)
+	unsigned int max77888_en_gpio;
+#endif
+
 };
 
 struct vibrator_platform_data_motor {
@@ -59,10 +63,18 @@ struct vibrator_platform_data_motor {
 		unsigned int motor_en;
 		unsigned int vib_clk;
 		struct i2c_client *client;
-#if defined(CONFIG_MACH_MATISSE3G_OPEN) || defined CONFIG_SEC_MATISSELTE_COMMON
+#if defined(CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
 		void (*power_onoff)(int onoff);
 #endif
 	};
+#endif
+
+#if defined(CONFIG_DRV2604_VIBRATOR)
+	struct vibrator_platform_data_drv2604 {
+		 unsigned int motor_en;
+		 struct i2c_client *client;
+	};
+
 #endif
 
 #endif

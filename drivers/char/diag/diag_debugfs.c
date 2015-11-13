@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,14 +33,14 @@ static ssize_t diag_dbgfs_read_status(struct file *file, char __user *ubuf,
 {
 	char *buf;
 	int ret;
-
+	unsigned int buf_size;
 	buf = kzalloc(sizeof(char) * DEBUG_BUF_SIZE, GFP_KERNEL);
 	if (!buf) {
 		pr_err("diag: %s, Error allocating memory\n", __func__);
 		return -ENOMEM;
 	}
-
-	ret = scnprintf(buf, DEBUG_BUF_SIZE,
+	buf_size = ksize(buf);
+	ret = scnprintf(buf, buf_size,
 		"modem ch: 0x%x\n"
 		"lpass ch: 0x%x\n"
 		"riva ch: 0x%x\n"
@@ -181,7 +181,7 @@ static ssize_t diag_dbgfs_read_status(struct file *file, char __user *ubuf,
 		driver->real_time_mode);
 
 #ifdef CONFIG_DIAG_OVER_USB
-	ret += scnprintf(buf+ret, DEBUG_BUF_SIZE,
+	ret += scnprintf(buf+ret, buf_size-ret,
 		"usb_connected: %d\n",
 		driver->usb_connected);
 #endif
@@ -195,9 +195,11 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 				char __user *ubuf, size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
-	int bytes_remaining, bytes_written = 0, bytes_in_buf = 0, i = 0;
+	unsigned int bytes_remaining, bytes_written = 0;
+	unsigned int bytes_in_buf = 0, i = 0;
 	struct diag_dci_data_info *temp_data = dci_data_smd;
-	int buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
+	unsigned int buf_size;
+	buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
 
 	if (diag_dbgfs_dci_finished) {
 		diag_dbgfs_dci_finished = 0;
@@ -210,6 +212,7 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 		return -ENOMEM;
 	}
 
+	buf_size = ksize(buf);
 	bytes_remaining = buf_size;
 
 	if (diag_dbgfs_dci_data_index == 0) {
@@ -230,38 +233,30 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 		bytes_in_buf += bytes_written;
 		bytes_remaining -= bytes_written;
 #endif
-		if (driver->dci_device) {
-			bytes_written = scnprintf(buf+bytes_in_buf,
-						  bytes_remaining,
-				"dci power active, relax: %lu, %lu\n",
-				driver->dci_device->power.wakeup->active_count,
-				driver->dci_device->power.wakeup->relax_count);
-			bytes_in_buf += bytes_written;
-			bytes_remaining -= bytes_written;
-		}
-		if (driver->dci_cmd_device) {
-			bytes_written = scnprintf(buf+bytes_in_buf,
-						  bytes_remaining,
-				"dci cmd power active, relax: %lu, %lu\n",
-				driver->dci_cmd_device->power.wakeup->
-						  active_count,
-				driver->dci_cmd_device->power.wakeup->
-						  relax_count);
-			bytes_in_buf += bytes_written;
-			bytes_remaining -= bytes_written;
-		}
+		bytes_written = scnprintf(buf+bytes_in_buf,
+					  bytes_remaining,
+					  "dci power: active, relax: %lu, %lu\n",
+					  driver->diag_dev->power.wakeup->
+						active_count,
+					  driver->diag_dev->
+						power.wakeup->relax_count);
+		bytes_in_buf += bytes_written;
+		bytes_remaining -= bytes_written;
+
 	}
 	temp_data += diag_dbgfs_dci_data_index;
 	for (i = diag_dbgfs_dci_data_index; i < DIAG_DCI_DEBUG_CNT; i++) {
 		if (temp_data->iteration != 0) {
 			bytes_written = scnprintf(
 				buf + bytes_in_buf, bytes_remaining,
-				"i %-10ld\t"
-				"s %-10d\t"
-				"c %-10d\t"
+				"i %-5ld\t"
+				"s %-5d\t"
+				"p %-5d\t"
+				"c %-5d\t"
 				"t %-15s\n",
 				temp_data->iteration,
 				temp_data->data_size,
+				temp_data->peripheral,
 				temp_data->ch_type,
 				temp_data->time_stamp);
 			bytes_in_buf += bytes_written;
@@ -286,6 +281,7 @@ static ssize_t diag_dbgfs_read_workpending(struct file *file,
 {
 	char *buf;
 	int ret;
+	unsigned int buf_size;
 
 	buf = kzalloc(sizeof(char) * DEBUG_BUF_SIZE, GFP_KERNEL);
 	if (!buf) {
@@ -293,7 +289,8 @@ static ssize_t diag_dbgfs_read_workpending(struct file *file,
 		return -ENOMEM;
 	}
 
-	ret = scnprintf(buf, DEBUG_BUF_SIZE,
+	buf_size = ksize(buf);
+	ret = scnprintf(buf, buf_size,
 		"Pending status for work_stucts:\n"
 		"diag_drain_work: %d\n"
 		"Modem data diag_read_smd_work: %d\n"
@@ -341,7 +338,7 @@ static ssize_t diag_dbgfs_read_workpending(struct file *file,
 						diag_notify_update_smd_work)));
 
 #ifdef CONFIG_DIAG_OVER_USB
-	ret += scnprintf(buf+ret, DEBUG_BUF_SIZE,
+	ret += scnprintf(buf+ret, buf_size-ret,
 		"diag_proc_hdlc_work: %d\n"
 		"diag_read_work: %d\n",
 		work_pending(&(driver->diag_proc_hdlc_work)),
@@ -359,10 +356,11 @@ static ssize_t diag_dbgfs_read_table(struct file *file, char __user *ubuf,
 	char *buf;
 	int ret = 0;
 	int i;
-	int bytes_remaining;
-	int bytes_in_buffer = 0;
-	int bytes_written;
-	int buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
+	unsigned int bytes_remaining;
+	unsigned int bytes_in_buffer = 0;
+	unsigned int bytes_written;
+	unsigned int buf_size;
+	buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
 
 	if (diag_dbgfs_table_index >= diag_max_reg) {
 		/* Done. Reset to prepare for future requests */
@@ -375,7 +373,7 @@ static ssize_t diag_dbgfs_read_table(struct file *file, char __user *ubuf,
 		pr_err("diag: %s, Error allocating memory\n", __func__);
 		return -ENOMEM;
 	}
-
+	buf_size = ksize(buf);
 	bytes_remaining = buf_size;
 
 	if (diag_dbgfs_table_index == 0) {
@@ -384,6 +382,7 @@ static ssize_t diag_dbgfs_read_table(struct file *file, char __user *ubuf,
 			"WCNSS: %d, APPS: %d\n",
 			MODEM_DATA, LPASS_DATA, WCNSS_DATA, APPS_DATA);
 		bytes_in_buffer += bytes_written;
+		bytes_remaining -= bytes_written;
 	}
 
 	for (i = diag_dbgfs_table_index; i < diag_max_reg; i++) {
@@ -427,18 +426,20 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 {
 	char *buf = NULL;
 	int ret = 0, i = 0;
-
+	unsigned int buf_size;
 	buf = kzalloc(sizeof(char) * DEBUG_BUF_SIZE, GFP_KERNEL);
 	if (ZERO_OR_NULL_PTR(buf)) {
 		pr_err("diag: %s, Error allocating memory\n", __func__);
 		return -ENOMEM;
 	}
+	buf_size = ksize(buf);
 
-	ret = scnprintf(buf, DEBUG_BUF_SIZE,
+	ret = scnprintf(buf, buf_size,
 		"POOL_TYPE_COPY: [0x%p : 0x%p] count = %d\n"
 		"POOL_TYPE_HDLC: [0x%p : 0x%p] count = %d\n"
 		"POOL_TYPE_USER: [0x%p : 0x%p] count = %d\n"
-		"POOL_TYPE_WRITE_STRUCT: [0x%p : 0x%p] count = %d\n",
+		"POOL_TYPE_WRITE_STRUCT: [0x%p : 0x%p] count = %d\n"
+		"POOL_TYPE_DCI: [0x%p : 0x%p] count = %d\n",
 		driver->diagpool,
 		diag_pools_array[POOL_COPY_IDX],
 		driver->count,
@@ -450,12 +451,15 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 		driver->count_user_pool,
 		driver->diag_write_struct_pool,
 		diag_pools_array[POOL_WRITE_STRUCT_IDX],
-		driver->count_write_struct_pool);
+		driver->count_write_struct_pool,
+		driver->diag_dci_pool,
+		diag_pools_array[POOL_DCI_IDX],
+		driver->count_dci_pool);
 
 	for (i = 0; i < MAX_HSIC_CH; i++) {
 		if (!diag_hsic[i].hsic_inited)
 			continue;
-		ret += scnprintf(buf+ret, DEBUG_BUF_SIZE-ret,
+		ret += scnprintf(buf+ret, buf_size-ret,
 				"POOL_TYPE_HSIC_%d: [0x%p : 0x%p] count = %d\n",
 				i+1,
 				diag_hsic[i].diag_hsic_pool,
@@ -466,7 +470,7 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 	for (i = 0; i < MAX_HSIC_CH; i++) {
 		if (!diag_hsic[i].hsic_inited)
 			continue;
-		ret += scnprintf(buf+ret, DEBUG_BUF_SIZE-ret,
+		ret += scnprintf(buf+ret, buf_size-ret,
 				"POOL_TYPE_HSIC_%d_WRITE: [0x%p : 0x%p] count = %d\n",
 				i+1,
 				diag_hsic[i].diag_hsic_write_pool,
@@ -485,6 +489,7 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 {
 	char *buf = NULL;
 	int ret = 0;
+	unsigned int buf_size;
 
 	buf = kzalloc(sizeof(char) * DEBUG_BUF_SIZE, GFP_KERNEL);
 	if (ZERO_OR_NULL_PTR(buf)) {
@@ -492,11 +497,13 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 		return -ENOMEM;
 	}
 
-	ret = scnprintf(buf, DEBUG_BUF_SIZE,
+	buf_size = ksize(buf);
+	ret = scnprintf(buf, buf_size,
 		"POOL_TYPE_COPY: [0x%p : 0x%p] count = %d\n"
 		"POOL_TYPE_HDLC: [0x%p : 0x%p] count = %d\n"
 		"POOL_TYPE_USER: [0x%p : 0x%p] count = %d\n"
-		"POOL_TYPE_WRITE_STRUCT: [0x%p : 0x%p] count = %d\n",
+		"POOL_TYPE_WRITE_STRUCT: [0x%p : 0x%p] count = %d\n"
+		"POOL_TYPE_DCI: [0x%p : 0x%p] count = %d\n",
 		driver->diagpool,
 		diag_pools_array[POOL_COPY_IDX],
 		driver->count,
@@ -508,7 +515,10 @@ static ssize_t diag_dbgfs_read_mempool(struct file *file, char __user *ubuf,
 		driver->count_user_pool,
 		driver->diag_write_struct_pool,
 		diag_pools_array[POOL_WRITE_STRUCT_IDX],
-		driver->count_write_struct_pool);
+		driver->count_write_struct_pool,
+		driver->diag_dci_pool,
+		diag_pools_array[POOL_DCI_IDX],
+		driver->count_dci_pool);
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, buf, ret);
 
@@ -524,12 +534,14 @@ static ssize_t diag_dbgfs_read_bridge(struct file *file, char __user *ubuf,
 	char *buf;
 	int ret;
 	int i;
-	int bytes_remaining;
-	int bytes_in_buffer = 0;
-	int bytes_written;
-	int buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
+	unsigned int bytes_remaining;
+	unsigned int bytes_in_buffer = 0;
+	unsigned int bytes_written;
+	unsigned int buf_size;
 	int bytes_hsic_inited = 45;
 	int bytes_hsic_not_inited = 410;
+
+	buf_size = (DEBUG_BUF_SIZE < count) ? DEBUG_BUF_SIZE : count;
 
 	if (diag_dbgfs_finished) {
 		diag_dbgfs_finished = 0;
@@ -542,6 +554,7 @@ static ssize_t diag_dbgfs_read_bridge(struct file *file, char __user *ubuf,
 		return -ENOMEM;
 	}
 
+	buf_size = ksize(buf);
 	bytes_remaining = buf_size;
 
 	/* Only one smux for now */
@@ -583,8 +596,8 @@ static ssize_t diag_dbgfs_read_bridge(struct file *file, char __user *ubuf,
 			"in_busy_hsic_write: %d\n"
 			"count_hsic_pool: %d\n"
 			"count_hsic_write_pool: %d\n"
-			"diag_hsic_pool: %x\n"
-			"diag_hsic_write_pool: %x\n"
+			"diag_hsic_pool: %p\n"
+			"diag_hsic_write_pool: %p\n"
 			"HSIC write_len: %d\n"
 			"num_hsic_buf_tbl_entries: %d\n"
 			"HSIC usb_connected: %d\n"
@@ -601,8 +614,8 @@ static ssize_t diag_dbgfs_read_bridge(struct file *file, char __user *ubuf,
 			diag_hsic[i].in_busy_hsic_write,
 			diag_hsic[i].count_hsic_pool,
 			diag_hsic[i].count_hsic_write_pool,
-			(unsigned int)diag_hsic[i].diag_hsic_pool,
-			(unsigned int)diag_hsic[i].diag_hsic_write_pool,
+			diag_hsic[i].diag_hsic_pool,
+			diag_hsic[i].diag_hsic_write_pool,
 			diag_bridge[i].write_len,
 			diag_hsic[i].num_hsic_buf_tbl_entries,
 			diag_bridge[i].usb_connected,

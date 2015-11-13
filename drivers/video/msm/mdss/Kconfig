@@ -21,9 +21,15 @@ config FB_MSM_MDSS_HDMI_MHL_SII8334
 	  MHL (Mobile High-Definition Link) technology
 	  uses USB connector to output HDMI content
 
+config FB_MSM_MDSS_SHARP_HD_PANEL
+        bool "MDSS SHARP HD Panel"
+        default n
+        ---help---
+        The MDSS SHARP LCD Panel support
+
 config BACKLIGHT_KTD2801
 	bool "Backlight IC KTD2801"
-	default n	
+	default n
 
 config MDNIE_VIDEO_ENHANCED
 bool "MDNIE VIDEO ENHANCED"
@@ -98,6 +104,10 @@ config FB_MSM_MIPI_MAGNA_OCTA_VIDEO_720P_PT_PANEL
 	bool "Support MAGNA OCTA Video 720P Panel"
 	default n
 
+config FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL
+	bool "Support MAGNA OCTA Video WXGA dual Panel"
+	default n
+
 config FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PT_PANEL
 	bool "Support Magna OCTA Video 720P (EA8061) Panel"
 	default n
@@ -122,12 +132,20 @@ config FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL
 	bool "Support SAMSUNG OCTA Command WQHD Panel"
 	default n
 
+config FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL
+	bool "Support MAGNA OCTA Command HD Panel"
+	default n
+
 config FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL
 	bool "Support SAMSUNG YOUM Command Full-HD Panel"
 	default n
 
 config FB_MSM_MIPI_S6E8AA0A_720P_PT_PANEL
 	bool "Support SAMSUNG OCTA Video 720P Panel"
+	default n
+
+config FB_MSM_MIPI_S6E88A0_QHD_VIDEO_PT_PANEL
+	bool "Support SAMSUNG OCTA Video qHD Panel"
 	default n
 
 config FB_MSM_MDSS_S6E8AA0A_HD_PANEL
@@ -160,8 +178,16 @@ config FB_MSM_MDSS_HX8369B_TFT_VIDEO_WVGA_PT_PANEL
 	bool "MIPI VIDEO WVGA HX8369B PANEL"
 	default n
 
+config FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL
+	bool "MIPI VIDEO 720P HX8394C PANEL"
+	default n
+
 config BACKLIGHT_IC_KTD253
 	bool "BACKLIGHT IC KTD253"
+	default n
+
+config BACKLIGHT_IC_KTD2801
+	bool "BACKLIGHT IC KTD2801"
 	default n
 
 config REGULATOR_LP8720
@@ -170,6 +196,7 @@ config REGULATOR_LP8720
 
 config DUAL_LCD
 	bool "Support DUAL LCD"
+	select FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL
 	default n
 
 config LCD_HMT
@@ -207,6 +234,10 @@ config CABC_TUNING
 	bool "CABC panel tuning"
 	default n
 
+config CABC_TUNING_HX8394C
+	bool "CABC panel(HX8394C) tuning"
+	default n
+
 config FB_MSM_MIPI_TFT_VIDEO_FULL_HD_PT_PANEL
 	bool "Support TFT VIDEO FULL HD Panel"
 	select FB_MSM_MIPI_DSI
@@ -216,6 +247,9 @@ config ESD_ERR_FG_RECOVERY
 	bool "ESD Feature"
 	default n
 
+config LCD_CRACK_RECOVERY
+	bool "LCD crack recovery feature"
+	default n
 config FB_MSM_MDSS_SDC_WXGA_PANEL
 	bool "MDSS SDC WXGA Panel"
 	default n
@@ -253,7 +287,19 @@ config FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL
 	bool "Support SAMSUNG TFT Video WQXGA Panel"
 	default n
 
+config FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6TNMR7_PT_PANEL
+	bool "Support SAMSUNG AMOLED Command WQXGA (S6TNMR7) Panel"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL
+	bool "Support SAMSUNG AMOLED Command WQXGA (S6E3HA1) Panel"
+	default n
+
 config FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL
+	bool "Support Magna OCTA Video 720P (EA8061) Panel"
+	default n
+
+config FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_HD_PANEL
 	bool "Support Magna OCTA Video 720P (EA8061) Panel"
 	default n
 
@@ -267,6 +313,10 @@ config FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION
 
 config GET_LCD_ATTACHED
 	bool "check if LCD connected or not and detect panel vendor"
+	default n
+
+config GET_LCD_PCD_DETECTED
+	bool "check if PCD detected or not"
 	default n
 
 config WHITE_PANEL
@@ -284,3 +334,12 @@ config MDSS_DSI_EVENT_HANDLER_PANEL
 config CLK_TUNING
 	bool "Support CLK tuning"
 	default n
+
+config MDP_NEGATIVE_SUPPORT
+	bool "Support MDP negative color"
+	default n
+
+config MDSS_UD_FLIP
+	bool "Support MDSS UD flip"
+	default n
+

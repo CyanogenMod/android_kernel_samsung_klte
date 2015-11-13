@@ -126,7 +126,8 @@ static int msm_vibrator_suspend(struct device *dev)
 #endif
 
 static SIMPLE_DEV_PM_OPS(vibrator_pm_ops, msm_vibrator_suspend, NULL);
-
+extern int system_rev;
+extern int expander_gpio_config(unsigned config, unsigned disable);
 static int msm_vibrator_probe(struct platform_device *pdev)
 {
 	struct msm_vib *vib;
@@ -151,16 +152,50 @@ static int msm_vibrator_probe(struct platform_device *pdev)
 	#ifdef CONFIG_SEC_AFYON_PROJECT
 		vib->pmic_gpio_enabled = 0;
 	#endif
-	
+
 	printk(KERN_ALERT " VIB PMIC GPIO ENABLED Flag is %d \n", vib->pmic_gpio_enabled);
 	if (!(vib->pmic_gpio_enabled)){
-		rc = gpio_tlmm_config(GPIO_CFG(vib->motor_en, 0, GPIO_CFG_OUTPUT,
-			GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+	#if defined (CONFIG_GPIO_PCAL6416A)
+		#ifdef CONFIG_MACH_ATLANTICLTE_ATT
+		if(system_rev == 0) {
+			rc = gpio_tlmm_config(GPIO_CFG(vib->motor_en, 0, GPIO_CFG_OUTPUT,
+				GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+                        if (rc < 0) {
+                                pr_err("%s: gpio_tlmm_config is failed\n",__func__);
+                                gpio_free(vib->motor_en);
+                                return rc;
+                        }
+		}
+		else {
+			rc = expander_gpio_config(GPIO_CFG(vib->motor_en, 0, GPIO_CFG_OUTPUT,
+				GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
 			if (rc < 0) {
-				pr_err("%s: gpio_tlmm_config is failed\n",__func__);
-				gpio_free(vib->motor_en);
+				pr_err("%s: expander_tlmm_config is failed\n",__func__);
 				return rc;
 			}
+		}
+		#else
+		rc = expander_gpio_config(GPIO_CFG(vib->motor_en, 0, GPIO_CFG_OUTPUT,
+					GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+
+		if (rc < 0) {
+				pr_err("%s: expander_tlmm_config is failed\n",__func__);
+				return rc;
+		}
+		#endif
+
+	#else
+
+	rc = gpio_tlmm_config(GPIO_CFG(vib->motor_en, 0, GPIO_CFG_OUTPUT,
+		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	if (rc < 0) {
+		pr_err("%s: gpio_tlmm_config is failed\n",__func__);
+		gpio_free(vib->motor_en);
+		return rc;
+	}
+	#endif
 	}
 	vib->timeout = VIB_DEFAULT_TIMEOUT;
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -26,17 +26,6 @@
 #include <mach/msm_ipc_logging.h>
 
 #include "smem_private.h"
-
-/**
- * OVERFLOW_ADD_UNSIGNED() - check for unsigned overflow
- *
- * @type: type to check for overflow
- * @a: left value to use
- * @b: right value to use
- * @returns: true if a + b will result in overflow; false otherwise
- */
-#define OVERFLOW_ADD_UNSIGNED(type, a, b) \
-	(((type)~0 - (a)) < (b) ? true : false)
 
 #define MODEM_SBL_VERSION_INDEX 7
 #define SMEM_VERSION_INFO_SIZE (32 * 4)
@@ -1381,7 +1370,7 @@ int __init msm_smem_init(void)
 
 	registered = true;
 
-	smem_ipc_log_ctx = ipc_log_context_create(NUM_LOG_PAGES, "smem");
+	smem_ipc_log_ctx = ipc_log_context_create(NUM_LOG_PAGES, "smem", 0);
 	if (!smem_ipc_log_ctx) {
 		pr_err("%s: unable to create logging context\n", __func__);
 		msm_smem_debug_mask = 0;

@@ -59,6 +59,11 @@
 
 #define BT_WAKE 58
 #define BT_EN 76
+#elif defined(CONFIG_SEC_PATEK_PROJECT)
+#define BT_HOST_WAKE 75
+
+#define BT_WAKE 91
+#define BT_EN 25
 #else
 #define BT_HOST_WAKE 75
 
@@ -250,7 +255,17 @@ static int bcm4339_bluetooth_probe(struct platform_device *pdev)
         pr_err("[BT] GPIO_BT_EN request failed.\n");
         return rc;
     }
+
+#if defined(CONFIG_SEC_PATEK_PROJECT)
+    gpio_tlmm_config(GPIO_CFG(BT_EN, 0, GPIO_CFG_OUTPUT,
+        GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+    gpio_set_value(BT_EN, 0);
+    gpio_tlmm_config(GPIO_CFG(BT_WAKE, 0, GPIO_CFG_OUTPUT,
+        GPIO_CFG_NO_PULL, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+    gpio_set_value(BT_WAKE, 0);
+#else
     gpio_direction_output(get_gpio_hwrev(BT_EN), 0);
+#endif
 
 	/* gpio request for bt_wake will be in bluesleeep.
     rc = gpio_request(get_gpio_hwrev(BT_WAKE), "bcm4339_btwake_gpio");

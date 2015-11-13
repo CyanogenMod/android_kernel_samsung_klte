@@ -23,13 +23,21 @@
 
 #define MAX_BRIGHTNESS_IN_BLU 32
 
+#if defined(CONFIG_BACKLIGHT_IC_KTD2801)
+#define BL_MIN_BRIGHTNESS			1
+#define BL_MAX_BRIGHTNESS_LEVEL		105
+#define BL_MID_BRIGHTNESS_LEVEL		45
+#define BL_LOW_BRIGHTNESS_LEVEL		1
+#define BL_DIM_BRIGHTNESS_LEVEL		3
+#define BL_DEFAULT_BRIGHTNESS		BL_MID_BRIGHTNESS_LEVEL
+#else
 #define BL_MIN_BRIGHTNESS			6
 #define BL_MAX_BRIGHTNESS_LEVEL		192
 #define BL_MID_BRIGHTNESS_LEVEL		94
 #define BL_LOW_BRIGHTNESS_LEVEL		7
 #define BL_DIM_BRIGHTNESS_LEVEL		13
 #define BL_DEFAULT_BRIGHTNESS		BL_MID_BRIGHTNESS_LEVEL
-
+#endif
 enum mipi_samsung_cmd_list {
 	PANEL_READY_TO_ON_FAST,
 	PANEL_READY_TO_ON,
@@ -70,6 +78,9 @@ enum {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
 	struct mutex lock;
 	int bl_level;
+#if defined(CONFIG_BACKLIGHT_IC_KTD2801)
+	int bl_ap_pwm;
+#endif	
 
 #if defined(CONFIG_LCD_CLASS_DEVICE)
 	struct platform_device *msm_pdev;

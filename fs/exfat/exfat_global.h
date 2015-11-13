@@ -24,8 +24,13 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/fs.h>
-
 #include "exfat_config.h"
+
+#ifdef CONFIG_EXFAT_SUPPORT_STLOG
+#include <linux/stlog.h>
+#else
+#define ST_LOG(fmt,...) 
+#endif
 
 #ifdef __cplusplus
 extern "C" {

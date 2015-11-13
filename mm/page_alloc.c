@@ -65,9 +65,21 @@
 #include <asm/div64.h>
 #include "internal.h"
 
+#ifdef CONFIG_SDP_CACHE_CLEANUP
+#include <linux/highmem.h>
+#define PER_USER_RANGE 100000
+#define SENSITIVITY_UNKNOWN 0
+#define SENSITIVE 1
+#define NOT_SENSITIVE 2
+#endif
+
 #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
 DEFINE_PER_CPU(int, numa_node);
 EXPORT_PER_CPU_SYMBOL(numa_node);
+#endif
+
+#ifdef CONFIG_SDP_CACHE_CLEANUP
+extern int dek_is_sdp_uid(uid_t uid);
 #endif
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -174,17 +186,10 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 #ifdef CONFIG_ZONE_DMA32
 	 256,
 #endif
-#ifdef CONFIG_ARCH_MSM8974PRO
 #ifdef CONFIG_HIGHMEM
 	 96,
 #endif
 	 96,
-#else
-#ifdef CONFIG_HIGHMEM
-	 32,
-#endif
-	 32,
-#endif
 };
 
 EXPORT_SYMBOL(totalram_pages);
@@ -726,6 +731,17 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 {
 	int i;
 	int bad = 0;
+#ifdef CONFIG_SDP_CACHE_CLEANUP
+	if (PageSensitive(page)) {
+		void *kaddr;
+		ClearPageSensitive(page);
+		kaddr = kmap_atomic(page);
+		if (kaddr)
+			clear_page(kaddr);
+		kunmap_atomic(kaddr);
+		flush_dcache_page(page);
+	}
+#endif
 
 	trace_mm_page_free(page, order);
 	kmemcheck_free_shadow(page, order);
@@ -1384,6 +1400,16 @@ void free_hot_cold_page(struct page *page, int cold)
 	unsigned long flags;
 	int migratetype;
 	int wasMlocked = __TestClearPageMlocked(page);
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+#if 1
+	{
+		extern u64 scfs_lowerpage_reclaim_count;
+		if (PageScfslower(page) || PageNocache(page))
+			scfs_lowerpage_reclaim_count++;
+	}
+#endif
+#endif
 
 	if (!free_pages_prepare(page, 0))
 		return;
@@ -2390,6 +2416,61 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 	return alloc_flags;
 }
 
+#if defined(CONFIG_SEC_SLOWPATH)
+unsigned int oomk_state; /* 0 none, bit_0 time's up, bit_1 OOMK */
+
+struct slowpath_pressure {
+	unsigned int total_jiffies;
+	struct mutex slow_lock;
+} slowpath;
+
+/* slowtime - milliseconds time spend int __alloc_pages_slowpath() */
+static void slowpath_pressure(unsigned int slowtime)
+{
+	mutex_lock(&slowpath.slow_lock);
+	if (unlikely(slowpath.total_jiffies + slowtime >= UINT_MAX))
+		slowpath.total_jiffies = UINT_MAX;
+	else
+		slowpath.total_jiffies += slowtime;
+	mutex_unlock(&slowpath.slow_lock);
+}
+
+unsigned int get_and_reset_timeup(void)
+{
+	bool val = 0;
+
+	val = oomk_state;
+	oomk_state = 0;
+	pr_debug("%s: timeup %u\n", __func__, val);
+
+	return val;
+}
+
+unsigned int get_and_reset_slowtime(void)
+{
+	static bool first_read = false;
+	unsigned int slowtime = 0;
+
+	slowtime = slowpath.total_jiffies;
+	if (unlikely(first_read == false)) {
+		first_read = true;
+		slowtime = 0;
+	}
+	slowpath.total_jiffies = 0;
+	pr_debug("%s: slowtime %u\n", __func__, slowtime);
+
+	return slowtime;
+}
+
+static int __init slowpath_init(void)
+{
+	mutex_init(&slowpath.slow_lock);
+	return 0;
+}
+
+module_init(slowpath_init)
+#endif
+
 static inline struct page *
 __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	struct zonelist *zonelist, enum zone_type high_zoneidx,
@@ -2405,7 +2486,10 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	bool deferred_compaction = false;
 	bool contended_compaction = false;
 #ifdef CONFIG_SEC_OOM_KILLER
-	unsigned long oom_invoke_timeout = jiffies + HZ/4;
+	unsigned long oom_invoke_timeout = jiffies + HZ/32;
+#endif
+#ifdef CONFIG_SEC_SLOWPATH
+	unsigned long slowpath_time = jiffies;
 #endif
 
 	/*
@@ -2532,10 +2616,13 @@ rebalance:
 			    !(gfp_mask & __GFP_NOFAIL))
 				goto nopage;
 #ifdef CONFIG_SEC_OOM_KILLER
-			if (did_some_progress)
+			if (did_some_progress) {
 				pr_info("time's up : calling "
 					"__alloc_pages_may_oom(o:%d, gfp:0x%x)\n", order, gfp_mask);
-
+#if defined(CONFIG_SEC_SLOWPATH)
+				oomk_state |= 0x01;
+#endif
+			}
 #endif
 
 			page = __alloc_pages_may_oom(gfp_mask, order,
@@ -2564,7 +2651,7 @@ rebalance:
 			}
 
 #ifdef CONFIG_SEC_OOM_KILLER
-			oom_invoke_timeout = jiffies + HZ/4;
+			oom_invoke_timeout = jiffies + HZ/32;
 #endif
 			goto restart;
 		}
@@ -2597,10 +2684,20 @@ rebalance:
 
 nopage:
 	warn_alloc_failed(gfp_mask, order, NULL);
+#if defined(CONFIG_SEC_SLOWPATH)
+	slowpath_time = jiffies - slowpath_time;
+	if (wait && slowpath_time)
+		slowpath_pressure(slowpath_time);
+#endif
 	return page;
 got_pg:
 	if (kmemcheck_enabled)
 		kmemcheck_pagealloc_alloc(page, order, gfp_mask);
+#if defined(CONFIG_SEC_SLOWPATH)
+	slowpath_time = jiffies - slowpath_time;
+	if (wait && slowpath_time)
+		slowpath_pressure(slowpath_time);
+#endif
 	return page;
 
 }
@@ -2671,6 +2768,32 @@ out:
 	if (unlikely(!put_mems_allowed(cpuset_mems_cookie) && !page))
 		goto retry_cpuset;
 
+#ifdef CONFIG_SDP_CACHE_CLEANUP
+	if(page) {
+		uid_t uid = task_uid(current);
+		if (((uid/PER_USER_RANGE) <= 199)  && ((uid/PER_USER_RANGE) >= 100)) {
+			if (dek_is_sdp_uid(uid)) {
+				switch (current->sensitive) {
+				case SENSITIVITY_UNKNOWN:
+					if ((0 == strcmp(current->comm, "m.android.email")) ||
+						(0 == strcmp(current->comm, "ndroid.exchange"))) {
+						SetPageSensitive(page);
+						current->sensitive = SENSITIVE;
+					} else {
+						current->sensitive = NOT_SENSITIVE;
+					}
+					break;
+				case SENSITIVE:
+						SetPageSensitive(page);
+					break;
+				case NOT_SENSITIVE:
+				default:
+					break;
+				}
+			}
+		}
+	}
+#endif
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_nodemask);
@@ -2704,19 +2827,6 @@ EXPORT_SYMBOL(get_zeroed_page);
 void __free_pages(struct page *page, unsigned int order)
 {
 	if (put_page_testzero(page)) {
-#ifdef CONFIG_TIMA_RKP_DEBUG
-	//TODO: Do the check for all pages if order > 0
-	if (((unsigned long)__va(page_to_phys(page))) < ((unsigned long) high_memory)){
-		if (tima_debug_page_protection((unsigned long)__va(page_to_phys(page)), 6, 0) == 1) {
-			tima_debug_signal_failure(0x3f80f221, 6);
-			//tima_send_cmd((unsigned long)__va(page_to_phys(page)), 0x3f80e221);
-			//printk(KERN_ERR"TIMA: Freed PAGE prtctd va %lx pa %lx caller %lx\n",
-			// (unsigned long)__va(page_to_phys(page)),
-			// (unsigned long) page_to_phys(page),
-			// (unsigned long)__builtin_return_address(0));
-		}
-	}
-#endif
 		if (order == 0)
 			free_hot_cold_page(page, 0);
 		else
@@ -6173,7 +6283,9 @@ static struct trace_print_flags pageflag_names[] = {
 	{1UL << PG_hwpoison,		"hwpoison"	},
 #endif
 	{1UL << PG_readahead,           "PG_readahead"  },
-	{-1UL,				NULL		},
+#ifdef CONFIG_SDP
+	{1UL << PG_sensitive,	"sensitive"	},
+#endif
 };
 
 static void dump_page_flags(unsigned long flags)

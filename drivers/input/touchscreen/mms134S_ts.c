@@ -200,6 +200,7 @@ struct isc_packet {
 
 
 int touch_is_pressed;
+bool mms134s_initialized = 0;
 
 #define TSP_DEVICE_NAME "sec_touchscreen"
 #define TSP_DEVICE_NAME2 "mms_ts"
@@ -354,7 +355,7 @@ static void run_cm_delta_read(void *device_data);
 static void run_intensity_read(void *device_data);
 static void not_support_cmd(void *device_data);
 
-struct tsp_cmd tsp_cmds[] = {
+static struct tsp_cmd tsp_cmds[] = {
 	{TSP_CMD("fw_update", fw_update),},
 	{TSP_CMD("get_fw_ver_bin", get_fw_ver_bin),},
 	{TSP_CMD("get_fw_ver_ic", get_fw_ver_ic),},
@@ -444,7 +445,6 @@ static void melfas_ts_power_enable(int en)
 {
 #if defined(CONFIG_MACH_KANAS3G_CTC)
 	static struct regulator* ldo22;
-	static int first_boot = 1;
 	int rc = 0;
 
 	printk(KERN_ERR "%s: (%d)\n", __func__, en);
@@ -458,13 +458,18 @@ static void melfas_ts_power_enable(int en)
 	}
 
 	if(en){
+		if(regulator_is_enabled(ldo22))
+		{
+			printk(KERN_ERR "%s: TSP power already enable\n", __func__);
+			return;
+		}
 		rc = regulator_enable(ldo22);
 		if(rc)
 			printk(KERN_ERR "%s: TSP power enable failed (%d)\n", __func__, rc);
 	} else {
-		if(first_boot){
-			first_boot = 0;
-			printk(KERN_INFO "%s TSP power disable at first boot\n", __func__);
+		if(!regulator_is_enabled(ldo22))
+		{
+			printk(KERN_ERR "%s: TSP power already disable\n", __func__);
 			return;
 		}
 		rc = regulator_disable(ldo22);
@@ -785,6 +790,9 @@ static int mms_flash_fw(struct mms_ts_info *info, bool force)
 		mms_isc_exit(client);
 		msleep(5);
 		melfas_ts_reboot_after_update();
+	} else {
+		ret = 0;
+		goto out;
 	}
 
 	if (get_fw_version(client, ver)) {
@@ -801,18 +809,17 @@ static int mms_flash_fw(struct mms_ts_info *info, bool force)
 				dev_err(&client->dev,
 					"%s: version mismatch after flash. [%d] 0x%02x != 0x%02x\n",
 					__func__, img[i]->type, ver[img[i]->type], target[i]);
-
 				ret = -1;
 				goto out;
 			}
 		}
 	}
-	dev_info(&info->client->dev, "%s: succeeded. IC[%02x%02x%02x], BIN[%02x%02x%02x]\n", __func__,
-		info->fw_ver_boot_ic, info->fw_ver_core_ic, info->fw_ver_config_ic,
-		info->fw_ver_boot_bin,info->fw_ver_core_bin, info->fw_ver_config_bin);
 	ret = 0;
 
 out:
+	dev_info(&info->client->dev, "%s: succeeded. IC[%02x%02x%02x], BIN[%02x%02x%02x]\n", __func__,
+		info->fw_ver_boot_ic, info->fw_ver_core_ic, info->fw_ver_config_ic,
+		info->fw_ver_boot_bin,info->fw_ver_core_bin, info->fw_ver_config_bin);
 	kfree(img);
 
 	return ret;
@@ -848,10 +855,33 @@ static int melfas_ts_set_fw_name(struct mms_ts_info *info)
 {
 	u8 ver[MAX_SECTION_NUM];
 	int ret;
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+	int retries = 3;
+#endif
 
 	/* Need 150ms to configure old/new firmware version in IC after power-on */
 	msleep(150);
 
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+	while(retries--) {
+		ret = get_fw_version(info->client, ver);
+		if(!ret)
+			break;
+		else if(ret == -5 || ret == -6) {
+			dev_err(&info->client->dev, "%s: it is not melfas IC\n",
+			__func__);
+			mdelay(5);
+			continue;
+		} else {
+			dev_err(&info->client->dev, "%s: Failed to get config_fw_ver from IC\n",
+				__func__);
+			info->fw_path = FW_IMAGE_NAME_NULL;
+			return -1;
+		}
+	}
+	if(retries == 0)
+		return ret;
+#else
 	ret = get_fw_version(info->client, ver);
 	if (ret) {
 		dev_err(&info->client->dev, "%s: Failed to get config_fw_ver from IC\n",
@@ -859,6 +889,7 @@ static int melfas_ts_set_fw_name(struct mms_ts_info *info)
 		info->fw_path = FW_IMAGE_NAME_NULL;
 		return -1;
 	}
+#endif
 
 	if (ver[CONFIG_SECTION] >= 0x50) {
 		info->fw_path = FW_IMAGE_NAME_NEW;
@@ -883,7 +914,14 @@ static int melfas_ts_fw_update_probe(struct mms_ts_info *info)
 	int ret, i;
 	const struct firmware *fw_entry = NULL;
 
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+	ret = melfas_ts_set_fw_name(info);
+	if(ret == -EIO || ret == -ENXIO) {
+		return -ENXIO;
+	}
+#else
 	melfas_ts_set_fw_name(info);
+#endif
 
 	if (!info->fw_path) {
 		dev_err(&info->client->dev, "%s: Firmware name is not defined\n",
@@ -1041,14 +1079,16 @@ static void melfas_ts_get_data(struct mms_ts_info *info)
 	int keyID = 0, touchType = 0, touchState = 0;
 	u8 setLowLevelData[2];
 
+	if (info == NULL) {
+		pr_err("%s : TS NULL\n", __func__);
+		return;
+	}
+
 	if (!info->tsp_enabled) {
 		dev_err(&info->client->dev, "[TSP ]%s. tsp_disabled.\n", __func__);
 		msleep(500);
 		return;
 	}
-
-	if (info == NULL)
-		dev_err(&info->client->dev, "%s : TS NULL\n", __func__);
 
 	for (j = 0; j < 3; j++) {
 		buf[0] = MMS_MIP_EVENT_PACKET_LENGTH;
@@ -1755,7 +1795,7 @@ static int get_raw_data_all(struct mms_ts_info *info, u8 cmd)
 	u8 sz = 0;
 	u8 buf[256] = {0, };
 	u8 reg[4] = { 0, };
-	s16 cmdata, max_value, min_value;
+	s16 cmdata, max_value = 0, min_value = 0;
 	char buff[TSP_CMD_STR_LEN] = {0};
 	s16 *raw_data;
 	struct i2c_msg msg[] = {
@@ -2417,6 +2457,13 @@ static void melfas_ts_request_gpio(struct mms_ts_dt_data *dt_data)
 	}
 }
 
+#if defined(CONFIG_GET_LCD_ATTACHED)
+extern int get_lcd_attached(void);
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_IST30XX) && defined(CONFIG_MACH_KANAS3G_CTC)
+extern bool ist30xx_initialized;
+#endif
 static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct mms_ts_info *info;
@@ -2424,6 +2471,13 @@ static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id
 	int ret = 0, i;
 
 	dev_err(&client->dev, "%s\n", __func__);
+
+#if defined(CONFIG_GET_LCD_ATTACHED)
+	if (get_lcd_attached() == 0) {
+		dev_err(&client->dev, "%s : get_lcd_attached()=0 \n", __func__);
+		return -EIO;
+	}
+#endif
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "%s: need I2C_FUNC_I2C\n", __func__);
@@ -2439,7 +2493,7 @@ static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id
 		}
 		ret = melfas_ts_parse_dt(&client->dev, dt_data);
 		if (ret < 0) {
-			kfree(dt_data);
+			devm_kfree(&client->dev, (void *)dt_data);
 			return ret;
 		}
 	} else	{
@@ -2585,7 +2639,7 @@ static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id
 #endif
 
 	info->tsp_enabled = true;
-
+	mms134s_initialized = 1;
 #if MELFAS_DEBUG_PRINT
 	dev_err(&info->client->dev, "%s: Start touchscreen. name: %s, irq: %d\n",
 		__func__, info->client->name, info->client->irq);
@@ -2614,10 +2668,13 @@ err_input_register_device_failed:
 	input_free_device(info->input_dev);
 err_input_dev_alloc_failed:
 err_fw_update_failed:
-	melfas_ts_power_enable(0);
+#if defined(CONFIG_TOUCHSCREEN_IST30XX) && defined(CONFIG_MACH_KANAS3G_CTC)
+	if(!ist30xx_initialized)
+#endif
+		melfas_ts_power_enable(0);
 	kfree(info);
 err_alloc_data_failed:
-	kfree(dt_data);
+	devm_kfree(&client->dev, (void *)dt_data);
 
 	return ret;
 }

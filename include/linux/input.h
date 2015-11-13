@@ -159,6 +159,11 @@ struct input_keymap_entry {
 
 #define EVIOCSCLOCKID		_IOW('E', 0xa0, int)			/* Set clockid to be used for timestamps */
 
+#ifdef CONFIG_INPUT_EXPANDED_ABS
+#define EVIOCGABS_LIMIT		(0x40)
+#define EVIOCGABS_CHG_LIMIT(nr)	(nr + EVIOCGABS_LIMIT)
+#endif
+
 /*
  * Device properties and quirks
  */
@@ -478,7 +483,7 @@ struct input_keymap_entry {
 #define KEY_DUMMY_MENU		251	/* Dummy Touchkey : MENU*/
 #define KEY_ACTIVITY_MENU	252	/* Activity menu key*/
 #define KEY_DUMMY_BACK		253	/* Dummy Touchkey : BACK*/
-#define KEY_RECENT	254	/* Key recent */
+#define KEY_RECENT		254	/* Key recent */
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -853,18 +858,26 @@ struct input_keymap_entry {
 #define ABS_MT_TRACKING_ID	0x39	/* Unique ID of initiated contact */
 #define ABS_MT_PRESSURE		0x3a	/* Pressure on contact area */
 #define ABS_MT_DISTANCE		0x3b	/* Contact hover distance */
-#define ABS_MT_ANGLE		0x3c	/* touch angle */
-#define ABS_MT_PALM		0x3d	/* palm touch */
-#define ABS_MT_COMPONENT	0x3e	/* touch component */
-#define ABS_MT_SUMSIZE		0x3f	/* touch sumsize */
+
+#ifdef CONFIG_INPUT_EXPANDED_ABS
+#define ABS_MT_PALM		0x40	/* palm touch */
+#define ABS_MT_GRIP		0x41	/* grip touch */
+#else
+#define ABS_MT_PALM		0x3e	/* palm touch */
+#define ABS_MT_GRIP		0x3f	/* grip touch */
+#endif
 
 #ifdef __KERNEL__
 /* Implementation details, userspace should not care about these */
 #define ABS_MT_FIRST		ABS_MT_TOUCH_MAJOR
-#define ABS_MT_LAST		ABS_MT_SUMSIZE
+#define ABS_MT_LAST		ABS_MT_GRIP
 #endif
 
+#ifdef CONFIG_INPUT_EXPANDED_ABS
+#define ABS_MAX			0x4f
+#else
 #define ABS_MAX			0x3f
+#endif
 #define ABS_CNT			(ABS_MAX+1)
 
 /*
@@ -890,6 +903,7 @@ struct input_keymap_entry {
 #define SW_HPHL_OVERCURRENT    0x0e  /* set = over current on left hph */
 #define SW_HPHR_OVERCURRENT    0x0f  /* set = over current on right hph */
 #define SW_UNSUPPORT_INSERT	0x10  /* set = unsupported device inserted */
+#define SW_MICROPHONE2_INSERT   0x11  /* set = inserted */
 #define SW_FLIP			0x15  /* set = flip cover */
 #define SW_PEN_INSERT		0x13
 #define SW_STROBE_INSERT	0x14

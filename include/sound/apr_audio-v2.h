@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,10 @@
 #define _APR_AUDIO_V2_H_
 
 #include <mach/qdsp6v2/apr.h>
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+#include <sound/maxim_dsm.h>
+#endif
 
 #define ADSP_ADM_VERSION    0x00070000
 
@@ -577,6 +581,15 @@ struct adm_cmd_matrix_mute_v5 {
 
 	u16                 reserved_for_align;
 	/* Clients must set this field to zero.*/
+} __packed;
+
+#define ASM_PARAM_ID_AAC_STEREO_MIX_COEFF_SELECTION_FLAG_V2 (0x00010DD8)
+
+struct asm_aac_stereo_mix_coeff_selection_param_v2 {
+	struct apr_hdr          hdr;
+	u32                     param_id;
+	u32                     param_size;
+	u32                     aac_stereo_mix_coeff_flag;
 } __packed;
 
 /* Allows a client to connect the desired stream to
@@ -2255,6 +2268,7 @@ struct afe_port_cmdrsp_get_param_v2 {
 #define VPM_TX_SM_ECNS_COPP_TOPOLOGY			0x00010F71
 #define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY			0x00010F72
 #define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY		0x00010F75
+#define VPM_TX_DM_RFECNS_COPP_TOPOLOGY			0x00010F86
 
 // NXP LVVEFQ
 #define VPM_TX_SM_LVVE_COPP_TOPOLOGY	0x1000BFFF
@@ -3936,6 +3950,9 @@ struct asm_stream_cmd_open_write_v3 {
 
 /* Absolute timestamp is identified by this value.*/
 #define ASM_ABSOLUTEIMESTAMP      1
+
+/* Bit value for Low Latency Tx stream subfield */
+#define ASM_LOW_LATENCY_TX_STREAM_SESSION			1
 
 /* Bit shift for the stream_perf_mode subfield. */
 #define ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ              29
@@ -6573,6 +6590,52 @@ struct afe_spkr_prot_config_command {
 	union afe_spkr_prot_config prot_config;
 } __packed;
 
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+struct afe_dsm_filter_set_params_t {
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+  uint32_t featureSetEnable;
+  uint32_t smooFacVoltClip;
+  uint32_t highPassCutOffFactor;
+  uint32_t leadResistance;
+  uint32_t rmsSmooFac;
+  uint32_t clipLimit;
+  uint32_t thermalCoeff;
+  uint32_t qSpk;
+  uint32_t excurLoggingThresh;
+  uint32_t coilTempLoggingThresh;
+  uint32_t resFreq;
+  uint32_t resFreqGuardBand;
+} __packed;
+
+union afe_dsm_spkr_prot_config {
+	struct asm_fbsp_mode_rx_cfg mode_rx_cfg;
+	struct asm_spkr_calib_vi_proc_cfg vi_proc_cfg;
+	struct asm_feedback_path_cfg feedback_path_cfg;
+	struct asm_mode_vi_proc_cfg mode_vi_proc_cfg;
+	struct afe_dsm_filter_set_params_t mode_dsm_proc_cfg;
+} __packed;
+
+struct afe_dsm_spkr_prot_config_command {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2 pdata;
+	union afe_dsm_spkr_prot_config prot_config;
+} __packed;
+#endif
+
 struct afe_spkr_prot_get_vi_calib {
 	struct afe_port_cmd_get_param_v2 get_param;
 	struct afe_port_param_data_v2 pdata;
@@ -6584,6 +6647,54 @@ struct afe_spkr_prot_calib_get_resp {
 	struct afe_port_param_data_v2 pdata;
 	struct asm_calib_res_cfg res_cfg;
 } __packed;
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+struct afe_dsm_filter_get_params_t {
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+  uint32_t featureSetEnable;
+  uint32_t smooFacVoltClip;
+  uint32_t highPassCutOffFactor;
+  uint32_t leadResistance;
+  uint32_t rmsSmooFac;
+  uint32_t clipLimit;
+  uint32_t thermalCoeff;
+  uint32_t qSpk;
+  uint32_t excurLoggingThresh;
+  uint32_t coilTempLoggingThresh;
+  uint32_t resFreq;
+  uint32_t resFreqGuardBand;
+#ifdef USE_DSM_LOG
+  uint8_t  byteLogArray[BEFORE_BUFSIZE];
+  uint32_t intLogArray[BEFORE_BUFSIZE];
+  uint8_t  afterProbByteLogArray[AFTER_BUFSIZE];
+  uint32_t afterProbIntLogArray[AFTER_BUFSIZE];
+#endif
+} __packed;
+
+struct afe_dsm_spkr_prot_get_vi_calib {
+	struct afe_port_cmd_get_param_v2 get_param;
+	struct afe_port_param_data_v2 pdata;
+	struct afe_dsm_filter_get_params_t res_cfg;
+} __packed;
+struct afe_dsm_spkr_prot_calib_get_resp {
+	uint32_t status;
+	struct afe_port_param_data_v2 pdata;
+	struct afe_dsm_filter_get_params_t res_cfg;
+} __packed;
+#endif
 
 
 /* SRS TRUMEDIA start */
@@ -6877,6 +6988,7 @@ struct afe_param_id_clip_bank_sel {
 #define Q6AFE_LPASS_IBIT_CLK_1_P024_MHZ		 0xFA000
 #define Q6AFE_LPASS_IBIT_CLK_768_KHZ		 0xBB800
 #define Q6AFE_LPASS_IBIT_CLK_512_KHZ		 0x7D000
+#define Q6AFE_LPASS_IBIT_CLK_256_KHZ		 0x3E800
 #define Q6AFE_LPASS_IBIT_CLK_DISABLE		     0x0
 
 /* Supported LPASS CLK sources */
@@ -7273,51 +7385,4 @@ struct afe_svc_cmd_set_clip_bank_selection {
 #define US_PROX_FORMAT_V2       0x0001272E
 #define US_RAW_SYNC_FORMAT      0x0001272F
 #define US_GES_SYNC_FORMAT      0x00012730
-
-#ifdef CONFIG_SND_SOC_MAX98504 // Vinay
-/* Integrating DSM specific AMD IDs */
-#define ADM_CUSTOM_PP_TOPO_ID_DYNAMIC 0x10000098
-#define ADM_CUSTOM_PP_TX_TOPO_ID_DYNAMIC 0x100000AB
-
-/* Structure for APR payload for the ADD_TOPOLOGY command */
-struct adm_cmd_add_topologies_v5_t {
-    u32 data_payload_addr_lsw;
-    /* LSW of the parameter data payload address. */
-    u32 data_payload_addr_msw;
-    /* MSW of the parameter data payload address. */
-    u32 mem_map_handle;
-    /* Unique identifier for an address
-    This memory map handle is returned by the aDSP through the
-    ADM_CMD_SHARED_MEM_MAP_REGIONS command. */
-    u32 buffer_size;
-    /* Size in bytes of the valid data in the topology buffer. */
-}__packed;
-
-struct adm_custom_topo_add{
-    struct apr_hdr hdr;
-    struct adm_cmd_add_topologies_v5_t param;
-} __packed;
-
-/* Topology ID */
-#define ASM_STREAM_PP_CUSTOM_FILTER_TOPO_ID 0x10010000
-
-/* module Id */
-#define MODULE_ID_DSM_FILTER 0x10010095
-
-/* parameters */
-#define PARAM_ID_DSM_FILTER_ENABLE 0x10001001
-#define PARAM_ID_DSM_FILTER_SHIFT 0x10001002
-#define PARAM_ID_DSM_FILTER_PARAM 0x10001003
-
-/* COMMAND IDs for DSM module */
-#define DSM_ID_FILTER_DISABLE 0x00000000
-#define DSM_ID_FILTER_ENABLE 0x00000001
-#define DSM_ID_FILTER_GET_PARAMS 0x00000002
-#define DSM_ID_FILTER_SET_CNTRLS 0x00000003
-#define DSM_ID_FILTER_SHIFT_3 0x00000004
-#define DSM_ID_FILTER_SHIFT_4 0x00000005
-
-#define DSM_ID_FILTER_PARAMS_RXINIT   0x00000006
-#define DSM_ID_FILTER_PARAMS_TXINIT   0x00000007
-#endif
 #endif /*_APR_AUDIO_V2_H_ */

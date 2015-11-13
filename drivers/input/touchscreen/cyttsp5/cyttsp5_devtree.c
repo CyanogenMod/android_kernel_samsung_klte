@@ -30,7 +30,7 @@
 #include "cyttsp5_regs.h"
 #include <linux/cyttsp5_platform.h>
 
-#ifdef CONFIG_SEC_ATLANTIC_PROJECT
+#if defined(CONFIG_SEC_ATLANTIC_PROJECT)
 #include <linux/of_gpio.h>
 #endif
 

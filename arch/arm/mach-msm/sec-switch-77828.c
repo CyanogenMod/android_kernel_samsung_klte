@@ -1001,7 +1001,7 @@ static void fsa9485_otg_cb(bool attached)
 #endif
 }
 
-#if defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_VIENNAVZW) || defined(CONFIG_MACH_V2LTEEUR)
+#if defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_VIENNAVZW) || defined(CONFIG_MACH_V2LTEEUR) || defined(CONFIG_MACH_VIENNAKOR)
 extern int vienna_usb_rdrv_pin;
 #endif
 
@@ -1015,7 +1015,7 @@ static void fsa9485_usb_cb(bool attached)
 	set_cable_status = attached ? CABLE_TYPE_USB : CABLE_TYPE_NONE;
 
         /* Vienna SS - USB 3.0 redriver enable/disable */
-#if defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_VIENNAVZW) || defined(CONFIG_MACH_V2LTEEUR)
+#if defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_VIENNAVZW) || defined(CONFIG_MACH_V2LTEEUR) || defined(CONFIG_MACH_VIENNAKOR)
 	gpio_set_value(vienna_usb_rdrv_pin, attached);
 	pr_info("%s vienna_usb_rdrv_pin = %d, enable=%d\n",
 		__func__,

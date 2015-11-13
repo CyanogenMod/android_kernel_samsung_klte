@@ -50,14 +50,17 @@
 #include <linux/uaccess.h>
 #include <linux/workqueue.h>
 #include <linux/cyttsp5_core.h>
-#define CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS
-#define CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER
 
 #define TTHE_TUNER_SUPPORT
 #define SAMSUNG_FACTORY_TEST
 #define SAMSUNG_TSP_INFO
+#define SAMSUNG_PALM_MOTION
+#define SAMSUNG_TOUCH_MODE
+#define CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER
+#define CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS
 
 #define CY_FW_FILE_NAME "cyttsp5_fw.bin"
+#define CY_FW_FILE_PATH "/sdcard/cyttsp5_fw.bin"
 #ifdef TTHE_TUNER_SUPPORT
 #define CYTTSP5_TTHE_TUNER_FILE_NAME "tthe_tuner"
 #endif
@@ -107,7 +110,9 @@
 
 /*  Timeout in ms */
 #define CY_REQUEST_EXCLUSIVE_TIMEOUT 500
-#define CY_WATCHDOG_TIMEOUT         1000
+#define CY_REQUEST_EXCLUSIVE_TIMEOUT_GET_PARAM 1000
+#define CY_REQUEST_EXCLUSIVE_TIMEOUT_SET_PARAM 2000
+#define CY_WATCHDOG_TIMEOUT         3000
 #define CY_WATCHDOG_REQUEST_EXCLUSIVE_TIMEOUT 6000
 #define CY_CORE_RESET_AND_WAIT_TIMEOUT		500
 #define CY_CORE_WAKEUP_TIMEOUT			500
@@ -128,6 +133,7 @@
 
 /* maximum number of concurrent tracks */
 #define MAX_TOUCH_NUMBER            10
+#define MAX_TOUCH_ID_NUMBER         15
 #define TOUCH_REPORT_SIZE           10
 #define TOUCH_INPUT_HEADER_SIZE     7
 #define TOUCH_COUNT_BYTE_OFFSET     5
@@ -319,6 +325,7 @@ enum hid_output_bl {
 	HID_OUTPUT_BL_GET_INFO,
 	HID_OUTPUT_BL_PROGRAM_AND_VERIFY,
 	HID_OUTPUT_BL_LAUNCH_APP = 0x3B,
+	HID_OUTPUT_BL_LAUNCH_APP_FAST = 0x3C,
 	HID_OUTPUT_BL_INITIATE_BL = 0x48,
 	HID_OUTPUT_BL_LAST,
 };
@@ -700,12 +707,13 @@ struct cyttsp5_mt_data {
 	bool is_suspended;
 #endif
 #if defined(TSP_BOOSTER)
+		u8 touch_pressed_num;
 		struct delayed_work work_dvfs_off;
 		struct delayed_work work_dvfs_chg;
 		bool	dvfs_lock_status;
 		struct mutex dvfs_lock;
 		int dvfs_old_status;
-		int dvfs_boost_mode;
+		unsigned char boost_level;
 		int dvfs_freq;
 #endif
 	bool input_device_registered;
@@ -713,6 +721,16 @@ struct cyttsp5_mt_data {
 	int num_prv_tch;
 #ifdef VERBOSE_DEBUG
 	u8 pr_buf[CY_MAX_PRBUF_SIZE];
+#endif
+#ifdef SAMSUNG_TOUCH_MODE
+	bool glove_enable;
+	bool glove_switch;
+	bool prevent_touch;
+	bool stylus_enable;
+#endif
+#ifdef SAMSUNG_PALM_MOTION
+	bool palm;
+	bool largeobj;
 #endif
 };
 
@@ -789,6 +807,14 @@ struct cyttsp5_samsung_factory_data {
 	struct cyttsp5_sfd_idac mutual_idac;
 
 	int num_all_nodes;
+
+	u32 touch_mode;
+	bool view_cover_closed;
+	bool stylus_enable;
+	u8 report_rate;
+	bool probe_done;
+	bool suspended;
+        bool is_inputmethod;
 };
 #endif
 
@@ -890,6 +916,7 @@ struct cyttsp5_core_data {
 	bool irq_disabled;
 	u8 easy_wakeup_gesture;
 	bool wake_initiated_by_device;
+	bool hw_power_state;
 	struct work_struct startup_work;
 	struct cyttsp5_sysinfo sysinfo;
 #ifdef SAMSUNG_TSP_INFO
@@ -903,6 +930,7 @@ struct cyttsp5_core_data {
 	struct cyttsp5_hid_core hid_core;
 	int hid_cmd_state;
 	int hid_reset_cmd_state; /* reset can happen any time */
+	bool check_postl;
 	struct cyttsp5_hid_desc hid_desc;
 	struct cyttsp5_hid_report *hid_reports[CY_HID_MAX_REPORTS];
 	int num_hid_reports;
@@ -918,6 +946,7 @@ struct cyttsp5_core_data {
 #ifdef VERBOSE_DEBUG
 	u8 pr_buf[CY_MAX_PRBUF_SIZE];
 #endif
+	bool probe_done;
 };
 
 struct cyttsp5_bus_ops {
@@ -958,23 +987,49 @@ enum pwc_data_type_list {
 };
 #endif
 
+#define CYTTSP5_ADAP_LOCK
 static inline int cyttsp5_adap_read_default(struct cyttsp5_core_data *cd,
 		void *buf, int size)
 {
+#ifdef CYTTSP5_ADAP_LOCK
+	int rc;
+	mutex_lock(&cd->adap_lock);
+	rc = cd->bus_ops->read_default(cd->dev, buf, size);
+	mutex_unlock(&cd->adap_lock);
+	return rc;
+#else
 	return cd->bus_ops->read_default(cd->dev, buf, size);
+#endif
 }
 
 static inline int cyttsp5_adap_read_default_nosize(struct cyttsp5_core_data *cd,
 		void *buf, int max)
 {
+#ifdef CYTTSP5_ADAP_LOCK
+	int rc;
+	mutex_lock(&cd->adap_lock);
+	rc = cd->bus_ops->read_default_nosize(cd->dev, buf, max);
+	mutex_unlock(&cd->adap_lock);
+	return rc;
+#else
 	return cd->bus_ops->read_default_nosize(cd->dev, buf, max);
+#endif
 }
 
 static inline int cyttsp5_adap_write_read_specific(struct cyttsp5_core_data *cd,
 		u8 write_len, u8 *write_buf, u8 *read_buf)
 {
+#ifdef CYTTSP5_ADAP_LOCK
+	int rc;
+	mutex_lock(&cd->adap_lock);
+	rc = cd->bus_ops->write_read_specific(cd->dev, write_len, write_buf,
+			read_buf);
+	mutex_unlock(&cd->adap_lock);
+	return rc;
+#else
 	return cd->bus_ops->write_read_specific(cd->dev, write_len, write_buf,
 			read_buf);
+#endif
 }
 
 static inline void *cyttsp5_get_dynamic_data(struct device *dev, int id)
@@ -1119,4 +1174,5 @@ extern const struct dev_pm_ops cyttsp5_pm_ops;
 int cyttsp5_core_suspend(struct device *dev);
 int cyttsp5_core_resume(struct device *dev);
 
+#define CY_CORE_STARTUP_RETRY_COUNT 3
 #endif /* _CYTTSP5_REGS_H */

@@ -1,11 +1,13 @@
 /**
    @copyright
-   Copyright (c) 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2013 - 2014, INSIDE Secure Oy. All rights reserved.
 */
 
 #ifndef PACKAGE_VERSION_H
 #define PACKAGE_VERSION_H
 
-#define PACKAGE_VERSION "vpnclient-3.0-src-package-vpnclient-3.0.2-969-r5430-2014-01-03_12-30-07"
-#endif
+#define PACKAGE_VERSION \
+        "939-23012-001-quicksec-vpnclient-for-android-devel-3.3-snaps" \
+        "hot-1-2396-a820892ba838-2014-10-30_15-56-00 " \
 
+#endif

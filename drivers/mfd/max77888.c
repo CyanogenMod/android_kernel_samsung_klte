@@ -133,9 +133,18 @@ static int of_max77888_dt(struct device *dev, struct max77888_platform_data *pda
 {
 	struct device_node *np = dev->of_node;
 	int retval = 0;
-
-	if(!np)
+#ifdef CONFIG_VIBETONZ
+	struct max77888_haptic_platform_data  *haptic_data;
+	haptic_data = kzalloc(sizeof(struct max77888_haptic_platform_data), GFP_KERNEL);
+	if (haptic_data == NULL)
+		return -ENOMEM;
+#endif
+	if(!np) {
+#ifdef CONFIG_VIBETONZ
+	kfree(haptic_data);
+#endif
 		return -EINVAL;
+	}
 
 	pdata->irq_gpio = of_get_named_gpio(np, "max77888,irq-gpio", 0);
 	if (pdata->irq_gpio < 0) {
@@ -167,6 +176,17 @@ static int of_max77888_dt(struct device *dev, struct max77888_platform_data *pda
 	pr_info("%s: irq-gpio_flags: %u \n", __func__, pdata->irq_gpio_flags);
 	pr_info("%s: irq-base: %u \n", __func__, pdata->irq_base);
 
+#ifdef CONFIG_VIBETONZ
+	of_property_read_u32(np, "haptic,max_timeout", &haptic_data->max_timeout);
+	of_property_read_u32(np, "haptic,duty", &haptic_data->duty);
+	of_property_read_u32(np, "haptic,period", &haptic_data->period);
+	of_property_read_u32(np, "haptic,pwm_id", &haptic_data->pwm_id);
+	pr_info("%s: timeout: %u \n", __func__, haptic_data->max_timeout);
+	pr_info("%s: duty: %u \n", __func__, haptic_data->duty);
+	pr_info("%s: period: %u \n", __func__, haptic_data->period);
+	pr_info("%s: pwm_id: %u \n", __func__, haptic_data->pwm_id);
+	pdata->haptic_data = haptic_data;
+#endif
 	return 0;
 }
 
@@ -206,9 +226,6 @@ static int max77888_i2c_probe(struct i2c_client *i2c,
 #if defined(CONFIG_REGULATOR_MAX77888)
 		pdata->num_regulators = MAX77888_REG_MAX;
 		pdata->regulators = max77888_regulators,
-#endif
-#ifdef CONFIG_VIBETONZ
-		pdata->haptic_data = &max77888_haptic_pdata;
 #endif
 #ifdef CONFIG_LEDS_MAX77888
 		pdata->led_data = &max77888_led_pdata;

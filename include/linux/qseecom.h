@@ -127,6 +127,8 @@ struct qseecom_send_svc_cmd_req {
 
 enum qseecom_key_management_usage_type {
 	QSEOS_KM_USAGE_DISK_ENCRYPTION = 0x01,
+	QSEOS_KM_USAGE_FILE_ENCRYPTION = 0x02,
+	QSEOS_KM_USAGE_MAX
 };
 
 struct qseecom_create_key_req {
@@ -135,6 +137,14 @@ struct qseecom_create_key_req {
 };
 
 struct qseecom_wipe_key_req {
+	enum qseecom_key_management_usage_type usage;
+	int wipe_key_flag;/* 1->remove key from storage(alone with clear key) */
+			  /* 0->do not remove from storage (clear key) */
+};
+
+struct qseecom_update_key_userinfo_req {
+	unsigned char current_hash32[QSEECOM_HASH_SIZE];
+	unsigned char new_hash32[QSEECOM_HASH_SIZE];
 	enum qseecom_key_management_usage_type usage;
 };
 
@@ -157,11 +167,6 @@ struct qseecom_is_es_activated_req {
 	int is_activated; /* out */
 };
 
-enum qseecom_buffer_protection {
-	QSEOS_UNPROTECTED_BUFFER,
-	QSEOS_PROTECT_BUFFER,
-	QSEOS_UNPROTECT_PROTECTED_BUFFER,
-};
 
 enum qseecom_bandwidth_request_mode {
 	INACTIVE = 0,
@@ -181,7 +186,6 @@ struct qseecom_send_modfd_listener_resp {
 	void *resp_buf_ptr; /* in */
 	unsigned int resp_len; /* in */
 	struct qseecom_ion_fd_info ifd_data[MAX_ION_FD]; /* in */
-	enum qseecom_buffer_protection protection_mode; /* in */
 };
 
 #define QSEECOM_IOC_MAGIC    0x97
@@ -250,10 +254,10 @@ struct qseecom_send_modfd_listener_resp {
 #define QSEECOM_IOCTL_SEND_MODFD_RESP \
 	_IOWR(QSEECOM_IOC_MAGIC, 21, struct qseecom_send_modfd_listener_resp)
 
-#define QSEECOM_IOCTL_UNPROTECT_BUF \
-	_IOWR(QSEECOM_IOC_MAGIC, 22, int)
-
 #define QSEECOM_IOCTL_SET_BUS_SCALING_REQ \
 	_IOWR(QSEECOM_IOC_MAGIC, 23, int)
+
+#define QSEECOM_IOCTL_UPDATE_KEY_USER_INFO_REQ \
+	_IOWR(QSEECOM_IOC_MAGIC, 24, struct qseecom_update_key_userinfo_req)
 
 #endif /* __QSEECOM_H_ */

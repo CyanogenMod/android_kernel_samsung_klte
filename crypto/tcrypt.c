@@ -47,7 +47,7 @@
 #define ENCRYPT 1
 #define DECRYPT 0
 
-#ifdef CONFIG_CRYPTO_FIPS
+#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 extern long integrity_mem_reservoir;
 extern void free_bootmem_late(unsigned long addr, unsigned long size);
 #endif
@@ -1583,6 +1583,51 @@ static int do_test(int m)
 	case 1000:
 		test_available();
 		break;
+
+#ifdef CONFIG_CRYPTO_FIPS
+	case 1402 : //For FIPS 140-2
+		printk(KERN_ERR "FIPS : Tcrypt Tests Start\n");
+
+		/* AES */
+		ret += alg_test("ecb(aes-generic)", "ecb(aes)", 0, 0);
+		ret += alg_test("cbc(aes-generic)", "cbc(aes)", 0, 0);
+		
+#ifdef CONFIG_CRYPTO_AES_ARM
+		ret += alg_test("ecb(aes-asm)", "ecb(aes)", 0, 0);
+		ret += alg_test("cbc(aes-asm)", "cbc(aes)", 0, 0);
+#endif
+
+		/* 3DES */
+		ret += alg_test("ecb(des3_ede-generic)", "ecb(des3_ede)", 0, 0);
+		ret += alg_test("cbc(des3_ede-generic)", "cbc(des3_ede)", 0, 0);
+
+		/* SHA */
+		ret += alg_test("sha1-generic", "sha1", 0, 0);
+		ret += alg_test("sha224-generic", "sha224", 0, 0);
+		ret += alg_test("sha256-generic", "sha256", 0, 0);
+		ret += alg_test("sha384-generic", "sha384", 0, 0);
+		ret += alg_test("sha512-generic", "sha512", 0, 0);
+
+#ifdef CONFIG_CRYPTO_SHA1_ARM
+		ret += alg_test("sha1-asm", "sha1", 0, 0);
+		ret += alg_test("hmac(sha1-asm)", "hmac(sha1)", 0, 0);
+#endif
+
+		/* HMAC */
+		ret += alg_test("hmac(sha1-generic)", "hmac(sha1)", 0, 0);
+		ret += alg_test("hmac(sha224-generic)", "hmac(sha224)", 0, 0);
+		ret += alg_test("hmac(sha256-generic)", "hmac(sha256)", 0, 0);
+		ret += alg_test("hmac(sha384-generic)", "hmac(sha384)", 0, 0);
+		ret += alg_test("hmac(sha512-generic)", "hmac(sha512)", 0, 0);
+
+		/* RNG */
+		ret += alg_test("fips_ansi_cprng", "ansi_cprng", 0, 0);
+
+		printk(KERN_ERR "FIPS : Tcrypt Tests End\n");
+
+		break;
+#endif //CONFIG_CRYPTO_FIPS
+
 	}
 
 	return ret;
@@ -1607,6 +1652,7 @@ static int __init tcrypt_mod_init(void)
 
 #ifdef CONFIG_CRYPTO_FIPS
 	testmgr_crypto_proc_init();
+	mode = 1402; //For FIPS 140-2
 #endif
 
 	if (alg)
@@ -1616,7 +1662,7 @@ static int __init tcrypt_mod_init(void)
 
 #if FIPS_FUNC_TEST == 1
     printk(KERN_ERR "FIPS FUNC TEST: Do test again\n");
-    do_test(0);
+    do_test(mode);
 #else
 	if (err) {
 		printk(KERN_ERR "tcrypt: one or more tests failed!\n");
@@ -1632,11 +1678,13 @@ static int __init tcrypt_mod_init(void)
 			printk(KERN_ERR "tcrypt: CRYPTO API started in FIPS mode!!!\n");
 		}
 
+#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
 		if (integrity_mem_reservoir != 0) {
 		  	printk(KERN_NOTICE "FIPS free integrity_mem_reservoir = %ld\n", integrity_mem_reservoir);
 		 	free_bootmem_late((unsigned long)CONFIG_CRYPTO_FIPS_INTEG_COPY_ADDRESS, integrity_mem_reservoir);
 		 	integrity_mem_reservoir = 0;
 		}
+#endif
 	}
 #endif
 #endif /* FIPS_FUNC_TEST */

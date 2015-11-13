@@ -1,5 +1,6 @@
 #if TSP_SEC_FACTORY
 #include <linux/uaccess.h>
+#define tostring(x) #x
 
 static void set_default_result(struct mxt_fac_data *data)
 {
@@ -799,6 +800,40 @@ static void get_config_ver(void *device_data)
 		__func__, buff, strnlen(buff, sizeof(buff)));
 }
 
+static void get_module_vendor(void *device_data)
+{
+	struct mxt_data *data = (struct mxt_data *)device_data;
+	struct i2c_client *client = data->client;
+	struct mxt_fac_data *fdata = data->fdata;
+	char buff[16] = {0};
+	int val;
+
+	set_default_result(fdata);
+	if (!(gpio_get_value(data->pdata->tsp_en) &&
+				gpio_get_value(data->pdata->tsp_en1))) {
+		dev_err(&client->dev, "%s: [ERROR] Touch is stopped\n",
+				__func__);
+		snprintf(buff, sizeof(buff), "%s", "TSP turned off");
+		set_cmd_result(fdata, buff, strnlen(buff, sizeof(buff)));
+		fdata->cmd_state = CMD_STATUS_NOT_APPLICABLE;
+		return;
+	}
+	if (data->pdata->tsp_vendor1 > 0) {
+		gpio_tlmm_config(GPIO_CFG(data->pdata->tsp_vendor1, 0,
+				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+		val = gpio_get_value(data->pdata->tsp_vendor1);
+		dev_info(&client->dev,
+			"%s: TSP_ID: %d[%d]\n", __func__,data->pdata->tsp_vendor1, val);
+		snprintf(buff, sizeof(buff), "%s,%d", tostring(OK), val);
+		fdata->cmd_state = CMD_STATUS_OK;
+		set_cmd_result(fdata, buff, strnlen(buff, sizeof(buff)));
+		return;
+	}
+	snprintf(buff, sizeof(buff),  "%s", tostring(NG));
+	fdata->cmd_state = CMD_STATUS_FAIL;
+	set_cmd_result(fdata, buff, strnlen(buff, sizeof(buff)));
+}
+
 static void get_threshold(void *device_data)
 {
 	struct mxt_data *data = (struct mxt_data *)device_data;
@@ -1571,6 +1606,7 @@ static struct tsp_cmd tsp_cmds[] = {
 	{TSP_CMD("get_fw_ver_ic", get_fw_ver_ic),},
 	{TSP_CMD("get_config_ver", get_config_ver),},
 	{TSP_CMD("get_threshold", get_threshold),},
+	{TSP_CMD("get_module_vendor", get_module_vendor),},
 	{TSP_CMD("module_off_master", module_off_master),},
 	{TSP_CMD("module_on_master", module_on_master),},
 	{TSP_CMD("module_off_slave", not_support_cmd),},

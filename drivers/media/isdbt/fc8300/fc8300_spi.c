@@ -48,7 +48,7 @@ static u8 rdata_buf[65536] __cacheline_aligned;
 
 static DEFINE_MUTEX(fci_spi_lock);
 
-static int __devinit fc8300_spi_probe(struct spi_device *spi)
+static int fc8300_spi_probe(struct spi_device *spi)
 {
 	s32 ret;
 
@@ -80,7 +80,7 @@ static struct spi_driver fc8300_spi_driver = {
 		.owner		= THIS_MODULE,
 	},
 	.probe		= fc8300_spi_probe,
-	.remove		= __devexit_p(fc8300_spi_remove),
+	.remove		= fc8300_spi_remove,
 };
 
 static int fc8300_spi_write_then_read(struct spi_device *spi

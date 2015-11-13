@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wldev_common.h,v 1.1.4.1.2.14 2011-02-09 01:40:07 $
+ * $Id: wldev_common.h 434085 2013-11-05 06:09:49Z $
  */
 #ifndef __WLDEV_COMMON_H__
 #define __WLDEV_COMMON_H__
@@ -83,7 +83,13 @@ s32 wldev_iovar_getint_bsscfg(
 s32 wldev_iovar_setint_bsscfg(
 	struct net_device *dev, s8 *iovar, s32 val, s32 bssidx);
 
-extern void get_customized_country_code(char *country_iso_code, wl_country_t *cspec);
+extern int dhd_net_set_fw_path(struct net_device *dev, char *fw);
+extern int dhd_net_bus_suspend(struct net_device *dev);
+extern int dhd_net_bus_resume(struct net_device *dev, uint8 stage);
+extern int dhd_net_wifi_platform_set_power(struct net_device *dev, bool on,
+	unsigned long delay_msec);
+extern void dhd_get_customized_country_code(struct net_device *dev, char *country_iso_code,
+	wl_country_t *cspec);
 extern void dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec, bool notify);
 extern void dhd_bus_band_set(struct net_device *dev, uint band);
 extern int wldev_set_country(struct net_device *dev, char *country_code, bool notify,
@@ -108,6 +114,5 @@ int wldev_get_ssid(struct net_device *dev, wlc_ssid_t *pssid);
 int wldev_get_band(struct net_device *dev, uint *pband);
 
 int wldev_set_band(struct net_device *dev, uint band);
-
 
 #endif /* __WLDEV_COMMON_H__ */

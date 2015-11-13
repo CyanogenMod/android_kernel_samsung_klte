@@ -17,7 +17,10 @@ choice
 		bool "ISDBT_FC8300_SPI"	
 		
 	config ISDBT_FC8150_SPI
-		bool "ISDBT_FC8150_SPI"			
+		bool "ISDBT_FC8150_SPI"
+	
+	config ISDBT_FC8150_HKDI
+		bool "ISDBT_FC8150_HKDI"
 endchoice
 
 config ISDBT_SPMI

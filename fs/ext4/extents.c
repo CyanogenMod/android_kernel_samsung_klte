@@ -380,8 +380,6 @@ ext4_ext_show_eh(struct inode *inode, struct ext4_extent_header *eh)
 				inode->i_ino);
 
 		for (i = 0; i < 4; i++, ex++) {
-			if (ex == NULL)
-				return;
 			printk(KERN_ERR "leaf - block : %d / length : [%d]%d /"
 				" pblock : %llu\n",le32_to_cpu(ex->ee_block),
 				ext4_ext_is_uninitialized(ex),
@@ -396,8 +394,6 @@ ext4_ext_show_eh(struct inode *inode, struct ext4_extent_header *eh)
 				inode->i_ino);
 
 		for (i = 0; i < 4; i++, ei++) {
-			if (ei == NULL)
-				return;
 			printk(KERN_ERR "idx - block : %d / pblock : %llu\n",
 					le32_to_cpu(ei->ei_block),
 					ext4_idx_pblock(ei));

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -52,6 +52,37 @@ static int dsi_on(struct mdss_panel_data *pdata)
 	return rc;
 }
 
+static int dsi_update_pconfig(struct mdss_panel_data *pdata,
+				int mode)
+{
+	int ret = 0;
+	struct mdss_panel_info *pinfo = &pdata->panel_info;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	if (!pdata)
+		return -ENODEV;
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	if (mode == DSI_CMD_MODE) {
+		pinfo->mipi.mode = DSI_CMD_MODE;
+		pinfo->type = MIPI_CMD_PANEL;
+		pinfo->mipi.vsync_enable = 1;
+		pinfo->mipi.hw_vsync_mode = 1;
+	} else {
+		pinfo->mipi.mode = DSI_VIDEO_MODE;
+		pinfo->type = MIPI_VIDEO_PANEL;
+		pinfo->mipi.vsync_enable = 0;
+		pinfo->mipi.hw_vsync_mode = 0;
+	}
+
+	ctrl_pdata->panel_mode = pinfo->mipi.mode;
+	mdss_panel_get_dst_fmt(pinfo->bpp, pinfo->mipi.mode,
+			pinfo->mipi.pixel_packing, &(pinfo->mipi.dst_format));
+	pinfo->cont_splash_enabled = 0;
+
+	return ret;
+}
+
 static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 {
 	int rc = 0;
@@ -66,17 +97,47 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 				panel_data);
 
 	if (enable) {
-		dsi_ctrl_gpio_request(ctrl_pdata);
-		mdss_dsi_panel_reset(pdata, 1);
-		rc = ctrl_pdata->on(pdata);
-		if (rc)
-			pr_err("dsi_panel_handler panel on failed %d\n", rc);
+		if (!pdata->panel_info.dynamic_switch_pending) {
+			if (pdata->panel_info.type == MIPI_CMD_PANEL)
+				dsi_ctrl_gpio_request(ctrl_pdata);
+			mdss_dsi_panel_reset(pdata, 1);
+		}
+		pdata->panel_info.panel_power_on = 1;
+		if (!pdata->panel_info.dynamic_switch_pending) {
+			rc = ctrl_pdata->on(pdata);
+			if (rc)
+				pr_err("%s: panel on failed!\n", __func__);
+		}
+		if (pdata->panel_info.type == MIPI_CMD_PANEL &&
+				pdata->panel_info.dynamic_switch_pending) {
+			dsi_ctrl_gpio_request(ctrl_pdata);
+			mdss_dsi_set_tear_on(ctrl_pdata);
+		}
 	} else {
+		msm_dsi_sw_reset();
 		if (dsi_intf.op_mode_config)
 			dsi_intf.op_mode_config(DSI_CMD_MODE, pdata);
-		rc = ctrl_pdata->off(pdata);
-		mdss_dsi_panel_reset(pdata, 0);
-		dsi_ctrl_gpio_free(ctrl_pdata);
+		if (pdata->panel_info.dynamic_switch_pending) {
+			pr_info("%s: switching to %s mode\n", __func__,
+			(pdata->panel_info.mipi.mode ? "video" : "command"));
+			if (pdata->panel_info.type == MIPI_CMD_PANEL) {
+				ctrl_pdata->switch_mode(pdata, DSI_VIDEO_MODE);
+				dsi_ctrl_gpio_free(ctrl_pdata);
+			} else if (pdata->panel_info.type == MIPI_VIDEO_PANEL) {
+				ctrl_pdata->switch_mode(pdata, DSI_CMD_MODE);
+				dsi_ctrl_gpio_request(ctrl_pdata);
+				mdss_dsi_set_tear_off(ctrl_pdata);
+				dsi_ctrl_gpio_free(ctrl_pdata);
+			}
+		}
+		if (!pdata->panel_info.dynamic_switch_pending)
+			rc = ctrl_pdata->off(pdata);
+		pdata->panel_info.panel_power_on = 0;
+		if (!pdata->panel_info.dynamic_switch_pending) {
+			if (pdata->panel_info.type == MIPI_CMD_PANEL)
+				dsi_ctrl_gpio_free(ctrl_pdata);
+			mdss_dsi_panel_reset(pdata, 0);
+		}
 	}
 
 	pr_info("%s-:\n", __func__);
@@ -164,6 +225,9 @@ static int dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_PANEL_CLK_CTRL:
 		rc = dsi_clk_ctrl(pdata, (int)arg);
 		break;
+	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
+		rc = dsi_update_pconfig(pdata, (int)(unsigned long) arg);
+		break;
 #if defined(CONFIG_MDSS_DSI_EVENT_HANDLER_PANEL)
 	case MDSS_EVENT_FB_REGISTERED:
 		if (ctrl_pdata->registered) {
@@ -205,7 +269,8 @@ static int dsi_parse_gpio(struct platform_device *pdev,
 						__func__, __LINE__);
 
 	ctrl_pdata->disp_te_gpio = -1;
-	if (ctrl_pdata->panel_data.panel_info.mipi.mode == DSI_CMD_MODE) {
+	if (ctrl_pdata->panel_data.panel_info.mipi.mode == DSI_CMD_MODE ||
+		ctrl_pdata->panel_data.panel_info.mipi.dynamic_switch_enabled) {
 		ctrl_pdata->disp_te_gpio = of_get_named_gpio(np,
 						"qcom,platform-te-gpio", 0);
 		if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
@@ -251,74 +316,22 @@ int dsi_ctrl_gpio_request(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int rc = 0;
 
-	if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-		rc = gpio_request(ctrl_pdata->disp_en_gpio, "disp_enable");
-		if (rc)
-			goto gpio_request_err4;
-
-		ctrl_pdata->disp_en_gpio_requested = 1;
-	}
-
-	if (gpio_is_valid(ctrl_pdata->rst_gpio)) {
-		rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
-		if (rc)
-			goto gpio_request_err3;
-
-		ctrl_pdata->rst_gpio_requested = 1;
-	}
-
 	if (gpio_is_valid(ctrl_pdata->disp_te_gpio)) {
 		rc = gpio_request(ctrl_pdata->disp_te_gpio, "disp_te");
 		if (rc)
-			goto gpio_request_err2;
-
-		ctrl_pdata->disp_te_gpio_requested = 1;
+			ctrl_pdata->disp_te_gpio_requested = 0;
+		else
+			ctrl_pdata->disp_te_gpio_requested = 1;
 	}
 
-	if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
-		rc = gpio_request(ctrl_pdata->mode_gpio, "panel_mode");
-		if (rc)
-			goto gpio_request_err1;
-
-		ctrl_pdata->mode_gpio_requested = 1;
-	}
-
-	return rc;
-
-gpio_request_err1:
-	if (gpio_is_valid(ctrl_pdata->disp_te_gpio))
-		gpio_free(ctrl_pdata->disp_te_gpio);
-gpio_request_err2:
-	if (gpio_is_valid(ctrl_pdata->rst_gpio))
-		gpio_free(ctrl_pdata->rst_gpio);
-gpio_request_err3:
-	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
-		gpio_free(ctrl_pdata->disp_en_gpio);
-gpio_request_err4:
-	ctrl_pdata->disp_en_gpio_requested = 0;
-	ctrl_pdata->rst_gpio_requested = 0;
-	ctrl_pdata->disp_te_gpio_requested = 0;
-	ctrl_pdata->mode_gpio_requested = 0;
 	return rc;
 }
 
 void dsi_ctrl_gpio_free(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
-	if (ctrl_pdata->disp_en_gpio_requested) {
-		gpio_free(ctrl_pdata->disp_en_gpio);
-		ctrl_pdata->disp_en_gpio_requested = 0;
-	}
-	if (ctrl_pdata->rst_gpio_requested) {
-		gpio_free(ctrl_pdata->rst_gpio);
-		ctrl_pdata->rst_gpio_requested = 0;
-	}
 	if (ctrl_pdata->disp_te_gpio_requested) {
 		gpio_free(ctrl_pdata->disp_te_gpio);
 		ctrl_pdata->disp_te_gpio_requested = 0;
-	}
-	if (ctrl_pdata->mode_gpio_requested) {
-		gpio_free(ctrl_pdata->mode_gpio);
-		ctrl_pdata->mode_gpio_requested = 0;
 	}
 }
 
@@ -332,7 +345,7 @@ static int dsi_parse_vreg(struct device *dev, struct dss_module_power *mp)
 	if (!dev || !mp) {
 		pr_err("%s: invalid input\n", __func__);
 		rc = -EINVAL;
-		goto error;
+		return rc;
 	}
 
 	np = dev->of_node;

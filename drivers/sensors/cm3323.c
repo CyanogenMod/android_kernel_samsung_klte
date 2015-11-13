@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/of_gpio.h>
+#include <linux/regulator/consumer.h>
 
 #include "sensors_core.h"
 
@@ -74,7 +75,43 @@ struct cm3323_p {
 	u16 color[4];
 	int irq;
 	int time_count;
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+	struct regulator *vdd_2p85;
+#endif
 };
+
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+static void sensor_power_on_vdd(struct cm3323_p *info, int onoff)
+{
+	int ret;
+	if (info->vdd_2p85 == NULL) {
+		info->vdd_2p85 =regulator_get(&info->i2c_client->dev, "8226_l19");
+		if (IS_ERR(info->vdd_2p85)){
+			pr_err("%s: regulator_get failed for 8226_l19\n", __func__);
+			return ;
+		}
+		ret = regulator_set_voltage(info->vdd_2p85, 2850000, 2850000);
+		if (ret)
+			pr_err("%s: error vsensor_2p85 setting voltage ret=%d\n",__func__, ret);
+	}
+	if (onoff == 1) {
+		ret = regulator_enable(info->vdd_2p85);
+		if (ret)
+			pr_err("%s: error enablinig regulator info->vdd_2p85\n", __func__);
+	}
+    else if (onoff == 0) {
+		if (regulator_is_enabled(info->vdd_2p85)) {
+			ret = regulator_disable(info->vdd_2p85);
+			if (ret)
+				pr_err("%s: error vdd_2p85 disabling regulator\n",__func__);
+		}
+	}
+	msleep(30);
+	return;
+}
+#endif
+
+
 
 static int cm3323_i2c_read_word(struct cm3323_p *data,
 		unsigned char reg_addr, u16 *buf)
@@ -382,7 +419,9 @@ static int cm3323_probe(struct i2c_client *client,
 
 	data->i2c_client = client;
 	i2c_set_clientdata(client, data);
-
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+	sensor_power_on_vdd(data,1);
+#endif
 	/* Check if the device is there or not. */
 	ret = cm3323_setup_reg(data);
 	if (ret < 0) {
@@ -409,6 +448,9 @@ static int cm3323_probe(struct i2c_client *client,
 exit_input_init:
 exit_setup_reg:
 	kfree(data);
+#ifdef CONFIG_SEC_RUBENS_PROJECT
+	sensor_power_on_vdd(data,0);
+#endif
 exit_kzalloc:
 exit:
 	pr_err("[SENSOR]: %s - Probe fail!\n", __func__);

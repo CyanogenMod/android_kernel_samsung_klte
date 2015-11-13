@@ -1653,6 +1653,16 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute
 		goto err_out;
 	}
 
+	len = (int)count;
+	if (*(buf + len - 1) == '\n')
+		len--;
+
+/* if wrong cmd is coming */
+	if (len > TSP_CMD_STR_LEN) {
+		dev_info(&client->dev, "%s: length overflow[%d]\n", __func__, len);
+		goto err_out;
+	}
+
 	/* check lock  */
 	mutex_lock(&fdata->cmd_lock);
 	fdata->cmd_is_running = true;
@@ -1663,9 +1673,6 @@ static ssize_t store_cmd(struct device *dev, struct device_attribute
 	for (i = 0; i < ARRAY_SIZE(fdata->cmd_param); i++)
 		fdata->cmd_param[i] = 0;
 
-	len = (int)count;
-	if (*(buf + len - 1) == '\n')
-		len--;
 	memset(fdata->cmd, 0x00, ARRAY_SIZE(fdata->cmd));
 	memcpy(fdata->cmd, buf, len);
 

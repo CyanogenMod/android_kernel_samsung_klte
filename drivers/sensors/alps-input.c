@@ -9,7 +9,10 @@
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <linux/ioctl.h>
-#include "sensors_core.h"
+#include <linux/sensor/sensors_core.h>
+#ifdef CONFIG_OF
+#include <linux/of_gpio.h>
+#endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -20,9 +23,9 @@
 #define EVENT_TYPE_ACCEL_Y          ABS_Y
 #define EVENT_TYPE_ACCEL_Z          ABS_Z
 
-#define EVENT_TYPE_MAG_X           ABS_HAT0X
-#define EVENT_TYPE_MAG_Y           ABS_HAT0Y
-#define EVENT_TYPE_MAG_Z           ABS_BRAKE
+#define EVENT_TYPE_MAG_X           ABS_X
+#define EVENT_TYPE_MAG_Y           ABS_Y
+#define EVENT_TYPE_MAG_Z           ABS_Z
 
 #define ALPS_POLL_INTERVAL   200    /* msecs */
 #define ALPS_INPUT_FUZZ        0    /* input event threshold */
@@ -48,6 +51,7 @@ struct alps_data {
 	int delay;
 	int flgM;
 	int flgA;
+	u32 position;
 };
 
 /* for I/O Control */
@@ -193,11 +197,13 @@ static const struct file_operations alps_fops = {
 	}
 }
 */
-static void hscd_poll(struct input_dev *idev)
+static void hscd_poll(struct alps_data *data)
 {
 	int xyz[3];
+	struct input_dev * idev = data->alps_idev->input;
 
 	if (hscd_get_magnetic_field_data(xyz) == 0) {
+		remap_sensor_data_32(xyz, data->position);
 		input_report_abs(idev, EVENT_TYPE_MAG_X, xyz[0]);
 		input_report_abs(idev, EVENT_TYPE_MAG_Y, xyz[1]);
 		input_report_abs(idev, EVENT_TYPE_MAG_Z, xyz[2]);
@@ -215,7 +221,7 @@ static void alps_poll(struct input_polled_dev *dev)
 		data->alps_idev->poll_interval = data->delay;
 
 		if (data->flgM)
-			hscd_poll(data->alps_idev->input);
+			hscd_poll(data);
 /*		if (data->flgA)
 			accsns_poll(data->alps_idev->input);*/
 		mutex_unlock(&data->alps_lock);
@@ -229,6 +235,27 @@ static struct of_device_id alps_match_table[] = {
 };
 #else
 #define magnetic_match_table NULL
+#endif
+
+#ifdef CONFIG_OF
+/* device tree parsing */
+static int alps_parse_dt(struct device *dev, struct alps_data *data)
+{
+	struct device_node *np = dev->of_node;
+
+	if (of_property_read_u32(np, "alps,mag-position", &data->position))
+		data->position = 0;
+
+	pr_info("%s position %d", __func__, data->position);
+
+	return 0;
+}
+#else
+static int alps_parse_dt(struct device *dev, struct alps_data *data)
+{
+	data->position = 0;
+	return -ENODEV;
+}
 #endif
 
 static int alps_probe(struct platform_device *dev)
@@ -260,13 +287,16 @@ static int alps_probe(struct platform_device *dev)
 		goto out_device;
 	}
 
+	if (alps_parse_dt(&dev->dev, data))
+		pr_err("ALPS parse for position failed");
+
 	data->alps_idev->poll = alps_poll;
 	data->alps_idev->poll_interval = ALPS_POLL_INTERVAL;
 	data->alps_idev->private = data;
 
 	/* initialize the input class */
 	idev = data->alps_idev->input;
-	idev->name = "alps";
+	idev->name = "magnetic_sensor";
 	idev->phys = "alps/input0";
 	idev->id.bustype = BUS_HOST;
 	idev->dev.parent = &data->pdev->dev;

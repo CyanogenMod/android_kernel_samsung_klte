@@ -50,7 +50,7 @@ int __init sec_avc_log_init(void)
 	return 1;
 }
 
-#define BUF_SIZE 256
+#define BUF_SIZE 512
 void sec_avc_log(char *fmt, ...)
 {
 	va_list args;

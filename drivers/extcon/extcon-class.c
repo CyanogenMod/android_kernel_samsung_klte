@@ -41,22 +41,23 @@
  * every single port-type of the following cable names. Please choose cable
  * names that are actually used in your extcon device.
  */
-const char *extcon_cable_name[] = {
+const char *extcon_cable_name[CABLE_NAME_MAX + 1] = {
 	[EXTCON_USB]		= "USB",
 	[EXTCON_USB_HOST]	= "USB-Host",
 	[EXTCON_USB_HOST_5V]	= "USB-Host-5V",
 	[EXTCON_TA]		= "TA",
+	[EXTCON_UNDEFINED_CHARGER]	= "Undefined-Charger",
 	[EXTCON_CEA936_CHG]	= "CEA936",
-	[EXTCON_FAST_CHARGER]	= "Fast-charger",
-	[EXTCON_SLOW_CHARGER]	= "Slow-charger",
 	[EXTCON_CHARGE_DOWNSTREAM]	= "Charge-downstream",
+#if defined(CONFIG_MUIC_DET_JACK)
+	[EXTCON_EARJACK]	= "Earjack",
+#endif
 	[EXTCON_MHL]		= "MHL",
 	[EXTCON_MHL_VB]		= "MHL-VB",
-	[EXTCON_LINE_OUT]	= "Line-out",
 	[EXTCON_DESKDOCK]	= "Desk-dock",
 	[EXTCON_DESKDOCK_VB]	= "Desk-dock-VB",
 	[EXTCON_CARDOCK]	= "Car-dock",
-	[EXTCON_CARDOCK_VB]	= "Car-dock0-VB",
+	[EXTCON_CARDOCK_VB]	= "Car-dock-VB",
 	[EXTCON_AUDIODOCK]	= "Audio-dock",
 	[EXTCON_SMARTDOCK]	= "Smart-dock",
 	[EXTCON_SMARTDOCK_TA]	= "Smart-dock-TA",
@@ -71,6 +72,11 @@ const char *extcon_cable_name[] = {
 #if defined(CONFIG_MUIC_MAX77804K_SUPPORT_HMT_DETECTION)
 	[EXTCON_HMT]	= "HMT",
 #endif
+#if defined(CONFIG_MUIC_MAX77804K_SUPPORT_LANHUB)
+	[EXTCON_LANHUB]		= "Lan-Hub",
+	[EXTCON_LANHUB_TA]	= "Lan-Hub-TA",
+#endif
+	[EXTCON_NONE] = "None",
 	NULL,
 };
 

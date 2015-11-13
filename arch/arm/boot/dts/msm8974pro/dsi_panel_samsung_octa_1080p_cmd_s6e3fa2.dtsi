@@ -23,6 +23,9 @@
 		qcom,rst-gpio = <&pma8084_gpios 17 0>;
 		qcom,te-gpio = <&msmgpio 12 0>;
 
+		qcom,panel-roi-alignment = <8 8 1 1 1 1>;
+		qcom,partial-update-enabled;
+
 		mdss-pan-broadcast-mode=<0>;
 
 		qcom,mdss-pan-res = <1080 1920>;
@@ -113,11 +116,12 @@
 
 				/* Touch Hsync */
 				29 01 00 00 00 00 04 BD 05 02 02	/* Touch Hsync Enable */
+													/* wait 120ms(0x78) */
 
 				29 01 00 00 00 00 03 F0 A5 A5		/* TEST KEY Disable */
 				29 01 00 00 00 00 03 FC A5 A5		/* TEST KEY Disable */
 			];
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
 		qcom,panel-display-off-seq = [
 				05 01 00 00 0A 00 02 28 00			/* wait 10ms(0x0A) */
 				05 01 00 00 78 00 02 10 00			/* wait 120ms(0x78) */
@@ -194,7 +198,7 @@
 			29 01 00 00 00 00 02 B0 20
 			29 01 00 00 00 00 02 D7 00		/* Look up table (2) */
 			29 01 00 00 00 00 02 FE 80
-			29 01 00 00 64 00 02 FE 00		/* wait 100ms(0x64) */
+			29 01 00 00 64 00 02 FE 00		/* wait 100ms(0x78) */
 			29 01 00 00 00 00 03 F0 A5 A5
 			29 01 00 00 00 00 03 FC A5 A5
 		];
@@ -375,7 +379,7 @@
 					23 01 00 00 00 00 02 F7 00
 				];
 
-			samsung,panel-etc-hbm-revG-cmds	 = [
+			samsung,panel-etc-hbm-cmds	 = [
 					29 01 00 00 00 00 05 B2 00 0E 00 0E 			/* AID 0% */
 					29 01 00 00 00 00 16 B6
 					88 04 00 00 00 00
@@ -401,7 +405,7 @@
 			 * AID command list and mappings
 			 * ************************************************************************************************************************
 			 */
-			samsung,panel-aid-cmds-list = [
+			samsung,panel-aid-cmds-revF-list = [
 				29 01 00 00 00 00 05 B2 07 60 00 06 /* 0  samsung_brightness_aor_ 2cd_97.6 */
 				29 01 00 00 00 00 05 B2 07 53 00 06 /* 1  samsung_brightness_aor_ 3cd_96.9 */
 				29 01 00 00 00 00 05 B2 07 42 00 06 /* 2  samsung_brightness_aor_ 4cd_96.0 */
@@ -453,7 +457,7 @@
 			];
 
 			/* bl_level, Index in acl command list */
-			samsung,panel-aid-map-table = <
+			samsung,panel-aid-map-revF-table = <
 				2	0
 				4	2		5	3		6	4		8	6		9	7
 				10	8		12	10		13	11		15	13		16	14
@@ -533,8 +537,7 @@
 				220	41		234	42		249	43		265	43	282	43
 				300	43		316	43		333	43		350	43
 			>;
-
-			samsung,panel-aid-cmds-revI-list = [
+			samsung,panel-aid-cmds-list = [
 				29 01 00 00 00 00 05 B2 07 68 00 0E /* 0  samsung_brightness_aor_2cd_97.9 */
 				29 01 00 00 00 00 05 B2 07 58 00 0E /* 1  samsung_brightness_aor_3cd_97.1 */
 				29 01 00 00 00 00 05 B2 07 49 00 0E /* 2  samsung_brightness_aor_4cd_96.3 */
@@ -584,7 +587,7 @@
 
 
 			/* bl_level, Index in acl command list */
-			samsung,panel-aid-map-revI-table = <
+			samsung,panel-aid-map-table = <
 				2	0
 				4	2		5	3		6	4		8	6		9	7
 				10	8		12	10		13	11		15	13		16	14
@@ -639,7 +642,8 @@
 			 * ELVSS(ACL Off) command list and mappings
 			 * ************************************************************************************************************************
 			 */
-			samsung,panel-elvss-cmds-list = [
+
+			samsung,panel-elvss-cmds-revG-list = [
 				29 01 00 00 00 00 03 b6 88 10 /* 0 */
 				29 01 00 00 00 00 03 b6 88 0F /* 1 */
 				29 01 00 00 00 00 03 b6 88 0F /* 2 */
@@ -668,7 +672,7 @@
 				29 01 00 00 00 00 03 b6 88 04 /* 25 */
 			];
 
-			samsung,panel-elvss-cmds-revI-list = [
+			samsung,panel-elvss-cmds-list = [
 				29 01 00 00 00 00 03 b6 88 0B /* 0 */
 				29 01 00 00 00 00 03 b6 88 0C /* 1 */
 				29 01 00 00 00 00 03 b6 88 0C /* 2 */
@@ -708,7 +712,7 @@
 			 * SMART ACL(ACL On) ELVSS command list and mappings
 			 * ************************************************************************************************************************
 			 */
-			samsung,panel-smart-acl-elvss-cmds-list = [
+			samsung,panel-smart-acl-elvss-cmds-revG-list = [
 				29 01 00 00 00 00 03 b6 88 10 /* 0 */
 				29 01 00 00 00 00 03 b6 88 0F /* 1 */
 				29 01 00 00 00 00 03 b6 88 0F /* 2 */
@@ -738,7 +742,7 @@
 			];
 
 			/* bl_level, Index in elvss command list */
-			samsung,panel-smart-acl-elvss-map-table = <
+			samsung,panel-smart-acl-elvss-map-revG-table = <
 					2    0
 					4    0	5    0       6   0       8   0 	9   0
 					10   0     12   0   	13   0	15   0	16   0
@@ -754,7 +758,7 @@
 					300  22	  316  23		333	 24		350  25
 					>;
 
-			samsung,panel-smart-acl-elvss-cmds-revI-list = [
+			samsung,panel-smart-acl-elvss-cmds-list = [
 				29 01 00 00 00 00 03 b6 88 0B /* 0 */
 				29 01 00 00 00 00 03 b6 88 0C /* 1 */
 				29 01 00 00 00 00 03 b6 88 0C /* 2 */
@@ -789,7 +793,7 @@
 			];
 
 			/* bl_level, Index in elvss command list */
-			samsung,panel-smart-acl-elvss-map-revI-table = <
+			samsung,panel-smart-acl-elvss-map-table = <
 					2    0
 					4    0	5    0       	  6   0            8   0       9   0
 					10   0      12   0   		13   0      	15   0   	16   0

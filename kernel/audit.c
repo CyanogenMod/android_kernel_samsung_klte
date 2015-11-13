@@ -390,7 +390,7 @@ static void audit_printk_skb(struct sk_buff *skb)
 	char *data = NLMSG_DATA(nlh);
 #endif
 
-	if (nlh->nlmsg_type != AUDIT_EOE) {
+	if (nlh->nlmsg_type != AUDIT_EOE && nlh->nlmsg_type != AUDIT_NETFILTER_CFG) {
 #ifdef CONFIG_PROC_AVC
 		sec_avc_log("%s\n", data);
 #endif
@@ -417,7 +417,7 @@ static void kauditd_send_skb(struct sk_buff *skb)
 		struct nlmsghdr *nlh = nlmsg_hdr(skb);
 		char *data = NLMSG_DATA(nlh);
 	
-		if (nlh->nlmsg_type != AUDIT_EOE) {
+		if (nlh->nlmsg_type != AUDIT_EOE && nlh->nlmsg_type != AUDIT_NETFILTER_CFG) {
 			sec_avc_log("%s\n", data);
 		}
 #endif

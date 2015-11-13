@@ -142,6 +142,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 #endif					/* CONFIG_MMU */
 
 #ifdef CONFIG_TIMA_RKP
+#if 0
 inline void tima_dump_log2()
 {
         char *tima_log = (char *)0xde100000, *ptr, *ptr1;
@@ -166,7 +167,7 @@ inline void tima_dump_log2()
                 ptr = ptr1;
         }
 }
-
+#endif
 inline void tima_verify_state(unsigned long pmdp, unsigned long val, unsigned long rd_only, unsigned long caller)
 {
         unsigned long pmdp_addr = (unsigned long)pmdp;
@@ -199,153 +200,17 @@ inline void tima_verify_state(unsigned long pmdp, unsigned long val, unsigned lo
         if (rd_only) {
                 if ((pte_val & 0x230) != 0x210) { 	/* Page is RO */
                         printk(KERN_ERR"Page is NOT RO, CALLER=%lx VA=%lx, PTE=%lx FLUSHED PTE=%lx PA=%lx\n", caller, pmdp_addr, pte_val, npte_val, __pa(pmdp_addr));
-			//tima_send_cmd(pmdp_addr, 0x3f80e221);
+			//tima_send_cmd(pmdp_addr, 0x0e);
 			//tima_dump_log2();
 		}
         } else {
                 if ((pte_val & 0x230) != 0x010) {	/* Page is RW */
                         printk(KERN_ERR"Page is NOT RW, CALLER=%lx VA=%lx, PTE=%lx FLUSHED PTE=%lx PA=%lx\n", caller, pmdp_addr, pte_val, npte_val, __pa(pmdp_addr));
-			//tima_send_cmd(pmdp_addr, 0x3f80e221);
+			//tima_send_cmd(pmdp_addr, 0x0e);
 			//tima_dump_log2();
 		}
         }
 }
-
-#ifdef CONFIG_TIMA_RKP_DEBUG
-/* 
- * Function decides what the response to 
- * a failure indicated by the debug infrastructure 
- * should be.
- * If signal = 0xffffffff, kernel panic.
- * Else the signal is the command id.
- */ 
-void tima_debug_signal_failure(unsigned long signal, unsigned long caller)
-{
-	if (signal == 0xffffffff)
-		panic("TIMA debug kernel panic with caller %lx\n", caller);
-	else 
-		tima_send_cmd(caller, signal);
-}
-#if 0
-unsigned long *l2_mmap_ptr = NULL;
-static inline unsigned long pt_walk(unsigned long va)
-{
-	unsigned long pgd;
-	unsigned long pmd;
-	unsigned long pmd_v;
-	unsigned long pte;
-	//unsigned long pa = 0;
-	unsigned long offset;
-	
-	pgd = (unsigned long)cpu_get_pgd();
-	offset = (va & 0xfff00000) >> 20;
-	pmd = *(unsigned long *)(pgd + offset*4);
-	/* Check if pmd is a section. Return if true
-	 */ 
-	if ((pmd & 0x3) != 0x1)
-		return 0;
-	offset = (pmd & 0x000ffc00) >> 2;
-	pmd_v = (unsigned long)(l2_mmap_ptr + offset);
-	offset = (va & 0x000ff000) >> 12;
-	pte = *(unsigned long *)(pmd_v + offset*4);
-
-
-/*
- * Check if a certain va is made read-only by tima
- * return: -1 error, 0 writable, 1 readonly
- */
-	/* Return on empty page
-	 */	
-	if ((pte & 0x3) == 0x0)
-		return 0;
-	
-	//pa = (pte & ~(0xfff));
-	/* return physical address without masking out
-	 * lower 12 bits so that access permission can
-	 * be checked in the caller function
-	 */
-	return pte;
-}
-#endif
-/* 
- * If debug infra. is enabled, do page walk for
- * passed in VA to get the correspoding PA
- * and check the AP bits to verify the 
- * protection.
- * Returns: 0 writable, 1 readonly page, -1 on Error
- * Assumption: For page walk to work for L2,
- * make sure that the sect_to_pgt region has been
- * mapped. Currently the mapping is done in 
- * paging_init().
- */
-int tima_debug_page_protection(unsigned long va, unsigned long caller, unsigned long readonly)
-{
-#if 0
-	unsigned long pte = 0;
-	if(l2_mmap_ptr)
-		pte = pt_walk(va);
-	if (pte) {
-		if(readonly) {
-			/* Page expected to be read-only
-			 */
-			if ((pte & 0x230) != 0x210) {
-				return 0;
-			}
-			else 
-				return 1;
-		} else	{ 
-			/* Page expected to be writable
-			 */
-			if ((pte & 0x230) != 0x010) { 
-				return 1;
-			}
-			else 
-				return 0;
-		}
-	}
-	/* Error */
-	return -1;
-#endif
-
-	unsigned long par = 0;
-	unsigned long flags;
-	/* 
-	 * Translate the page using priviledged read. 
-	 * Failure implies a translation fault!
-	 * Success implies page might be RO or RW.
-	 */
-	raw_spin_lock_irqsave(&par_lock, flags);
-	__asm__ __volatile__ (
-		"mcr	p15, 0, %1, c7, c8, 0\n"
-		"isb\n"
-		"mrc 	p15, 0, %0, c7, c4, 0\n"
-		:"=r"(par):"r"(va));
-	raw_spin_unlock_irqrestore(&par_lock, flags);
-	if (par & 0x1) {
-		/* Translation failed! */
-		return -1;
-	}
-
-	/* 
-	 * Translate the page using priviledged write.
-	 * Failure implies that the page is read-only.
-	 * Success implies that the page is writable.
-	 */ 
-	raw_spin_lock_irqsave(&par_lock, flags);
-	__asm__ __volatile__ (
-		"mcr	p15, 0, %1, c7, c8, 1\n"
-		"isb\n"
-		"mrc 	p15, 0, %0, c7, c4, 0\n"
-		:"=r"(par):"r"(va));
-	raw_spin_unlock_irqrestore(&par_lock, flags);
-	if (par & 0x1) {
-		/* Translation failed */
-		return 1;
-	}
-
-	return 0; /* Page is writable */
-}
-#endif /* CONFIG_TIMA_RKP_DEBUG */ 
 
 /*
  * Check if a certain va is made read-only by tima
@@ -363,15 +228,13 @@ int tima_is_pg_protected(unsigned long va)
         unsigned long rindex;
         unsigned long val;
 
-        if(!p)
-                return -1;
         p += (tmp);
 #ifndef	CONFIG_TIMA_RKP_COHERENT_TT
 	asm volatile("mcr     p15, 0, %0, c7, c6, 1\n"
 	"dsb\n"
 	"isb\n"
 	: : "r" (p));
-#endif        
+#endif
         rindex = index % 32;
 
         val = (*p) & (1 << rindex)?1:0;
@@ -442,7 +305,7 @@ static unsigned int rkp_fixup(unsigned long addr, struct pt_regs *regs) {
                 "isb\n"
 		: : "r" (addr));
 #endif
-		tima_send_cmd2(__pa(addr), reg_val, 0x3f808221);
+		tima_send_cmd2(__pa(addr), reg_val, 0x08);
 #ifndef	CONFIG_TIMA_RKP_COHERENT_TT
 		asm volatile("mcr     p15, 0, %0, c7, c6, 1\n" 
 		"dsb\n"
@@ -481,7 +344,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	printk(KERN_ERR"TIMA:====> %lx, [%lx]\n", addr, tima_switch_count);
 	if (addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
 		printk(KERN_ERR"TIMA:==> Handling fault for %lx\n", addr);
-		tima_send_cmd(addr, 0x3f821221);
+		tima_send_cmd(addr, 0x21);
 		__asm__ ("mcr    p15, 0, %0, c8, c3, 0\n"
 			"isb"
 			::"r"(0));
@@ -509,7 +372,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	if (tima_is_pg_protected(addr) == 1) {
 		printk(KERN_ERR"RKP ==> Address %lx is RO by RKP\n", addr);
 	}
-	tima_send_cmd(addr, 0x3f80e221);
+	tima_send_cmd(addr, 0x0e);
 #endif
 	die("Oops", regs, fsr);
 	bust_spinlocks(0);
@@ -1030,6 +893,8 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;
 
+	trace_unhandled_abort(regs, addr, fsr);
+
 	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
 
@@ -1061,6 +926,8 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 
 	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
 		return;
+
+	trace_unhandled_abort(regs, addr, ifsr);
 
 	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
 		inf->name, ifsr, addr);

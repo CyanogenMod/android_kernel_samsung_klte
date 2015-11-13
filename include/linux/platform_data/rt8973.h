@@ -22,6 +22,16 @@
 #define SAMSUNG_MVRL_MUIC_RT8973 1
 #endif
 
+#ifdef CONFIG_SEC_FACTORY
+#if defined(CONFIG_MACH_KANAS3G_CTC) || defined(CONFIG_MACH_HEAT_AIO) || defined(CONFIG_MACH_KANAS3G_CMCC)
+#define MUIC_SUPPORT_CARDOCK_FUNCTION 1
+#endif
+#endif
+
+#if defined(CONFIG_RT8973_JIG_WAKEUP)
+extern int rt8973_dock_init(void);
+#endif
+
 enum {
     MUIC_RT8973_CABLE_TYPE_NONE = 0,
     MUIC_RT8973_CABLE_TYPE_UART,            //adc 0x16
@@ -85,6 +95,7 @@ struct rt8973_platform_data {
     void (*uart_callback)(uint8_t attached);
     void (*otg_callback)(uint8_t attached);
     void (*jig_callback)(jig_type_t type, uint8_t attached);
+	int	(*dock_init) (void);
 	int gpio_int;
 	u32 irq_gpio_flags;
 //	int gpio_sda;

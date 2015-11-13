@@ -78,6 +78,7 @@ struct sec_battery_data {
 	
 	unsigned int			ui_full_soc;
         unsigned int                    ui_full_current;	/* mA */
+	unsigned int			ui_full_voltage;	/* mV */
 	unsigned int                    ui_full_count;
         unsigned int                    charging_term_time;	/* sec */
         unsigned int                    recharging_voltage;	/* mV */

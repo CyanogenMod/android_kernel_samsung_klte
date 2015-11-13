@@ -23,23 +23,23 @@
 /* SSP Kernel -> HAL input evnet function                                */
 /*************************************************************************/
 
-#define IIO_BUFFER_12_BYTES         20 /* 12 + timestamp 8*/
-#define IIO_BUFFER_6_BYTES         14
-#define IIO_BUFFER_1_BYTES			9
-#define IIO_BUFFER_17_BYTES			25
-
+#define IIO_BUFFER_12_BYTES 20 /* 12 + timestamp 8*/
+#define IIO_BUFFER_6_BYTES 14
+#define IIO_BUFFER_1_BYTES 9
+#define IIO_BUFFER_17_BYTES 25
+#define IIO_BUFFER_24_BYTES 20
+#define IIO_BUFFER_7_BYTES 15
 /* data header defines */
 
-static int ssp_push_17bytes_buffer(struct iio_dev *indio_dev,
-							u64 t, int *q)
+static int ssp_push_17bytes_buffer(struct iio_dev *indio_dev, u64 t, int *q)
 {
 	u8 buf[IIO_BUFFER_17_BYTES];
-	
+
 	int i;
 
 	for (i = 0; i < 4; i++)
 		memcpy(buf + 4 * i, &q[i], sizeof(q[i]));
-	buf[16] = (u8)q[5];
+	buf[16] = (u8)q[4];
 	memcpy(buf + 17, &t, sizeof(t));
 	mutex_lock(&indio_dev->mlock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
@@ -48,8 +48,7 @@ static int ssp_push_17bytes_buffer(struct iio_dev *indio_dev,
 	return 0;
 }
 
-static int ssp_push_12bytes_buffer(struct iio_dev *indio_dev, u64 t,
-									int *q)
+static int ssp_push_12bytes_buffer(struct iio_dev *indio_dev, u64 t, int *q)
 {
 	u8 buf[IIO_BUFFER_12_BYTES];
 	int i;
@@ -64,8 +63,22 @@ static int ssp_push_12bytes_buffer(struct iio_dev *indio_dev, u64 t,
 	return 0;
 }
 
-static int ssp_push_6bytes_buffer(struct iio_dev *indio_dev,
-							u64 t, s16 *d)
+static int ssp_push_24bytes_buffer(struct iio_dev *indio_dev, u64 t, s16 *q)
+{
+	u8 buf[IIO_BUFFER_24_BYTES];
+	int i;
+
+	for (i = 0; i < 6; i++)
+		memcpy(buf + 2 * i, &q[i], sizeof(q[i]));
+	memcpy(buf + 12, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
+	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
+
+	return 0;
+}
+
+static int ssp_push_6bytes_buffer(struct iio_dev *indio_dev, u64 t, s16 *d)
 {
 	u8 buf[IIO_BUFFER_6_BYTES];
 	int i;
@@ -81,8 +94,7 @@ static int ssp_push_6bytes_buffer(struct iio_dev *indio_dev,
 	return 0;
 }
 
-static int ssp_push_1bytes_buffer(struct iio_dev *indio_dev,
-							u64 t, u8 *d)
+static int ssp_push_1bytes_buffer(struct iio_dev *indio_dev, u64 t, u8 *d)
 {
 	u8 buf[IIO_BUFFER_1_BYTES];
 
@@ -93,6 +105,57 @@ static int ssp_push_1bytes_buffer(struct iio_dev *indio_dev,
 	mutex_unlock(&indio_dev->mlock);
 
 	return 0;
+}
+
+static int ssp_push_7bytes_buffer(struct iio_dev *indio_dev, u64 t, s16 *d,
+	u8 status)
+{
+	u8 buf[IIO_BUFFER_7_BYTES];
+	int i;
+
+	for (i = 0; i < 3; i++)
+		memcpy(buf + i * 2, &d[i], sizeof(d[i]));
+	buf[6] = status;
+	memcpy(buf + 7, &t, sizeof(t));
+	mutex_lock(&indio_dev->mlock);
+	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&indio_dev->mlock);
+
+	return 0;
+}
+
+void report_meta_data(struct ssp_data *data, struct sensor_value *s)
+{
+	pr_info("[SSP]: %s - what: %d, sensor: %d\n", __func__,
+		s->meta_data.what, s->meta_data.sensor);
+
+	if (s->meta_data.sensor == ACCELEROMETER_SENSOR) {
+		s16 accel_buf[3];
+		memset(accel_buf, 0xff, sizeof(s16) * 3);
+		ssp_push_6bytes_buffer(data->accel_indio_dev, 0, accel_buf);
+	} else if (s->meta_data.sensor == GYROSCOPE_SENSOR) {
+		int gyro_buf[3];
+		memset(gyro_buf, 0xff, sizeof(int) * 3);
+		ssp_push_12bytes_buffer(data->gyro_indio_dev, 0, gyro_buf);
+	} else if (s->meta_data.sensor == PRESSURE_SENSOR) {
+		int pressure_buf[3];
+		memset(pressure_buf, 0xff, sizeof(int) * 3);
+		ssp_push_12bytes_buffer(data->pressure_indio_dev, 0,
+			pressure_buf);
+	} else if (s->meta_data.sensor == GAME_ROTATION_VECTOR) {
+		int grot_buf[5];
+		memset(grot_buf, 0xff, sizeof(int) * 4);
+		ssp_push_17bytes_buffer(data->game_rot_indio_dev, 0, grot_buf);
+	} else if (s->meta_data.sensor == STEP_DETECTOR) {
+		u8 step_buf[1] = {0xff};
+		ssp_push_1bytes_buffer(data->step_det_indio_dev, 0, step_buf);
+	} else {
+		input_report_rel(data->meta_input_dev, REL_DIAL,
+			s->meta_data.what);
+		input_report_rel(data->meta_input_dev, REL_HWHEEL,
+			s->meta_data.sensor + 1);
+		input_sync(data->meta_input_dev);
+	}
 }
 
 void convert_acc_data(s16 *iValue)
@@ -113,13 +176,6 @@ void report_acc_data(struct ssp_data *data, struct sensor_value *accdata)
 	accel_buf[2] = data->buf[ACCELEROMETER_SENSOR].z;
 	ssp_push_6bytes_buffer(data->accel_indio_dev, accdata->timestamp,
 		accel_buf);
-}
-
-void report_meta_data(struct ssp_data *data, struct sensor_value *s)
-{
-	input_report_rel(data->meta_input_dev, REL_DIAL, s->meta_data.what);
-	input_report_rel(data->meta_input_dev, REL_HWHEEL, s->meta_data.sensor + 1);
-	input_sync(data->meta_input_dev);
 }
 
 void report_gyro_data(struct ssp_data *data, struct sensor_value *gyrodata)
@@ -160,84 +216,45 @@ void report_geomagnetic_raw_data(struct ssp_data *data,
 }
 void report_mag_data(struct ssp_data *data, struct sensor_value *magdata)
 {
-#ifdef SAVE_MAG_LOG
-	s16 arrTemp[9] = {0, };
+	s16 lTemp[3] = { 0, };
 
-	arrTemp[0] = magdata->log_data[0];	// ST1 Reg
-	arrTemp[1] = (short)((magdata->log_data[3] << 8) +\
-				magdata->log_data[2]);
-	arrTemp[2] = (short)((magdata->log_data[5] << 8) +\
-				magdata->log_data[4]);
-	arrTemp[3] = (short)((magdata->log_data[7] << 8) +\
-				magdata->log_data[6]);
-	arrTemp[4] = magdata->log_data[1];	// ST2 Reg
-	arrTemp[5] = (short)((magdata->log_data[9] << 8) +\
-				magdata->log_data[8]);
-	arrTemp[6] = (short)((magdata->log_data[11] << 8) +\
-				magdata->log_data[10]);
-	arrTemp[7] = (short)((magdata->log_data[13] << 8) +\
-				magdata->log_data[12]);
-
-	/* We report data & register to HAL only when ST1 register sets to 1 */
-	if (arrTemp[0] == 1) {
-		input_report_rel(data->mag_input_dev, REL_X, arrTemp[0] + 1);
-		input_report_rel(data->mag_input_dev, REL_Y, arrTemp[1]);
-		input_report_rel(data->mag_input_dev, REL_Z, arrTemp[2]);
-		input_report_rel(data->mag_input_dev, REL_RX, arrTemp[3]);
-		input_report_rel(data->mag_input_dev, REL_RY, arrTemp[4] + 1);
-		input_report_rel(data->mag_input_dev, REL_RZ, arrTemp[5]);
-		input_report_rel(data->mag_input_dev, REL_HWHEEL, arrTemp[6]);
-		input_report_rel(data->mag_input_dev, REL_DIAL, arrTemp[7]);
-		mdelay(5);
-		input_sync(data->mag_input_dev);
-	} else {
-		pr_info("[SSP] %s, not initialised, val = %d", __func__, arrTemp[0]);
-	}
-#else
 	data->buf[GEOMAGNETIC_SENSOR].cal_x = magdata->cal_x;
 	data->buf[GEOMAGNETIC_SENSOR].cal_y = magdata->cal_y;
 	data->buf[GEOMAGNETIC_SENSOR].cal_z = magdata->cal_z;
 	data->buf[GEOMAGNETIC_SENSOR].accuracy = magdata->accuracy;
 
-	input_report_rel(data->mag_input_dev, REL_RX,
-		data->buf[GEOMAGNETIC_SENSOR].cal_x);
-	input_report_rel(data->mag_input_dev, REL_RY,
-		data->buf[GEOMAGNETIC_SENSOR].cal_y);
-	input_report_rel(data->mag_input_dev, REL_RZ,
-		data->buf[GEOMAGNETIC_SENSOR].cal_z);
-	input_report_rel(data->mag_input_dev, REL_HWHEEL,
-		data->buf[GEOMAGNETIC_SENSOR].accuracy + 1);
+	lTemp[0] = data->buf[GEOMAGNETIC_SENSOR].cal_x;
+	lTemp[1] = data->buf[GEOMAGNETIC_SENSOR].cal_y;
+	lTemp[2] = data->buf[GEOMAGNETIC_SENSOR].cal_z;
 
-	input_sync(data->mag_input_dev);
-#endif
+	ssp_push_7bytes_buffer(data->mag_indio_dev, magdata->timestamp,
+		lTemp, data->buf[GEOMAGNETIC_SENSOR].accuracy);
 }
 
 void report_mag_uncaldata(struct ssp_data *data, struct sensor_value *magdata)
 {
+	s16 lTemp[6] = {0,};
+
 	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_x = magdata->uncal_x;
 	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_y = magdata->uncal_y;
 	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_z = magdata->uncal_z;
-	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_x= magdata->offset_x;
-	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_y= magdata->offset_y;
-	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_z= magdata->offset_z;
+	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_x = magdata->offset_x;
+	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_y = magdata->offset_y;
+	data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_z = magdata->offset_z;
 
-	input_report_rel(data->uncal_mag_input_dev, REL_RX,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_x);
-	input_report_rel(data->uncal_mag_input_dev, REL_RY,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_y);
-	input_report_rel(data->uncal_mag_input_dev, REL_RZ,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_z);
-	input_report_rel(data->uncal_mag_input_dev, REL_HWHEEL,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_x);
-	input_report_rel(data->uncal_mag_input_dev, REL_DIAL,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_y);
-	input_report_rel(data->uncal_mag_input_dev, REL_WHEEL,
-		data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_z);
-	input_sync(data->uncal_mag_input_dev);
+	lTemp[0] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_x;
+	lTemp[1] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_y;
+	lTemp[2] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].uncal_z;
+	lTemp[3] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_x;
+	lTemp[4] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_y;
+	lTemp[5] = data->buf[GEOMAGNETIC_UNCALIB_SENSOR].offset_z;
+
+	ssp_push_24bytes_buffer(data->uncal_mag_indio_dev, magdata->timestamp, lTemp);
 }
 
 void report_uncalib_gyro_data(struct ssp_data *data, struct sensor_value *gyrodata)
 {
+	s16 lTemp[6] = {0,};
 	data->buf[GYRO_UNCALIB_SENSOR].uncal_x = gyrodata->uncal_x;
 	data->buf[GYRO_UNCALIB_SENSOR].uncal_y = gyrodata->uncal_y;
 	data->buf[GYRO_UNCALIB_SENSOR].uncal_z = gyrodata->uncal_z;
@@ -245,19 +262,14 @@ void report_uncalib_gyro_data(struct ssp_data *data, struct sensor_value *gyroda
 	data->buf[GYRO_UNCALIB_SENSOR].offset_y = gyrodata->offset_y;
 	data->buf[GYRO_UNCALIB_SENSOR].offset_z = gyrodata->offset_z;
 
-	input_report_rel(data->uncalib_gyro_input_dev, REL_X,
-		data->buf[GYRO_UNCALIB_SENSOR].uncal_x);
-	input_report_rel(data->uncalib_gyro_input_dev, REL_Y,
-		data->buf[GYRO_UNCALIB_SENSOR].uncal_y);
-	input_report_rel(data->uncalib_gyro_input_dev, REL_Z,
-		data->buf[GYRO_UNCALIB_SENSOR].uncal_z);
-	input_report_rel(data->uncalib_gyro_input_dev, REL_RX,
-		data->buf[GYRO_UNCALIB_SENSOR].offset_x);
-	input_report_rel(data->uncalib_gyro_input_dev, REL_RY,
-		data->buf[GYRO_UNCALIB_SENSOR].offset_y);
-	input_report_rel(data->uncalib_gyro_input_dev, REL_RZ,
-		data->buf[GYRO_UNCALIB_SENSOR].offset_z);
-	input_sync(data->uncalib_gyro_input_dev);
+	lTemp[0] = gyrodata->uncal_x;
+	lTemp[1] = gyrodata->uncal_y;
+	lTemp[2] = gyrodata->uncal_z;
+	lTemp[3] = gyrodata->offset_x;
+	lTemp[4] = gyrodata->offset_y;
+	lTemp[5] = gyrodata->offset_z;
+
+	ssp_push_24bytes_buffer(data->uncal_gyro_indio_dev, gyrodata->timestamp, lTemp);
 }
 
 void report_sig_motion_data(struct ssp_data *data,
@@ -376,9 +388,12 @@ void report_light_data(struct ssp_data *data, struct sensor_value *lightdata)
 	data->buf[LIGHT_SENSOR].g = lightdata->g;
 	data->buf[LIGHT_SENSOR].b = lightdata->b;
 	data->buf[LIGHT_SENSOR].w = lightdata->w;
-#ifdef CONFIG_SENSORS_SSP_TMG399X
+#if defined (CONFIG_SENSORS_SSP_TMG399X)
 	data->buf[LIGHT_SENSOR].a_time = lightdata->a_time;
 	data->buf[LIGHT_SENSOR].a_gain = (0x03) & (lightdata->a_gain);
+#elif defined (CONFIG_SENSORS_SSP_MAX88921)
+	data->buf[LIGHT_SENSOR].ir_cmp = lightdata->ir_cmp;
+	data->buf[LIGHT_SENSOR].amb_pga = lightdata->amb_pga;
 #endif
 
 	input_report_rel(data->light_input_dev, REL_HWHEEL,
@@ -389,12 +404,16 @@ void report_light_data(struct ssp_data *data, struct sensor_value *lightdata)
 		data->buf[LIGHT_SENSOR].b + 1);
 	input_report_rel(data->light_input_dev, REL_MISC,
 		data->buf[LIGHT_SENSOR].w + 1);
-
-#ifdef CONFIG_SENSORS_SSP_TMG399X
+#if defined (CONFIG_SENSORS_SSP_TMG399X)
 	input_report_rel(data->light_input_dev, REL_RY,
 		data->buf[LIGHT_SENSOR].a_time + 1);
 	input_report_rel(data->light_input_dev, REL_RZ,
 		data->buf[LIGHT_SENSOR].a_gain + 1);
+#elif defined (CONFIG_SENSORS_SSP_MAX88921)
+	input_report_rel(data->light_input_dev, REL_RY,
+		data->buf[LIGHT_SENSOR].ir_cmp + 1);
+	input_report_rel(data->light_input_dev, REL_RZ,
+		data->buf[LIGHT_SENSOR].amb_pga + 1);
 #endif
 	input_sync(data->light_input_dev);
 }
@@ -522,28 +541,10 @@ int initialize_event_symlink(struct ssp_data *data)
 		goto iRet_temp_humi_sysfs_create_link;
 
 	iRet = sysfs_create_link(&data->sen_dev->kobj,
-		&data->mag_input_dev->dev.kobj,
-		data->mag_input_dev->name);
-	if (iRet < 0)
-		goto iRet_mag_sysfs_create_link;
-
-	iRet = sysfs_create_link(&data->sen_dev->kobj,
-		&data->uncal_mag_input_dev->dev.kobj,
-		data->uncal_mag_input_dev->name);
-	if (iRet < 0)
-		goto iRet_uncal_mag_sysfs_create_link;
-
-	iRet = sysfs_create_link(&data->sen_dev->kobj,
 		&data->sig_motion_input_dev->dev.kobj,
 		data->sig_motion_input_dev->name);
 	if (iRet < 0)
 		goto iRet_sig_motion_sysfs_create_link;
-
-	iRet = sysfs_create_link(&data->sen_dev->kobj,
-		&data->uncalib_gyro_input_dev->dev.kobj,
-		data->uncalib_gyro_input_dev->name);
-	if (iRet < 0)
-		goto iRet_uncalib_gyro_sysfs_create_link;
 
 	iRet = sysfs_create_link(&data->sen_dev->kobj,
 		&data->step_cnt_input_dev->dev.kobj,
@@ -564,21 +565,9 @@ iRet_meta_sysfs_create_link:
 		data->step_cnt_input_dev->name);
 iRet_step_cnt_sysfs_create_link:
 	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->uncalib_gyro_input_dev->dev.kobj,
-		data->uncalib_gyro_input_dev->name);
-iRet_uncalib_gyro_sysfs_create_link:
-	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->sig_motion_input_dev->dev.kobj,
 		data->sig_motion_input_dev->name);
 iRet_sig_motion_sysfs_create_link:
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->uncal_mag_input_dev->dev.kobj,
-		data->uncal_mag_input_dev->name);
-iRet_uncal_mag_sysfs_create_link:
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->mag_input_dev->dev.kobj,
-		data->mag_input_dev->name);
-iRet_mag_sysfs_create_link:
 	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->temp_humi_input_dev->dev.kobj,
 		data->temp_humi_input_dev->name);
@@ -615,17 +604,8 @@ void remove_event_symlink(struct ssp_data *data)
 		&data->temp_humi_input_dev->dev.kobj,
 		data->temp_humi_input_dev->name);
 	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->mag_input_dev->dev.kobj,
-		data->mag_input_dev->name);
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->uncal_mag_input_dev->dev.kobj,
-		data->uncal_mag_input_dev->name);
-	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->sig_motion_input_dev->dev.kobj,
 		data->sig_motion_input_dev->name);
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->uncalib_gyro_input_dev->dev.kobj,
-		data->uncalib_gyro_input_dev->name);
 	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->step_cnt_input_dev->dev.kobj,
 		data->step_cnt_input_dev->name);
@@ -652,7 +632,50 @@ static const struct iio_info gyro_info = {
 	.driver_module = THIS_MODULE,
 };
 
+static const struct iio_info mag_info = {
+	.driver_module = THIS_MODULE,
+};
+
+static const struct iio_chan_spec mag_channels[] = {
+	{
+		.type = IIO_TIMESTAMP,
+		.channel = -1,
+		.scan_index = 3,
+		.scan_type = IIO_ST('s', IIO_BUFFER_7_BYTES * 8,
+			IIO_BUFFER_7_BYTES * 8, 0)
+	}
+};
+
+static const struct iio_info uncal_mag_info = {
+	.driver_module = THIS_MODULE,
+};
+
+static const struct iio_chan_spec uncal_mag_channels[] = {
+	{
+		.type = IIO_TIMESTAMP,
+		.channel = -1,
+		.scan_index = 3,
+		.scan_type = IIO_ST('s', IIO_BUFFER_12_BYTES * 8,
+			IIO_BUFFER_12_BYTES * 8, 0)
+	}
+};
+
 static const struct iio_chan_spec gyro_channels[] = {
+	{
+		.type = IIO_TIMESTAMP,
+		.channel = -1,
+		.scan_index = 3,
+		.scan_type = IIO_ST('s', IIO_BUFFER_12_BYTES * 8,
+			IIO_BUFFER_12_BYTES * 8, 0)
+	}
+};
+
+
+static const struct iio_info uncal_gyro_info = {
+	.driver_module = THIS_MODULE,
+};
+
+static const struct iio_chan_spec uncal_gyro_channels[] = {
 	{
 		.type = IIO_TIMESTAMP,
 		.channel = -1,
@@ -723,10 +746,9 @@ int initialize_input_dev(struct ssp_data *data)
 {
 	int iRet = 0;
 	struct input_dev *light_input_dev, *prox_input_dev, *temp_humi_input_dev,
-		*mag_input_dev, *gesture_input_dev, *uncal_mag_input_dev,
-		*sig_motion_input_dev, *uncalib_gyro_input_dev, *step_cnt_input_dev,
+		*gesture_input_dev, *sig_motion_input_dev, *step_cnt_input_dev,
 		*meta_input_dev;
-
+	/* accel */
 	data->accel_indio_dev = iio_allocate_device(0);
 	if (!data->accel_indio_dev) {
 		pr_err("[SSP]: %s failed to allocate memory for iio accel device\n", __func__);
@@ -755,7 +777,65 @@ int initialize_input_dev(struct ssp_data *data)
 	iRet = iio_device_register(data->accel_indio_dev);
 	if (iRet)
 		goto out_remove_trigger_accel;
+	/* mag */
+	data->mag_indio_dev = iio_allocate_device(0);
+	if (!data->mag_indio_dev) {
+		pr_err("[SSP]: %s failed to allocate memory for iio mag device\n", __func__);
+		goto out_alloc_fail_mag;
+	}
 
+	data->mag_indio_dev->name = "geomagnetic_sensor";
+	data->mag_indio_dev->dev.parent = &data->spi->dev;
+	data->mag_indio_dev->info = &mag_info;
+	data->mag_indio_dev->channels = mag_channels;
+	data->mag_indio_dev->num_channels = ARRAY_SIZE(mag_channels);
+	data->mag_indio_dev->modes = INDIO_DIRECT_MODE;
+	data->mag_indio_dev->currentmode = INDIO_DIRECT_MODE;
+
+	iRet = ssp_iio_configure_ring(data->mag_indio_dev);
+	if (iRet) {
+		pr_err("[SSP]: %s configure ring buffer fail\n", __func__);
+		goto out_free_mag;
+	}
+
+	iRet = iio_buffer_register(data->mag_indio_dev,
+		data->mag_indio_dev->channels, data->mag_indio_dev->num_channels);
+	if (iRet)
+		goto out_unreg_ring_mag;
+
+	iRet = iio_device_register(data->mag_indio_dev);
+	if (iRet)
+		goto out_remove_trigger_mag;
+	/* uncal mag */
+	data->uncal_mag_indio_dev = iio_allocate_device(0);
+	if (!data->uncal_mag_indio_dev) {
+		pr_err("[SSP]: %s failed to allocate memory for iio uncal mag device\n", __func__);
+		goto out_alloc_fail_uncal_mag;
+	}
+
+	data->uncal_mag_indio_dev->name = "uncal_geomagnetic_sensor";
+	data->uncal_mag_indio_dev->dev.parent = &data->spi->dev;
+	data->uncal_mag_indio_dev->info = &uncal_mag_info;
+	data->uncal_mag_indio_dev->channels = uncal_mag_channels;
+	data->uncal_mag_indio_dev->num_channels = ARRAY_SIZE(uncal_mag_channels);
+	data->uncal_mag_indio_dev->modes = INDIO_DIRECT_MODE;
+	data->uncal_mag_indio_dev->currentmode = INDIO_DIRECT_MODE;
+
+	iRet = ssp_iio_configure_ring(data->uncal_mag_indio_dev);
+	if (iRet) {
+		pr_err("[SSP]: %s configure ring buffer fail\n", __func__);
+		goto out_free_uncal_mag;
+	}
+
+	iRet = iio_buffer_register(data->uncal_mag_indio_dev,
+		data->uncal_mag_indio_dev->channels, data->uncal_mag_indio_dev->num_channels);
+	if (iRet)
+		goto out_unreg_ring_uncal_mag;
+
+	iRet = iio_device_register(data->uncal_mag_indio_dev);
+	if (iRet)
+		goto out_remove_trigger_uncal_mag;
+	/* gyro */
 	data->gyro_indio_dev = iio_allocate_device(0);
 	if (!data->gyro_indio_dev) {
 		pr_err("[SSP]: %s failed to allocate memory for iio gyro device\n", __func__);
@@ -784,6 +864,35 @@ int initialize_input_dev(struct ssp_data *data)
 	iRet = iio_device_register(data->gyro_indio_dev);
 	if (iRet)
 		goto out_remove_trigger_gyro;
+
+	data->uncal_gyro_indio_dev = iio_allocate_device(0);
+	if (!data->uncal_gyro_indio_dev) {
+		pr_err("[SSP]: %s failed to allocate memory for iio gyro device\n", __func__);
+		goto out_alloc_fail_uncal_gyro;
+	}
+
+	data->uncal_gyro_indio_dev->name = "uncalibrated_gyro_sensor";
+	data->uncal_gyro_indio_dev->dev.parent = &data->spi->dev;
+	data->uncal_gyro_indio_dev->info = &uncal_gyro_info;
+	data->uncal_gyro_indio_dev->channels = uncal_gyro_channels;
+	data->uncal_gyro_indio_dev->num_channels = ARRAY_SIZE(uncal_gyro_channels);
+	data->uncal_gyro_indio_dev->modes = INDIO_DIRECT_MODE;
+	data->uncal_gyro_indio_dev->currentmode = INDIO_DIRECT_MODE;
+
+	iRet = ssp_iio_configure_ring(data->uncal_gyro_indio_dev);
+	if (iRet) {
+		pr_err("[SSP]: %s configure ring buffer fail\n", __func__);
+		goto out_free_uncal_gyro;
+	}
+
+	iRet = iio_buffer_register(data->uncal_gyro_indio_dev, data->uncal_gyro_indio_dev->channels,
+					data->uncal_gyro_indio_dev->num_channels);
+	if (iRet)
+		goto out_unreg_ring_uncal_gyro;
+
+	iRet = iio_device_register(data->uncal_gyro_indio_dev);
+	if (iRet)
+		goto out_remove_trigger_uncal_gyro;
 
 	data->game_rot_indio_dev = iio_allocate_device(0);
 	if (!data->game_rot_indio_dev) {
@@ -918,21 +1027,9 @@ int initialize_input_dev(struct ssp_data *data)
 	if (temp_humi_input_dev == NULL)
 		goto iRet_temp_humidity_input_free_device;
 
-	mag_input_dev = input_allocate_device();
-	if (mag_input_dev == NULL)
-		goto iRet_mag_input_free_device;
-
-	uncal_mag_input_dev = input_allocate_device();
-	if (uncal_mag_input_dev == NULL)
-		goto iRet_uncal_mag_input_free_device;
-
 	sig_motion_input_dev = input_allocate_device();
 	if (sig_motion_input_dev == NULL)
 		goto iRet_sig_motion_input_free_device;
-
-	uncalib_gyro_input_dev = input_allocate_device();
-	if (uncalib_gyro_input_dev == NULL)
-		goto iRet_uncalib_gyro_input_free_device;
 
 	step_cnt_input_dev = input_allocate_device();
 	if (step_cnt_input_dev == NULL)
@@ -946,10 +1043,7 @@ int initialize_input_dev(struct ssp_data *data)
 	input_set_drvdata(light_input_dev, data);
 	input_set_drvdata(prox_input_dev, data);
 	input_set_drvdata(temp_humi_input_dev, data);
-	input_set_drvdata(mag_input_dev, data);
-	input_set_drvdata(uncal_mag_input_dev, data);
 	input_set_drvdata(sig_motion_input_dev, data);
-	input_set_drvdata(uncalib_gyro_input_dev, data);
 	input_set_drvdata(step_cnt_input_dev, data);
 	input_set_drvdata(meta_input_dev, data);
 
@@ -957,10 +1051,7 @@ int initialize_input_dev(struct ssp_data *data)
 	light_input_dev->name = "light_sensor";
 	prox_input_dev->name = "proximity_sensor";
 	temp_humi_input_dev->name = "temp_humidity_sensor";
-	mag_input_dev->name = "geomagnetic_sensor";
-	uncal_mag_input_dev->name = "uncal_geomagnetic_sensor";
 	sig_motion_input_dev->name = "sig_motion_sensor";
-	uncalib_gyro_input_dev->name = "uncalibrated_gyro_sensor";
 	step_cnt_input_dev->name = "step_cnt_sensor";
 	meta_input_dev->name = "meta_event";
 
@@ -1020,38 +1111,8 @@ int initialize_input_dev(struct ssp_data *data)
 	input_set_capability(temp_humi_input_dev, EV_REL, REL_DIAL);
 	input_set_capability(temp_humi_input_dev, EV_REL, REL_WHEEL);
 
-#ifdef SAVE_MAG_LOG
-	input_set_capability(mag_input_dev, EV_REL, REL_X);
-	input_set_capability(mag_input_dev, EV_REL, REL_Y);
-	input_set_capability(mag_input_dev, EV_REL, REL_Z);
-	input_set_capability(mag_input_dev, EV_REL, REL_RX);
-	input_set_capability(mag_input_dev, EV_REL, REL_RY);
-	input_set_capability(mag_input_dev, EV_REL, REL_RZ);
-	input_set_capability(mag_input_dev, EV_REL, REL_HWHEEL);
-	input_set_capability(mag_input_dev, EV_REL, REL_DIAL);
-	input_set_capability(mag_input_dev, EV_REL, REL_WHEEL);
-#else
-	input_set_capability(mag_input_dev, EV_REL, REL_RX);
-	input_set_capability(mag_input_dev, EV_REL, REL_RY);
-	input_set_capability(mag_input_dev, EV_REL, REL_RZ);
-	input_set_capability(mag_input_dev, EV_REL, REL_HWHEEL);
-#endif
-
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_RX);
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_RY);
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_RZ);
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_HWHEEL);
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_DIAL);
-	input_set_capability(uncal_mag_input_dev, EV_REL, REL_WHEEL);
-
 	input_set_capability(sig_motion_input_dev, EV_REL, REL_MISC);
 
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_X);
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_Y);
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_Z);
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_RX);
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_RY);
-	input_set_capability(uncalib_gyro_input_dev, EV_REL, REL_RZ);
 	input_set_capability(step_cnt_input_dev, EV_REL, REL_MISC);
 
 	input_set_capability(meta_input_dev, EV_REL, REL_HWHEEL);
@@ -1067,10 +1128,7 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(light_input_dev);
 		input_free_device(prox_input_dev);
 		input_free_device(temp_humi_input_dev);
-		input_free_device(mag_input_dev);
-		input_free_device(uncal_mag_input_dev);
 		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
 		input_free_device(step_cnt_input_dev);
 		input_free_device(meta_input_dev);
 		goto iRet_light_input_unreg_device;
@@ -1080,10 +1138,7 @@ int initialize_input_dev(struct ssp_data *data)
 	if (iRet < 0) {
 		input_free_device(prox_input_dev);
 		input_free_device(temp_humi_input_dev);
-		input_free_device(mag_input_dev);
-		input_free_device(uncal_mag_input_dev);
 		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
 		input_free_device(step_cnt_input_dev);
 		input_free_device(meta_input_dev);
 		goto iRet_proximity_input_unreg_device;
@@ -1092,51 +1147,18 @@ int initialize_input_dev(struct ssp_data *data)
 	iRet = input_register_device(temp_humi_input_dev);
 	if (iRet < 0) {
 		input_free_device(temp_humi_input_dev);
-		input_free_device(mag_input_dev);
-		input_free_device(uncal_mag_input_dev);
 		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
 		input_free_device(step_cnt_input_dev);
 		input_free_device(meta_input_dev);
 		goto iRet_tmep_humi_input_unreg_device;
 	}
 
-	iRet = input_register_device(mag_input_dev);
-	if (iRet < 0) {
-		input_free_device(mag_input_dev);
-		input_free_device(uncal_mag_input_dev);
-		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
-		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
-		goto iRet_mag_input_unreg_device;
-	}
-
-	iRet = input_register_device(uncal_mag_input_dev);
-	if (iRet < 0) {
-		input_free_device(uncal_mag_input_dev);
-		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
-		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
-		goto iRet_uncal_mag_input_unreg_device;
-	}
-
 	iRet = input_register_device(sig_motion_input_dev);
 	if (iRet < 0) {
 		input_free_device(sig_motion_input_dev);
-		input_free_device(uncalib_gyro_input_dev);
 		input_free_device(step_cnt_input_dev);
 		input_free_device(meta_input_dev);
 		goto iRet_sig_motion_input_unreg_device;
-	}
-
-	iRet = input_register_device(uncalib_gyro_input_dev);
-	if (iRet < 0) {
-		input_free_device(uncalib_gyro_input_dev);
-		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
-		goto iRet_uncalib_gyro_input_unreg_device;
 	}
 
 	iRet = input_register_device(step_cnt_input_dev);
@@ -1156,10 +1178,7 @@ int initialize_input_dev(struct ssp_data *data)
 	data->light_input_dev = light_input_dev;
 	data->prox_input_dev = prox_input_dev;
 	data->temp_humi_input_dev = temp_humi_input_dev;
-	data->mag_input_dev = mag_input_dev;
-	data->uncal_mag_input_dev = uncal_mag_input_dev;
 	data->sig_motion_input_dev = sig_motion_input_dev;
-	data->uncalib_gyro_input_dev = uncalib_gyro_input_dev;
 	data->step_cnt_input_dev = step_cnt_input_dev;
 	data->meta_input_dev = meta_input_dev;
 
@@ -1167,14 +1186,8 @@ int initialize_input_dev(struct ssp_data *data)
 iRet_meta_input_unreg_device:
 	input_unregister_device(step_cnt_input_dev);
 iRet_step_cnt_input_unreg_device:
-	input_unregister_device(uncalib_gyro_input_dev);
-iRet_uncalib_gyro_input_unreg_device:
 	input_unregister_device(sig_motion_input_dev);
 iRet_sig_motion_input_unreg_device:
-	input_unregister_device(uncal_mag_input_dev);
-iRet_uncal_mag_input_unreg_device:
-	input_unregister_device(mag_input_dev);
-iRet_mag_input_unreg_device:
 	input_unregister_device(temp_humi_input_dev);
 iRet_tmep_humi_input_unreg_device:
 	input_unregister_device(prox_input_dev);
@@ -1188,14 +1201,8 @@ iRet_gesture_input_unreg_device:
 iRet_meta_input_free_device:
 	input_free_device(step_cnt_input_dev);
 iRet_step_cnt_input_free_device:
-	input_free_device(uncalib_gyro_input_dev);
-iRet_uncalib_gyro_input_free_device:
 	input_free_device(sig_motion_input_dev);
 iRet_sig_motion_input_free_device:
-	input_free_device(uncal_mag_input_dev);
-iRet_uncal_mag_input_free_device:
-	input_free_device(mag_input_dev);
-iRet_mag_input_free_device:
 	input_free_device(temp_humi_input_dev);
 iRet_temp_humidity_input_free_device:
 	input_free_device(prox_input_dev);
@@ -1236,6 +1243,14 @@ out_unreg_ring_game_rot:
 out_free_game_rot:
 	iio_free_device(data->game_rot_indio_dev);
 out_alloc_fail_game_rot:
+	iio_device_unregister(data->uncal_gyro_indio_dev);
+out_remove_trigger_uncal_gyro:
+	iio_buffer_unregister(data->uncal_gyro_indio_dev);
+out_unreg_ring_uncal_gyro:
+	ssp_iio_unconfigure_ring(data->uncal_gyro_indio_dev);
+out_free_uncal_gyro:
+	iio_free_device(data->uncal_gyro_indio_dev);
+out_alloc_fail_uncal_gyro:
 	iio_device_unregister(data->gyro_indio_dev);
 out_remove_trigger_gyro:
 	iio_buffer_unregister(data->gyro_indio_dev);
@@ -1244,6 +1259,22 @@ out_unreg_ring_gyro:
 out_free_gyro:
 	iio_free_device(data->gyro_indio_dev);
 out_alloc_fail_gyro:
+	iio_device_unregister(data->uncal_mag_indio_dev);
+out_remove_trigger_uncal_mag:
+	iio_buffer_unregister(data->uncal_mag_indio_dev);
+out_unreg_ring_uncal_mag:
+	ssp_iio_unconfigure_ring(data->uncal_mag_indio_dev);
+out_free_uncal_mag:
+	iio_free_device(data->uncal_mag_indio_dev);
+out_alloc_fail_uncal_mag:
+	iio_device_unregister(data->mag_indio_dev);
+out_remove_trigger_mag:
+	iio_buffer_unregister(data->mag_indio_dev);
+out_unreg_ring_mag:
+	ssp_iio_unconfigure_ring(data->mag_indio_dev);
+out_free_mag:
+	iio_free_device(data->mag_indio_dev);
+out_alloc_fail_mag:
 	iio_device_unregister(data->accel_indio_dev);
 out_remove_trigger_accel:
 	iio_buffer_unregister(data->accel_indio_dev);
@@ -1261,10 +1292,7 @@ void remove_input_dev(struct ssp_data *data)
 	input_unregister_device(data->light_input_dev);
 	input_unregister_device(data->prox_input_dev);
 	input_unregister_device(data->temp_humi_input_dev);
-	input_unregister_device(data->mag_input_dev);
-	input_unregister_device(data->uncal_mag_input_dev);
 	input_unregister_device(data->sig_motion_input_dev);
-	input_unregister_device(data->uncalib_gyro_input_dev);
 	input_unregister_device(data->step_cnt_input_dev);
 	input_unregister_device(data->meta_input_dev);
 }

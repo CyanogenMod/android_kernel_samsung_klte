@@ -68,7 +68,9 @@ static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(73),
 #elif !defined(CONFIG_MACH_K3GDUOS_CTC)
 	GPIOMUX_SET_NC(18),
+	#if !defined(CONFIG_MACH_KLTE_LTNDUOS)
 	GPIOMUX_SET_NC(73),
+	#endif
 #endif
 #endif
 #if !defined(CONFIG_MACH_KLTE_CHN)
@@ -157,7 +159,7 @@ static struct msm_gpiomux_config gpio_rev08_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(106),
 #endif
 #if defined(CONFIG_MACH_KLTE_DCM)
-	GPIOMUX_SET_NC(9),     // REV 09 
+	GPIOMUX_SET_NC(9),     // REV 09
 	GPIOMUX_SET_NC(104),
 	GPIOMUX_SET_NC(105),
 	GPIOMUX_SET_NC(106),   // CP
@@ -172,7 +174,7 @@ static struct msm_gpiomux_config gpio_rev08_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(136),
 #endif
 #if defined(CONFIG_MACH_KLTE_KDI)
-	GPIOMUX_SET_NC(9),     // REV 06 
+	GPIOMUX_SET_NC(9),     // REV 06
 	GPIOMUX_SET_NC(104),   // CP
 	GPIOMUX_SET_NC(105),   // CP
 	GPIOMUX_SET_NC(106),   // CP
@@ -718,7 +720,7 @@ static struct msm_gpiomux_config mhl_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &mhl_hpd_suspend_cfg,
 		},
 	},
-#if !defined(CONFIG_ISDBT_FC8300_SPI) && !defined(CONFIG_ISDBT_FC8150_SPI)	
+#if !defined(CONFIG_ISDBT_FC8300_SPI) && !defined(CONFIG_ISDBT_FC8150_SPI)
 	{
 		.gpio      = 51, /* BLSP9 QUP I2C_DAT */
 		.settings = {
@@ -799,7 +801,7 @@ static struct msm_gpiomux_config msm_epm_configs[] __initdata = {
 };
 
 static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
-#if defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_SBM) 
+#if defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_SBM)
         {
                 .gpio      = 2,         /* BLSP1 QUP*/
                 .settings = {
@@ -1097,15 +1099,15 @@ static struct msm_gpiomux_config es705_config[] __initdata = {
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &es705_intrevent_config,
 		},
-	},	
+	},
 #else
 	{
 		.gpio	= 110,		/* es705 2mic int */
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &es705_intrevent_config,
 		},
-	},	
-#endif	
+	},
+#endif
 	{
 		.gpio	= 79,		/* es705 intr event */
 		.settings = {
@@ -2082,7 +2084,7 @@ static void msm_gpiomux_sdc3_install(void)
 }
 
 #if defined(CONFIG_MACH_KLTE_JPN)
-// HRM_INT , DCM REV 08A , KDDI REV 06 
+// HRM_INT , DCM REV 08A , KDDI REV 06
 static struct gpiomux_setting general_gpio_suspend_cfg1 = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -2096,7 +2098,7 @@ static struct gpiomux_setting general_gpio_suspend_cfg1 = {
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_IN,
 };
-#endif 
+#endif
 
 static struct gpiomux_setting general_gpio_suspend_cfg2 = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -2447,12 +2449,22 @@ static struct msm_gpiomux_config msm8974_fingerprint_configs_08[] __initdata = {
 		},
 	},
 #endif
+#if defined(CONFIG_MACH_KLTE_LTNDUOS)
+	{
+		/* BTP_LDO_EN2 */
+		.gpio = 73,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &gpio_spi_btp_rst_config,
+			[GPIOMUX_ACTIVE] = &gpio_spi_btp_rst_config,
+		},
+	},
+#endif
 };
 
 #endif
 #ifdef CONFIG_FELICA
 
-/* USE "GPIO_SHARED_I2C_SCL/SDA" 
+/* USE "GPIO_SHARED_I2C_SCL/SDA"
  * ("GPIO_MHL_SCL/SDA" sets initial configuration)
  */
 static struct gpiomux_setting felica_i2c_sda_setting = {
@@ -2468,7 +2480,7 @@ static struct gpiomux_setting felica_i2c_scl_setting = {
 };
 
 static struct gpiomux_setting felica_uart_tx_setting = {
-	.func = GPIOMUX_FUNC_3, 
+	.func = GPIOMUX_FUNC_3,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
@@ -2480,7 +2492,7 @@ static struct gpiomux_setting felica_uart_rx_setting = {
 };
 
 static struct gpiomux_setting felica_uart_tx_rev04_setting = {
-	.func = GPIOMUX_FUNC_2, 
+	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
@@ -2665,7 +2677,7 @@ static struct msm_gpiomux_config msm8974_felica_configs_rev06[] __initdata = {
 			[GPIOMUX_ACTIVE]    = &felica_rfs_setting,
 			[GPIOMUX_SUSPENDED] = &felica_rfs_setting,
 		},
-	},	
+	},
 	{
 		.gpio = GPIO_FELICA_INTU,/*INTU*/
 		.settings = {
@@ -2781,7 +2793,7 @@ void __init msm_8974_init_gpiomux(void)
 					ARRAY_SIZE(ath_gpio_configs));
 #endif
 
-	msm_gpiomux_install(msm8974_slimbus_config, 
+	msm_gpiomux_install(msm8974_slimbus_config,
 				ARRAY_SIZE(msm8974_slimbus_config));
 	msm_gpiomux_install(msm_taiko_config,
 				ARRAY_SIZE(msm_taiko_config));
@@ -2790,7 +2802,7 @@ void __init msm_8974_init_gpiomux(void)
 	if (system_rev >= 4)
 		msm_gpiomux_install(es705_config,
 					ARRAY_SIZE(es705_config));
-	
+
 	msm_gpiomux_install(hap_lvl_shft_config,
 				ARRAY_SIZE(hap_lvl_shft_config));
 
@@ -2832,9 +2844,9 @@ void __init msm_8974_init_gpiomux(void)
 
 	msm_gpiomux_install(msm_hdmi_configs, ARRAY_SIZE(msm_hdmi_configs));
 #ifdef CONFIG_VIDEO_MHL_V2
-#if !defined(CONFIG_ISDBT_FC8300_SPI) && !defined(CONFIG_ISDBT_FC8150_SPI)	
+#if !defined(CONFIG_ISDBT_FC8300_SPI) && !defined(CONFIG_ISDBT_FC8150_SPI)
 	if (system_rev >= 4)
-	{		
+	{
 		 mhl_configs[1].gpio = 10; /* BLSP3 QUP I2C_DAT */
 		 mhl_configs[1].settings[GPIOMUX_ACTIVE] =
 					&gpio_i2c_config;
@@ -2880,10 +2892,8 @@ void __init msm_8974_init_gpiomux(void)
 			ARRAY_SIZE(msm8974_sec_quat_auxpcm_configs));
 	}
 #endif
-	if (system_rev >= 4)	{
 		msm_gpiomux_install(gpio_oledid_config,
 					ARRAY_SIZE(gpio_oledid_config));
-	}
 
 #if !defined(CONFIG_BT_BCM4354)
 	if (of_board_is_rumi())

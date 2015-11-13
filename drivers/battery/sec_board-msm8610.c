@@ -1,5 +1,5 @@
 /*
- *  sec_board-msm8974.c
+ *  sec_board-msm8610.c
  *  Samsung Mobile Battery Driver
  *
  *  Copyright (C) 2012 Samsung Electronics
@@ -9,6 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
 #include <linux/battery/sec_battery.h>
 #include <linux/battery/sec_fuelgauge.h>
 #include <linux/battery/sec_charging_common.h>
@@ -21,9 +22,6 @@ int current_cable_type = POWER_SUPPLY_TYPE_BATTERY;
 extern int current_cable_type;
 #endif
 extern unsigned int system_rev;
-
-struct qpnp_vadc_chip *adc_client;
-
 
 #if defined(CONFIG_FUELGAUGE_MAX17048)
 static struct battery_data_t samsung_battery_data[] = {
@@ -82,6 +80,7 @@ static void * samsung_battery_data;
 #define CAPACITY_MAX			1000
 #define CAPACITY_MAX_MARGIN	50
 #define CAPACITY_MIN			0
+
 //static struct qpnp_vadc_chip *adc_client;
 static enum qpnp_vadc_channels temp_channel;
 static struct sec_fuelgauge_info *sec_fuelgauge =  NULL;
@@ -112,6 +111,26 @@ static sec_bat_adc_table_data_t temp_table[] = {
 	{40436,	-100},
 	{41105,	-150},
 	{41653,	-200},
+};
+#elif defined(CONFIG_SEC_KANAS_PROJECT)
+static sec_bat_adc_table_data_t temp_table[] = {
+	{29153, 600},
+	{29859, 550},
+	{30576, 500},
+	{31518, 450},
+	{32491, 400},
+	{33484, 350},
+	{34508, 300},
+	{35532, 250},
+	{36556, 200},
+	{37509, 150},
+	{38481, 100},
+	{39249, 50},
+	{40017, 0},
+	{40591, -50},
+	{41154, -100},
+	{41543, -150},
+	{41902, -200},
 };
 #else
 static sec_bat_adc_table_data_t temp_table[] = {
@@ -157,18 +176,31 @@ static sec_bat_adc_table_data_t temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM		450
 #define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		0
-#else
-#define TEMP_HIGH_THRESHOLD_EVENT	650
-#define TEMP_HIGH_RECOVERY_EVENT		440
-#define TEMP_LOW_THRESHOLD_EVENT		-45
-#define TEMP_LOW_RECOVERY_EVENT		0
-#define TEMP_HIGH_THRESHOLD_NORMAL	650
-#define TEMP_HIGH_RECOVERY_NORMAL	440
-#define TEMP_LOW_THRESHOLD_NORMAL	-45
+#elif defined(CONFIG_SEC_KANAS_PROJECT)
+#define TEMP_HIGH_THRESHOLD_EVENT	600
+#define TEMP_HIGH_RECOVERY_EVENT	460
+#define TEMP_LOW_THRESHOLD_EVENT	-50
+#define TEMP_LOW_RECOVERY_EVENT	0
+#define TEMP_HIGH_THRESHOLD_NORMAL	600
+#define TEMP_HIGH_RECOVERY_NORMAL	460
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
 #define TEMP_LOW_RECOVERY_NORMAL	0
-#define TEMP_HIGH_THRESHOLD_LPM		650
-#define TEMP_HIGH_RECOVERY_LPM		440
-#define TEMP_LOW_THRESHOLD_LPM		-45
+#define TEMP_HIGH_THRESHOLD_LPM		600
+#define TEMP_HIGH_RECOVERY_LPM		460
+#define TEMP_LOW_THRESHOLD_LPM		-50
+#define TEMP_LOW_RECOVERY_LPM		0
+#else
+#define TEMP_HIGH_THRESHOLD_EVENT	600
+#define TEMP_HIGH_RECOVERY_EVENT	460
+#define TEMP_LOW_THRESHOLD_EVENT	-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	600
+#define TEMP_HIGH_RECOVERY_NORMAL	460
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		600
+#define TEMP_HIGH_RECOVERY_LPM		460
+#define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		0
 #endif
 void sec_bat_check_batt_id(struct sec_battery_info *battery)
@@ -192,26 +224,12 @@ void sec_bat_check_batt_id(struct sec_battery_info *battery)
 static void sec_bat_adc_ap_init(struct platform_device *pdev,
 			struct sec_battery_info *battery)
 {
-	struct power_supply *psy_fuelgauge;
-	struct sec_fuelgauge_info *fuelgauge;
-
-	psy_fuelgauge = get_power_supply_by_name(battery->pdata->fuelgauge_name);
-	if (!psy_fuelgauge) {
-		pr_err("%s : can't get sec-fuelgauge\n", __func__);
-	} else {
-		fuelgauge = container_of(psy_fuelgauge, struct sec_fuelgauge_info, psy_fg);
-
-		adc_client = qpnp_get_vadc(&fuelgauge->client->dev, "sec-fuelgauge");
-
-		if (IS_ERR(adc_client)) {
-			int rc;
-			rc = PTR_ERR(adc_client);
-			if (rc != -EPROBE_DEFER)
-				pr_err("%s: Fail to get vadc %d\n", __func__, rc);
-		}
-	}
+#if defined(CONFIG_SEC_KANAS_PROJECT)
+	temp_channel = P_MUX3_1_1;
+#else
     temp_channel = LR_MUX1_BATT_THERM;
-
+#endif
+	pr_info("%s :  temp_channel = %d\n", __func__,temp_channel);
 }
 
 static int sec_bat_adc_ap_read(struct sec_battery_info *battery, int channel)
@@ -223,7 +241,7 @@ static int sec_bat_adc_ap_read(struct sec_battery_info *battery, int channel)
 	switch (channel)
 	{
 	case SEC_BAT_ADC_CHANNEL_TEMP :
-		rc = qpnp_vadc_read(adc_client, temp_channel, &results);
+		rc = qpnp_vadc_read(NULL, temp_channel, &results);
 		if (rc) {
 			pr_err("%s: Unable to read batt temperature rc=%d\n",
 				__func__, rc);
@@ -235,9 +253,9 @@ static int sec_bat_adc_ap_read(struct sec_battery_info *battery, int channel)
 		data = 33000;
 		break;
 	case SEC_BAT_ADC_CHANNEL_BAT_CHECK :
-		rc = qpnp_vadc_read(adc_client, LR_MUX2_BAT_ID, &results);
+		rc = qpnp_vadc_read(NULL, LR_MUX2_BAT_ID, &results);
         if (rc) {
-			pr_err("%s: Unable to read battid rc=%d\n",
+			pr_err("%s: Unable to read BATT_ID ADC rc=%d\n",
 				__func__, rc);
 			return 0;
 		}
@@ -354,7 +372,7 @@ int adc_read(struct sec_battery_info *battery, int channel)
 
 	adc = adc_read_type(battery, channel);
 
-	pr_debug("[%s]adc = %d\n", __func__, adc);
+	pr_info("[%s]adc = %d\n", __func__, adc);
 
 	return adc;
 }

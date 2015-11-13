@@ -49,6 +49,8 @@
 #include "barcode_emul_ice4_hlte.h"
 #include <linux/err.h>
 
+#define US_TO_PATTERN		1000000
+
 #if defined(CONFIG_MACH_H3GDUOS)
 #include <mach/gpiomux.h>
 #endif
@@ -66,7 +68,7 @@
 #define BEAM_STATUS_ADDR	0xFE
 #define SEC_FPGA_MAX_FW_PATH	255
 #define SEC_FPGA_FW_FILENAME		"i2c_top_bitmap.bin"
-
+#define IRDA_BUFFER_MAX_SIZE 255
 #define BARCODE_I2C_ADDR	0x6C
 #define FIRMWARE_MAX_RETRY	2
 #if defined(CONFIG_MACH_H3GDUOS)
@@ -88,8 +90,6 @@
 #define BOARD_REV02 2
 #define BOARD_REV03 3
 #define BOARD_REV07 3
-#define TIME_LIMIT_MSEC 300
-#define tm(time) (u32)ktime_to_us(time)
 
 extern int system_rev;
 
@@ -194,7 +194,7 @@ static int ice4_clock_en(int onoff)
 #if defined(CONFIG_MACH_H3GDUOS)
      if (onoff) {
 		int rc = 0;
-		
+
 		//msm_tlmm_misc_reg_write(TLMM_SPARE_REG, 0x1);
 		rc = gpio_request(GPIO_FPGA_MAIN_CLK, "fpga_main_clk");
 
@@ -209,13 +209,13 @@ static int ice4_clock_en(int onoff)
      } else {
 		//msm_tlmm_misc_reg_write(TLMM_SPARE_REG, 0x5);
 		gpio_free(GPIO_FPGA_MAIN_CLK);
-     }  
+     }
 
       if (!fpga_main_src_clk){
-      	fpga_main_src_clk = clk_get(NULL, "gp1_src_clk");
+	fpga_main_src_clk = clk_get(NULL, "gp1_src_clk");
       }
       if (IS_ERR(fpga_main_src_clk)) {
-      	pr_err( "%s: unable to get fpga_main_src_clk\n", __func__);
+	pr_err( "%s: unable to get fpga_main_src_clk\n", __func__);
       }
       
       if (!fpga_main_clk){
@@ -326,7 +326,7 @@ static void barcode_gpio_config(void)
 		GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
 #if !defined(CONFIG_MACH_H3GDUOS)
 	gpio_tlmm_config(GPIO_CFG(GPIO_FPGA_MAIN_CLK, \
-		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);	
+		2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 #endif
 
 	gpio_request(g_pdata->cresetb, "irda_creset");
@@ -429,8 +429,7 @@ static int barcode_fpga_fimrware_update_start(const u8 *data, int len)
 		udelay(5);
 		pr_barcode("FPGA firmware update success\n");
 		fw_dl_complete = true;
-		break;		
-		
+		break;
 	} while (retry);
 	fpga_enable(0,0);
 	return 0;
@@ -802,7 +801,7 @@ static ssize_t barcode_ver_check_show(struct device *dev,
 	pr_info("Actual value read f/w %u \n",fw_ver);
 	fw_ver = (fw_ver >> 5) & 0x7;
 
-	return snprintf(buf, sizeof(buf), "%u\n", fw_ver+14);
+	return snprintf(buf, IRDA_BUFFER_MAX_SIZE, "%u\n", fw_ver+14);
 }
 
 static DEVICE_ATTR(barcode_ver_check, 0664, barcode_ver_check_show, NULL);
@@ -815,7 +814,7 @@ static ssize_t barcode_led_status_show(struct device *dev,
 	u8 status;
 	barcode_emul_read(data->client, BEAM_STATUS_ADDR, 1, &status);
 	status = status & 0x1;
-	return snprintf(buf, sizeof(buf), "%d\n", status);
+	return snprintf(buf, IRDA_BUFFER_MAX_SIZE, "%d\n", status);
 }
 static DEVICE_ATTR(barcode_led_status, 0664, barcode_led_status_show, NULL);
 
@@ -854,10 +853,9 @@ static void ir_remocon_work(struct barcode_emul_data *ir_data, int count)
 	int ret;
 //	int sleep_timing;
 //	int end_data;
-	int actual_time;
+    int converting_factor = 1;
 	int emission_time;
 	int ack_pin_onoff;
-	ktime_t t1,t2;
 
 	if (count_number >= 100)
 		count_number = 0;
@@ -943,23 +941,12 @@ static void ir_remocon_work(struct barcode_emul_data *ir_data, int count)
 /*
 	printk(KERN_INFO "%s: sleep_timing = %d\n", __func__, sleep_timing);
 */
+    converting_factor = US_TO_PATTERN / data->ir_freq;
 	emission_time = \
-		(1000 * (data->ir_sum) / (data->ir_freq));
-/*	if (emission_time > 0)
+		((data->ir_sum) * (converting_factor) / 1000);
+	if (emission_time > 0)
 		msleep(emission_time);
-*/
-	actual_time = 0;
-	t1 = ktime_get();
-	while((gpio_get_value(g_pdata->irda_irq) == 0) && (actual_time <= emission_time))
-	{
-		int diff;
-		t2 = ktime_get();
-		diff = (tm(t2) - tm(t1))/1000;
-		msleep(10);
-		actual_time += 10;
-		if(diff > TIME_LIMIT_MSEC)
-			break;
-	}
+
 		pr_barcode("%s: emission_time = %d\n",
 					__func__, emission_time);
 
@@ -992,8 +979,8 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t size)
 {
 	struct barcode_emul_data *data = dev_get_drvdata(dev);
-	unsigned int _data;
-	int count, i;
+	unsigned int _data, _tdata;
+	int count, i, converting_factor = 1;
 
 	pr_barcode("ir_send called\n");
 
@@ -1003,6 +990,7 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 				break;
 			if (data->count == 2) {
 				data->ir_freq = _data;
+				converting_factor = US_TO_PATTERN / data->ir_freq;
 				if (data->on_off) {
 				//	msleep(30);
 				} else {
@@ -1017,12 +1005,13 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 								= _data & 0xFF;
 				data->count += 3;
 			} else {
-				data->ir_sum += _data;
+				_tdata = _data / converting_factor;
+				data->ir_sum += _tdata;
 				count = data->count;
 				data->i2c_block_transfer.data[count]
-								= _data >> 8;
+								= _tdata >> 8;
 				data->i2c_block_transfer.data[count+1]
-								= _data & 0xFF;
+								= _tdata & 0xFF;
 				data->count += 2;
 			}
 
@@ -1232,9 +1221,10 @@ static int __devinit barcode_emul_probe(struct i2c_client *client,
 	} else
 		pdata = client->dev.platform_data;
 
-#if !defined(CONFIG_MACH_VIENNAEUR) && !defined(CONFIG_MACH_LT03EUR)\
+#if !defined(CONFIG_MACH_VIENNAEUR) && !defined(CONFIG_MACH_VIENNAKOR) && !defined(CONFIG_MACH_LT03EUR)\
 	&& !defined(CONFIG_MACH_LT03SKT) && !defined(CONFIG_MACH_LT03KTT)\
-	&& !defined(CONFIG_MACH_LT03LGT) && !defined(CONFIG_MACH_V2)
+	&& !defined(CONFIG_MACH_LT03LGT) && !defined(CONFIG_MACH_V2)\
+	&& !defined(CONFIG_MACH_CHAGALL) && !defined(CONFIG_MACH_KLIMT)
 	if(system_rev < BOARD_REV02)
 		pdata->fw_type = ICE_I2C_2;
 

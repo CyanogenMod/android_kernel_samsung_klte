@@ -81,12 +81,10 @@ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
 	if ((pmd[0]|0x4) != (addr|0x4)) {
 		printk(KERN_ERR"pmd[0] %lx != addr %lx - %lx %lx in func: %s tima_wr_out = %lx\n",
 				(unsigned long) pmd[0], addr, (unsigned long) pmd[1], addr + SECTION_SIZE, __func__, tima_wr_out);
-		tima_send_cmd(pmd[0], 0x3f810221);
 	}
 	if ((pmd[1]|0x4)!=((addr + SECTION_SIZE)|0x4)) {
 		printk(KERN_ERR"pmd[1] %lx != (addr + SECTION_SIZE) %lx in func: %s\n",
 				(unsigned long) pmd[1], (addr + SECTION_SIZE), __func__);
-		tima_send_cmd(pmd[1], 0x3f810221);
 	}
 #else
 	pmd[0] = __pmd(addr);

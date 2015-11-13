@@ -16,8 +16,6 @@
 #include <asm/unaligned.h>
 #include "mms100_cfg_update.h"
 
-#include "fw_mfsb_mms136_victor.c"  //firmware file  *mfsb.c 
-
 /*
  *      Default configuration of ISC mode
  */
@@ -62,7 +60,8 @@
 	(((num/10)<<4) + (num%10))
 #define ISC_MAX(x, y)		( ((x) > (y))? (x) : (y) )
 
-#define MMS_FW_NAME					"mms_ts.fw"
+#define MMS_BUILTIN_FW_NAME				"tsp_melfas/victor/victor.fw"
+#define MMS_SDCARD_FW_NAME				"/sdcard/melfas.fw"
 
 typedef enum {
 	EC_NONE = -1,
@@ -137,7 +136,7 @@ static bool section_update_flag[SECTION_NUM];
 
 //const struct firmware *fw_mfsb[SECTION_NUM];
 
-const struct firmware *fw_mfsb;
+static struct firmware *fw_mfsb;
 static struct mms_bin_hdr *fw_hdr;
 static struct mms_fw_img **img;
 
@@ -292,10 +291,10 @@ static eISCRet_t mms100_seek_section_info(void) {
 
 	pr_info("[TSP ISC] %s\n", __func__);
 
-	fw_hdr = (struct mms_bin_hdr *)MELFAS_MFSB;
+	fw_hdr = (struct mms_bin_hdr *)fw_mfsb->data;
 	img = kzalloc(sizeof(*img) * fw_hdr->section_num, GFP_KERNEL);
 	for (i = 0; i < fw_hdr->section_num ;i++, offset += sizeof(struct mms_fw_img)){
-		img[i] = (struct mms_fw_img *)(MELFAS_MFSB + offset);
+		img[i] = (struct mms_fw_img *)(fw_mfsb->data + offset);
 		mfsb_info[i].version = img[i]->version;
 		mfsb_info[i].start_addr = img[i]->start_page;
 		mfsb_info[i].end_addr = img[i]->end_page;
@@ -336,19 +335,21 @@ static eISCRet_t mms100_compare_version_info(struct i2c_client *_client) {
 
 	mms100_seek_section_info();
 
-	for (i = 0; i < SECTION_NUM; i++) {
+	target_ver[0] = mfsb_info[0].version;
+	section_update_flag[0] = false;
+	for (i = SEC_CORE; i < SECTION_NUM; i++) {
 		
 		if (mfsb_info[i].version != ts_info[i].version) {
 			fw_up_to_date = false;
 			section_update_flag[i] = true;
 			target_ver[i] = mfsb_info[i].version;
-			
+		/*	
 			if(mfsb_info[0].version != ts_info[0].version){
 				section_update_flag[0]=true;
 				section_update_flag[1]=true;
 				section_update_flag[2]=true;
 			}
-
+		*/
 			if(mfsb_info[1].version != ts_info[1].version){
 				section_update_flag[0]=false;
 				section_update_flag[1]=true;
@@ -619,7 +620,7 @@ static eISCRet_t mms100_update_section_data(struct i2c_client *_client) {
 	int page_addr;
 	const u8 *fw_data;
 	pr_info("[TSP ISC] %s\n", __func__);
-	fw_data = MELFAS_MFSB + fw_hdr->binary_offset;
+	fw_data = fw_mfsb->data + fw_hdr->binary_offset;
 	for (i = 0; i < fw_hdr->section_num ; i++){
 		pr_info("update flag (%d)\n", section_update_flag[i]);
 		ptr = img[i]->offset;
@@ -685,23 +686,70 @@ static eISCRet_t mms100_update_section_data(struct i2c_client *_client) {
 
 	return ISC_SUCCESS;
 }
-/*
-static eISCRet_t mms100_open_mbinary(struct i2c_client *_client) {
-	const char *fw_name =MMS_FW_NAME;
+
+static eISCRet_t mms100_open_kernel_mbinary(struct i2c_client *_client) {
+	const char *fw_name = MMS_BUILTIN_FW_NAME;
+	const struct firmware *fw = NULL;
 	int ret;
-	pr_info("[TSP ISC] %s\n", __func__);
+	dev_info(&_client->dev, "[TSP ISC] %s\n", __func__);
 
 	fw_name = kstrdup(fw_name, GFP_KERNEL);
-	ret=request_firmware(&fw_mfsb, fw_name, &_client->dev);
+	ret=request_firmware(&fw, fw_name, &_client->dev);
+	fw_mfsb = kzalloc(sizeof(*fw_mfsb), GFP_KERNEL);
+	fw_mfsb->data = fw->data;
 	if (ret) {
-		pr_info("failed to schedule firmware update\n");
+		dev_info(&_client->dev, "failed to schedule firmware update\n");
 		return ISC_FILE_OPEN_ERROR;
 	}
-	pr_info("End mms100_open_mbinary()\n");
+	dev_info(&_client->dev, "[TSP ISC] End %s\n", __func__);
 
 	return ISC_SUCCESS;
 }
 
+static eISCRet_t mms100_open_sdcard_mbinary(struct i2c_client *_client) {
+	mm_segment_t old_fs = {0};
+	struct file *fp;
+	int nread = 0;
+	unsigned char *fw_data;
+	int ret = ISC_FILE_OPEN_ERROR;
+
+	dev_info(&_client->dev, "[TSP ISC] %s\n", __func__);
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fp = filp_open(MMS_SDCARD_FW_NAME, O_RDONLY, S_IRUSR);
+	if (IS_ERR(fp)) {
+		dev_err(&_client->dev,
+			"file %s open error:%d\n", MMS_SDCARD_FW_NAME, (s32)fp);
+		goto open_err;
+	}
+
+	fw_mfsb = kzalloc(sizeof(*fw_mfsb), GFP_KERNEL);
+	fw_mfsb->size= fp->f_path.dentry->d_inode->i_size;
+	if(fw_mfsb->size >0 ){
+		fw_data = kzalloc(fw_mfsb->size, GFP_KERNEL);
+		nread = vfs_read(fp, (char __user *)fw_data, fw_mfsb->size, &fp->f_pos);
+		dev_info(&_client->dev,
+				"%s: start, fw path(%s), fw size %u Bytes\n", __func__,
+				MMS_SDCARD_FW_NAME, fw_mfsb->size);
+
+		if (nread != fw_mfsb->size) {
+			dev_err(&_client->dev, "%s : fail to read fw (nread = %d)\n",
+					  __func__, nread);
+			goto open_err;
+		}
+		fw_mfsb->data = fw_data;
+		dev_info(&_client->dev, "ums fw is opened successfully!!\n");
+		ret = ISC_SUCCESS;
+	}
+
+	filp_close(fp, current->files);
+open_err:
+	set_fs(old_fs);
+	return ret;
+}
+/*
 static eISCRet_t mms100_close_mbinary(void) {
 	pr_info("[TSP ISC] %s\n", __func__);
 
@@ -715,15 +763,15 @@ static eISCRet_t mms100_close_mbinary(void) {
 /*
  *       본 함수는 TSP device driver의 i2c_set_clientdata가 완료된 이후에 호출되어야 합니다.
  */
-eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_update) {
+eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_update, int fw_location) {
 	eISCRet_t ret_msg = ISC_NONE;
 
 	pr_info("[TSP ISC] %s\n", __func__);
 
 	//함수내 Todo 확인 해 주세요..!!!
-	mms100_reset(_client);
+	//mms100_reset(_client);
 
-	mms100_seek_section_info();
+	//mms100_seek_section_info();
 
 	/*IC의 부팅 여부 판단*/
 	ret_msg = mms100_check_operating_mode(_client, EC_BOOT_ON_SUCCEEDED);
@@ -732,14 +780,23 @@ eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_upd
 
 	/*FW BIN(.mfsb)을 open 함.*/
 	//함수내 mfsb 경로 확인 해 주세요..!!!
-/*	ret_msg = mms100_open_mbinary(_client);
-	if (ret_msg != ISC_SUCCESS)
-		goto ISC_ERROR_HANDLE;
-*/
+	if (fw_location == BUILT_IN){
+		ret_msg = mms100_open_kernel_mbinary(_client);
+		if (ret_msg != ISC_SUCCESS)
+			goto ISC_ERROR_HANDLE;
+	}
+	else if (fw_location == UMS){
+		ret_msg = mms100_open_sdcard_mbinary(_client);
+		if (ret_msg != ISC_SUCCESS)
+			goto ISC_ERROR_HANDLE;
+	}
+
 	/*Config version Check*/
 	if (force_update) {
 		int i;
-		for (i = 0; i < SECTION_NUM; i++)
+		mms100_seek_section_info();
+		section_update_flag[0] = false; //don't update boot area
+		for (i = SEC_CORE; i < SECTION_NUM; i++)
 			section_update_flag[i] = true;
 	} else {
 		ret_msg = mms100_compare_version_info(_client);
@@ -764,7 +821,7 @@ eISCRet_t mms100_ISC_download_mbinary(struct i2c_client *_client, bool force_upd
 	if (ret_msg != ISC_SUCCESS)
 		goto ISC_ERROR_HANDLE;
 	kfree(img);
-	mms100_reset(_client); 
+	//mms100_reset(_client); 
 
 	pr_info("FIRMWARE_UPDATE_FINISHED!!!\n");
 

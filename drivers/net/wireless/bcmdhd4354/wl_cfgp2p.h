@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.h 476678 2014-05-09 14:46:37Z $
+ * $Id: wl_cfgp2p.h 514182 2014-11-10 09:16:50Z $
  */
 #ifndef _wl_cfgp2p_h_
 #define _wl_cfgp2p_h_

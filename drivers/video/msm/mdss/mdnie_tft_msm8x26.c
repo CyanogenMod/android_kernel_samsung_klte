@@ -41,9 +41,14 @@
 #include "mdss_dsi.h"
 #include "mdss_samsung_dsi_panel_msm8x26.h"
 #include "mdnie_tft_msm8x26.h"
-
-#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined(CONFIG_MACH_MS01_EUR_3G) || defined(CONFIG_MACH_MS01_EUR_LTE)
+#include "mdnie_lite_tuning_data_ms01.h"
+#elif defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_DEGAS_PROJECT)
 #include "mdnie_tft_data_millet.h"
+#elif defined(CONFIG_SEC_T10_PROJECT) || defined(CONFIG_SEC_T8_PROJECT)
+#include "mdnie_tft_data_t10_t8.h"
+#elif defined(CONFIG_MACH_MEGA23GEUR_OPEN)
+#include "mdnie_tft_data_mega23g.h"
 #endif
 
 int get_lcd_attached(void);
@@ -71,6 +76,16 @@ int get_lcd_attached(void);
 #define INPUT_PAYLOAD4(x) PAYLOAD4.payload = x
 #define INPUT_PAYLOAD5(x) PAYLOAD5.payload = x
 #define INPUT_PAYLOAD6(x) PAYLOAD6.payload = x
+#elif defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+#define PAYLOAD1 mdni_tune_cmd[0]
+#define PAYLOAD2 mdni_tune_cmd[1]
+#define PAYLOAD3 mdni_tune_cmd[2]
+#define PAYLOAD4 mdni_tune_cmd[3]
+
+#define INPUT_PAYLOAD1(x) PAYLOAD1.payload = x
+#define INPUT_PAYLOAD2(x) PAYLOAD2.payload = x
+#define INPUT_PAYLOAD3(x) PAYLOAD3.payload = x
+#define INPUT_PAYLOAD4(x) PAYLOAD4.payload = x
 #else
 #define PAYLOAD1 mdni_tune_cmd[3]
 #define PAYLOAD2 mdni_tune_cmd[2]
@@ -93,14 +108,21 @@ struct mdnie_tft_type mdnie_tun_state = {
 	.negative = mDNIe_NEGATIVE_OFF,
 	.blind = ACCESSIBILITY_OFF,
 };
-
+#if defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+const char background_name[MAX_BACKGROUND_MODE][16] = {
+	"DYNAMIC",
+	"STANDARD",
+	"MOVIE",
+	"AUTO"
+};
+#else
 const char background_name[MAX_BACKGROUND_MODE][16] = {
 	"DYNAMIC",
 	"STANDARD",
 	"MOVIE",
 	"NATURAL",
 };
-
+#endif
 const char scenario_name[MAX_mDNIe_MODE][16] = {
 	"UI_MODE",
 	"VIDEO_MODE",
@@ -119,7 +141,15 @@ const char scenario_name[MAX_mDNIe_MODE][16] = {
 #endif
 };
 
+#if defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+const char accessibility_name[ACCESSIBILITY_MAX][20] = {
+	"ACCESSIBILITY_OFF",
+	"NEGATIVE_MODE",
+	"COLOR_BLIND_MODE",
+};
+#endif
 
+#if !defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 static char level1_key[] = {
 	0xF0,
 	0x5A, 0x5A,
@@ -129,34 +159,39 @@ static char level2_key[] = {
 	0xF1,
 	0x5A, 0x5A,
 };
-
+#endif
 static char tune_data1[MDNIE_TUNE_FIRST_SIZE] = {0,};
 static char tune_data2[MDNIE_TUNE_SECOND_SIZE] = {0,};
-#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL) || defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 static char tune_data3[MDNIE_TUNE_THIRD_SIZE] = {0,};
 static char tune_data4[MDNIE_TUNE_FOURTH_SIZE] = {0,};
+#if !defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 static char tune_data5[MDNIE_TUNE_FIFTH_SIZE] = {0,};
 static char tune_data6[MDNIE_TUNE_SIXTH_SIZE] = {0,};
 #endif
+#endif
 static struct dsi_cmd_desc mdni_tune_cmd[] = {
+#if !defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 1,
 		sizeof(level1_key)}, level1_key},
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 1,
 		sizeof(level2_key)}, level2_key},
-
+#endif
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data1)}, tune_data1},
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data2)}, tune_data2},
-#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL) || defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data3)}, tune_data3},
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data4)}, tune_data4},
+#if !defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data5)}, tune_data5},
 	{{DTYPE_DCS_LWRITE, 1, 0, 0, 2,
 		sizeof(tune_data6)}, tune_data6},
+#endif
 #endif
 };
 
@@ -189,6 +224,24 @@ void print_tun_data(void)
 	for (i = 0; i < MDNIE_TUNE_FIRST_SIZE ; i++)
 		DPRINT("0x%x ", PAYLOAD6.payload[i]);
 	DPRINT("\n");
+#elif defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+	DPRINT("\n");
+	DPRINT("---- size1 : %d", PAYLOAD1.dchdr.dlen);
+	for (i = 0; i < MDNIE_TUNE_FIRST_SIZE ; i++)
+	DPRINT("0x%x ", PAYLOAD1.payload[i]);
+	DPRINT("\n");
+	DPRINT("---- size2 : %d", PAYLOAD2.dchdr.dlen);
+	for (i = 0; i < MDNIE_TUNE_SECOND_SIZE ; i++)
+		DPRINT("0x%x ", PAYLOAD2.payload[i]);
+	DPRINT("\n");
+	DPRINT("---- size3 : %d", PAYLOAD3.dchdr.dlen);
+	for (i = 0; i < MDNIE_TUNE_THIRD_SIZE ; i++)
+		DPRINT("0x%x ", PAYLOAD3.payload[i]);
+	DPRINT("\n");
+	DPRINT("---- size4 : %d", PAYLOAD4.dchdr.dlen);
+	for (i = 0; i < MDNIE_TUNE_FOURTH_SIZE ; i++)
+		DPRINT("0x%x ", PAYLOAD4.payload[i]);
+	DPRINT("\n");
 #else
 	DPRINT("\n");
 	DPRINT("---- size1 : %d", PAYLOAD1.dchdr.dlen);
@@ -206,11 +259,13 @@ void free_tun_cmd(void)
 {
 	memset(tune_data1, 0, MDNIE_TUNE_FIRST_SIZE);
 	memset(tune_data2, 0, MDNIE_TUNE_SECOND_SIZE);
-#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL) || defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 	memset(tune_data3, 0, MDNIE_TUNE_THIRD_SIZE);
 	memset(tune_data4, 0, MDNIE_TUNE_FOURTH_SIZE);
+#if !defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
 	memset(tune_data5, 0, MDNIE_TUNE_FIFTH_SIZE);
 	memset(tune_data6, 0, MDNIE_TUNE_SIXTH_SIZE);
+#endif
 #endif
 }
 void sending_tuning_cmd(void)
@@ -288,7 +343,7 @@ void mDNIe_Set_Mode(enum Lcd_mDNIe_UI mode)
 	if (mdnie_tun_state.blind == COLOR_BLIND)
 		mode = mDNIE_BLINE_MODE;
 
-#if !defined(CONFIG_SEC_MATISSE_PROJECT)
+#if !defined(CONFIG_SEC_MATISSE_PROJECT) && !defined(CONFIG_MDP_NEGATIVE_SUPPORT)
 	switch (mode) {
 #if defined (CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
 	case mDNIe_UI_MODE:
@@ -412,6 +467,229 @@ void mDNIe_Set_Mode(enum Lcd_mDNIe_UI mode)
 		INPUT_PAYLOAD5(COLOR_BLIND_5);
 		INPUT_PAYLOAD6(COLOR_BLIND_6);
 		break;
+#elif defined (CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+	case mDNIe_UI_MODE:
+		DPRINT(" = UI MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+		break;
+
+	case mDNIe_VIDEO_MODE:
+		DPRINT(" = VIDEO MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIe_VIDEO_WARM_MODE:
+		DPRINT(" = VIDEO WARM MODE =\n");
+		DPRINT("no data for WARM MODE..\n");
+		break;
+
+	case mDNIe_VIDEO_COLD_MODE:
+		DPRINT(" = VIDEO COLD MODE =\n");
+		DPRINT("no data for COLD MODE..\n");
+		break;
+
+	case mDNIe_CAMERA_MODE:
+		DPRINT(" = CAMERA MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIe_NAVI:
+		DPRINT(" = NAVI MODE =\n");
+		DPRINT("no data for NAVI MODE..\n");
+		break;
+
+	case mDNIe_GALLERY:
+		DPRINT(" = GALLERY MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIe_VT_MODE:
+		DPRINT(" = VT MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+#if defined(CONFIG_TDMB)
+	case mDNIe_DMB_MODE:
+		DPRINT(" = DMB MODE =\n");
+		DPRINT("no data for DMB MODE..\n");
+		break;
+
+	case mDNIe_DMB_WARM_MODE:
+		DPRINT(" = DMB WARM MODE =\n");
+		DPRINT("no data for DMB  WARM MODE..\n");
+		break;
+
+	case mDNIe_DMB_COLD_MODE:
+		DPRINT(" = DMB COLD MODE =\n");
+		DPRINT("no data for DMB COLD MODE..\n");
+		break;
+#endif
+
+	case mDNIe_BROWSER_MODE:
+		DPRINT(" = BROWSER MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIe_eBOOK_MODE:
+		DPRINT(" = eBOOK MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIe_EMAIL_MODE:
+		DPRINT(" = EMAIL MODE =\n");
+		if (!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2] ||
+			!mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0]);
+			INPUT_PAYLOAD2(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][1]);
+			INPUT_PAYLOAD3(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][2]);
+			INPUT_PAYLOAD4(
+				mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][3]);
+
+		}
+
+		break;
+
+	case mDNIE_BLINE_MODE:
+		DPRINT(" = BLIND MODE =\n");
+
+		if (!blind_tune_value[mdnie_tun_state.blind][0] || !blind_tune_value[mdnie_tun_state.blind][1] ||
+			!blind_tune_value[mdnie_tun_state.blind][2] || !blind_tune_value[mdnie_tun_state.blind][3]) {
+			pr_err("mdnie tune data is NULL!\n");
+			return;
+		} else {
+			INPUT_PAYLOAD1(blind_tune_value[mdnie_tun_state.blind][0]);
+			INPUT_PAYLOAD2(blind_tune_value[mdnie_tun_state.blind][1]);
+			INPUT_PAYLOAD3(blind_tune_value[mdnie_tun_state.blind][2]);
+			INPUT_PAYLOAD4(blind_tune_value[mdnie_tun_state.blind][3]);
+		}
+		break;
+
 #else
 	case mDNIe_UI_MODE:
 		DPRINT(" = UI MODE =\n");
@@ -509,8 +787,14 @@ void mDNIe_Set_Mode(enum Lcd_mDNIe_UI mode)
 	sending_tuning_cmd();
 	free_tun_cmd();
 
-	DPRINT("mDNIe_Set_Mode end , mode(%d), background(%d)\n",
+#if defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+		DPRINT("mDNIe_Set_Mode end , %s(%d), %s(%d),\n",
+		scenario_name[mdnie_tun_state.scenario], mdnie_tun_state.scenario,
+		background_name[mdnie_tun_state.background], mdnie_tun_state.background);
+#else
+		DPRINT("mDNIe_Set_Mode end , mode(%d), background(%d)\n",
 		mode, mdnie_tun_state.background);
+#endif
 }
 void is_negative_on(void)
 {
@@ -525,7 +809,7 @@ void is_negative_on(void)
 		/* check the mode and tuning again when wake up*/
 		DPRINT("negative off when resume, tuning again!\n");
 		mdss_negative_color(mdnie_tun_state.negative);
-#if !defined(CONFIG_SEC_MATISSE_PROJECT)
+#if !defined(CONFIG_SEC_MATISSE_PROJECT)  && !defined(CONFIG_MDP_NEGATIVE_SUPPORT)
 		mDNIe_Set_Mode(mdnie_tun_state.scenario);
 #endif
 	}
@@ -556,7 +840,7 @@ void is_play_speed_1_5(int enable)
  * #	3. Natural
  * #
  * ##########################################################*/
-#if !defined(CONFIG_SEC_MATISSE_PROJECT)
+#if !defined(CONFIG_SEC_MATISSE_PROJECT)  && !defined(CONFIG_MDP_NEGATIVE_SUPPORT)
 static ssize_t mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -925,11 +1209,20 @@ static ssize_t accessibility_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
+#if defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+	DPRINT("Current accessibility Mode : %s\n",
+			accessibility_name[mdnie_tun_state.blind]);
+
+	return snprintf(buf, 256, "Current accessibility Mode : %s\n",
+			accessibility_name[mdnie_tun_state.blind]);
+
+#else
 	DPRINT("called %s\n", __func__);
 	return snprintf(buf, 256, "%d\n", play_speed_1_5);
+#endif
 }
 
-#if defined(CONFIG_SEC_MATISSE_PROJECT)
+#if defined(CONFIG_SEC_MATISSE_PROJECT) || defined(CONFIG_MDP_NEGATIVE_SUPPORT)
 static ssize_t accessibility_store(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t size)
@@ -985,9 +1278,12 @@ static ssize_t accessibility_store(struct device *dev,
 	} else if (cmd_value == COLOR_BLIND) {
 		mdnie_tun_state.negative = mDNIe_NEGATIVE_OFF;
 		mdnie_tun_state.blind = COLOR_BLIND;
-
+#if defined(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL)
+	   memcpy(&COLOR_BLIND_4[22],buffer, MDNIE_COLOR_BLINDE_CMD);
+#else
 		memcpy(&COLOR_BLIND_2[MDNIE_COLOR_BLINDE_CMD],
 				buffer, MDNIE_COLOR_BLINDE_CMD);
+#endif
 	} else if (cmd_value == ACCESSIBILITY_OFF) {
 		mdnie_tun_state.blind = ACCESSIBILITY_OFF;
 		mdnie_tun_state.negative = mDNIe_NEGATIVE_OFF;
@@ -1025,7 +1321,7 @@ void init_mdnie_class(void)
 	if (IS_ERR(tune_mdnie_dev))
 		pr_err("Failed to create device(mdnie)!\n");
 
-#if !defined(CONFIG_SEC_MATISSE_PROJECT)
+#if !defined(CONFIG_SEC_MATISSE_PROJECT)  && !defined(CONFIG_MDP_NEGATIVE_SUPPORT)
 	if (device_create_file
 	    (tune_mdnie_dev, &dev_attr_scenario) < 0)
 		pr_err("Failed to create device file(%s)!\n",
