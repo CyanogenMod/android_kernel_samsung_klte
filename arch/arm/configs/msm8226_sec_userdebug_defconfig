@@ -1,0 +1,3 @@
+#enable /proc/config.gz kernel build option
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y

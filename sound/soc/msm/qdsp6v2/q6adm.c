@@ -26,6 +26,12 @@
 
 #include "audio_acdb.h"
 
+#if defined(CONFIG_SEC_MILLETWIFI_COMMON) || defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+#ifdef pr_debug
+#undef pr_debug
+#define pr_debug pr_err
+#endif
+#endif
 
 #define TIMEOUT_MS 1000
 
@@ -46,6 +52,7 @@ enum {
 	ADM_RTAC,
 	ADM_MAX_CAL_TYPES
 };
+
 
 struct adm_ctl {
 	void *apr;
@@ -430,18 +437,10 @@ int adm_get_params(int port_id, uint32_t module_id, uint32_t param_id,
 		rc = -EINVAL;
 		goto adm_get_param_return;
 	}
-	if ((params_data) && (ARRAY_SIZE(adm_get_parameters) >=
-		(1+adm_get_parameters[0])) &&
-		(params_length/sizeof(int) >=
-		adm_get_parameters[0])) {
+	if ((params_data) && (adm_get_parameters[0] <
+		ARRAY_SIZE(adm_get_parameters))) {
 		for (i = 0; i < adm_get_parameters[0]; i++)
 			params_data[i] = adm_get_parameters[1+i];
-	} else {
-		pr_err("%s: Get param data not copied! get_param array size %zd, index %d, params array size %zd, index %d\n",
-		__func__, ARRAY_SIZE(adm_get_parameters),
-		(1+adm_get_parameters[0]),
-		params_length/sizeof(int),
-		adm_get_parameters[0]);
 	}
 	rc = 0;
 adm_get_param_return:
@@ -598,6 +597,9 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			default:
 				pr_err("%s: Unknown Cmd: 0x%x\n", __func__,
 								payload[0]);
+#if defined(CONFIG_SEC_MILLETWIFI_COMMON) || defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+				panic("Q6 ADM Error...\n");
+#endif
 				break;
 			}
 			return 0;
@@ -638,22 +640,16 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 
 			/* payload[3] is the param size, check if payload */
 			/* is big enough and has a valid param size */
-			if ((payload[0] == 0) && (data->payload_size >
-				(4 * sizeof(*payload))) &&
-				(data->payload_size/sizeof(*payload)-4 >=
-				payload[3]) &&
-				(ARRAY_SIZE(adm_get_parameters)-1 >=
-				payload[3])) {
+			if ((data->payload_size > (4 * sizeof(uint32_t))) &&
+				(payload[3] <= ADM_GET_PARAMETER_LENGTH) &&
+				(adm_get_parameters[0] <
+				ARRAY_SIZE(adm_get_parameters))) {
 				adm_get_parameters[0] = payload[3];
-				pr_debug("%s: GET_PP PARAM:received parameter length: 0x%x\n",
-					__func__, adm_get_parameters[0]);
+				pr_debug("GET_PP PARAM:received parameter length: %x\n",
+						adm_get_parameters[0]);
 				/* storing param size then params */
 				for (i = 0; i < payload[3]; i++)
 					adm_get_parameters[1+i] = payload[4+i];
-			} else {
-				adm_get_parameters[0] = -1;
-				pr_err("%s: GET_PP_PARAMS failed, setting size to %d\n",
-					__func__, adm_get_parameters[0]);
 			}
 			atomic_set(&this_adm.copp_stat[index], 1);
 			wake_up(&this_adm.wait[index]);
@@ -670,6 +666,9 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 		default:
 			pr_err("%s: Unknown cmd:0x%x\n", __func__,
 							data->opcode);
+#if defined(CONFIG_SEC_MILLETWIFI_COMMON) || defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+				panic("Q6 ADM Error...\n");
+#endif
 			break;
 		}
 	}
@@ -912,6 +911,7 @@ static void send_adm_cal(int port_id, int path, int perf_mode)
 	else
 		pr_debug("%s: Audvol cal not sent for port id: %#x, path %d\n",
 			__func__, port_id, acdb_path);
+
 }
 
 int adm_map_rtac_block(struct rtac_cal_block_data *cal_block)
@@ -1188,7 +1188,11 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		open.topology_id = topology;
 		if ((open.topology_id == VPM_TX_SM_ECNS_COPP_TOPOLOGY) ||
 			(open.topology_id == VPM_TX_DM_FLUENCE_COPP_TOPOLOGY) ||
-			(open.topology_id == VPM_TX_DM_RFECNS_COPP_TOPOLOGY))
+			(open.topology_id == VPM_TX_DM_RFECNS_COPP_TOPOLOGY) ||
+		   	 (open.topology_id == VPM_TX_SM_LVVE_COPP_TOPOLOGY) ||
+			/* LVVE for Barge-in */
+			(open.topology_id == 0x1000BFF0) ||
+			(open.topology_id == 0x1000BFF1))
 				rate = 16000;
 
 		if (perf_mode == ULTRA_LOW_LATENCY_PCM_MODE) {
@@ -1201,6 +1205,7 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 			    (open.topology_id == SRS_TRUMEDIA_TOPOLOGY_ID))
 				open.topology_id = DEFAULT_COPP_TOPOLOGY;
 		}
+
 		open.dev_num_channel = channel_mode & 0x00FF;
 		open.bit_width = bits_per_sample;
 		WARN_ON(perf_mode == ULTRA_LOW_LATENCY_PCM_MODE &&
@@ -1229,12 +1234,12 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 			open.dev_channel_mapping[3] = PCM_CHANNEL_LB;
 			open.dev_channel_mapping[4] = PCM_CHANNEL_RB;
 		} else if (channel_mode == 6) {
-			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
-			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
-			open.dev_channel_mapping[2] = PCM_CHANNEL_LFE;
-			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
-			open.dev_channel_mapping[4] = PCM_CHANNEL_LS;
-			open.dev_channel_mapping[5] = PCM_CHANNEL_RS;
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FC;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_FR;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[5] = PCM_CHANNEL_LFE;
 		} else if (channel_mode == 8) {
 			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
 			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
@@ -1295,6 +1300,7 @@ fail_cmd:
 
 	return ret;
 }
+
 
 int adm_multi_ch_copp_open(int port_id, int path, int rate, int channel_mode,
 			int topology, int perf_mode, uint16_t bits_per_sample)

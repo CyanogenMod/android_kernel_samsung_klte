@@ -36,6 +36,9 @@ struct hdmi_tx_platform_data {
 	bool primary;
 	struct dss_io_data io[HDMI_TX_MAX_IO];
 	struct dss_module_power power_data[HDMI_TX_MAX_PM];
+#if defined (CONFIG_VIDEO_MHL_V2)
+	bool drm_workaround;
+#endif
 };
 
 struct hdmi_audio {
@@ -95,6 +98,13 @@ struct hdmi_tx_ctrl {
 	void *downstream_data;
 
 	void *feature_data[HDMI_TX_FEAT_MAX];
+#if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
+	int is_power_enabled[HDMI_TX_MAX_PM];
+#endif
 };
 
+#if defined (CONFIG_VIDEO_MHL_V2) || defined (CONFIG_VIDEO_MHL_SII8246)
+void mhl_hpd_handler(bool state);
+int hdmi_hpd_status(void);
+#endif
 #endif /* __MDSS_HDMI_TX_H__ */

@@ -183,6 +183,17 @@ __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 		page = page_cache_alloc_readahead(mapping);
 		if (!page)
 			break;
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+#if 1
+		{
+			extern u64 scfs_lowerpage_alloc_count;
+			if (filp->f_flags & O_SCFSLOWER)
+				scfs_lowerpage_alloc_count++;
+		}
+#endif
+#endif
+
 		page->index = page_offset;
 
 		page->flags |= (1L << PG_readahead);

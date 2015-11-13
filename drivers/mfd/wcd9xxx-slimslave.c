@@ -217,9 +217,9 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	prop.ratem = (rate/4000);
 	prop.sampleszbits = bit_width;
 
-	pr_debug("Before slim_define_ch:\n"
-		 "ch_cnt %d,ch_h[0] %d ch_h[1] %d, grph %d\n",
-		 ch_cnt, ch_h[0], ch_h[1], *grph);
+	pr_info("Before slim_define_ch:\n"
+		"ch_cnt %d,ch_h[0] %d ch_h[1] %d, grph %d sampleszbits %d \n",
+		ch_cnt, ch_h[0], ch_h[1], *grph, bit_width);
 	ret = slim_define_ch(wcd9xxx->slim, &prop, ch_h, ch_cnt,
 			     true, grph);
 	if (ret < 0) {

@@ -81,6 +81,7 @@ enum ngd_status {
 	NGD_LADDR		= 1 << 1,
 };
 
+extern unsigned int system_rev;
 static int ngd_slim_runtime_resume(struct device *device);
 static int ngd_slim_power_up(struct msm_slim_ctrl *dev, bool mdm_restart);
 
@@ -1181,6 +1182,17 @@ static int ngd_notify_slaves(void *data)
 				ret = slim_get_logical_addr(sbdev,
 						sbdev->e_addr,
 						6, &sbdev->laddr);
+#if defined(CONFIG_MACH_KLTE_TMO)
+				if (system_rev == 0xd) {
+					pr_info("%s : system rev = %d\n", __func__, system_rev);
+					if ((ret == -ENXIO) &&
+						((sbdev->e_addr[4] == 0xbe) && (sbdev->e_addr[2] == 0x83))) {
+						pr_info("%s : es704 fail to assign retry to assign the es705\n", __func__);
+						sbdev->e_addr[2] = 0x03;
+						ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &sbdev->laddr);		
+					}
+				}
+#endif
 				if (!ret)
 					break;
 				else /* time for ADSP to assign LA */

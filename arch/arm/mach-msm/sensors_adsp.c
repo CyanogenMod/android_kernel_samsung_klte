@@ -349,10 +349,18 @@ sns_ocmem_send_msg(struct sns_ocmem_hdr_s *hdr, void const *msg_ptr)
 	int rv = 0;
 	int err = 0;
 	void *temp = NULL;
-	int size = sizeof(struct sns_ocmem_hdr_s) + hdr->msg_size;
+	int size = 0;
 
+	if (hdr == NULL) {
+		pr_err("%s: NULL message header\n", __func__);
+		rv = -EINVAL;
+		goto out;
+	}
+
+	size = sizeof(struct sns_ocmem_hdr_s) + hdr->msg_size;
 	temp = kzalloc(sizeof(struct sns_ocmem_hdr_s) + hdr->msg_size,
 			GFP_KERNEL);
+
 	if (temp == NULL) {
 		pr_err("%s: allocation failure\n", __func__);
 		rv = -ENOMEM;
@@ -369,22 +377,17 @@ sns_ocmem_send_msg(struct sns_ocmem_hdr_s *hdr, void const *msg_ptr)
 				__func__, hdr->msg_type, hdr->msg_size,
 				hdr->msg_id, hdr->dst_module, hdr->src_module);
 
-	if (hdr == NULL) {
-		pr_err("%s: NULL message header\n", __func__);
+	if (sns_ctl.smd_ch == NULL) {
+		pr_err("%s: null smd_ch\n", __func__);
 		rv = -EINVAL;
+	}
+	err = smd_write(sns_ctl.smd_ch, temp, size);
+	if (err < 0) {
+		pr_err("%s: smd_write failed %i\n", __func__, err);
+		rv = -ECOMM;
 	} else {
-		if (sns_ctl.smd_ch == NULL) {
-			pr_err("%s: null smd_ch\n", __func__);
-			rv = -EINVAL;
-		}
-		err = smd_write(sns_ctl.smd_ch, temp, size);
-		if (err < 0) {
-			pr_err("%s: smd_write failed %i\n", __func__, err);
-			rv = -ECOMM;
-		} else {
-			pr_debug("%s smd_write successful ret=%d\n",
-				__func__, err);
-		}
+		pr_debug("%s smd_write successful ret=%d\n",
+			__func__, err);
 	}
 
 	kfree(temp);
@@ -1076,11 +1079,32 @@ const struct file_operations sensors_adsp_fops = {
 	.release = sensors_adsp_release,
 	.unlocked_ioctl = sensors_adsp_ioctl,
 };
+#ifdef CONFIG_ADSP_FACTORY
+ struct class* get_adsp_sensor_class( void )
+{
 
+pr_err(" %s:",__func__);
+if (sns_ctl.dev_class == NULL) {
+		sns_ctl.dev_class = class_create(THIS_MODULE, DRV_NAME);
+		if (sns_ctl.dev_class == NULL) {
+			pr_err("%s: class_create fail.\n", __func__);
+	}
+}
+
+return sns_ctl.dev_class;
+}
+
+EXPORT_SYMBOL(get_adsp_sensor_class);
+#endif
 static int sensors_adsp_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-	sns_ctl.dev_class = class_create(THIS_MODULE, CLASS_NAME);
+#ifdef CONFIG_ADSP_FACTORY
+	pr_err("%s:++",__func__);
+	if (sns_ctl.dev_class == NULL) {
+	sns_ctl.dev_class = class_create(THIS_MODULE, DRV_NAME);
+	}
+#endif
 	if (sns_ctl.dev_class == NULL) {
 		pr_err("%s: class_create fail.\n", __func__);
 		goto res_err;

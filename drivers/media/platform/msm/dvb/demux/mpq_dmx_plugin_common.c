@@ -88,7 +88,11 @@ static int mpq_sdmx_scramble_odd = 0x3;
 module_param(mpq_sdmx_scramble_odd, int, S_IRUGO | S_IWUSR);
 
 /* Whether to use secure demux or bypass it. Use for debugging */
+#if defined(CONFIG_MACH_KLTE_DCM)
+static int mpq_bypass_sdmx = 0;
+#else 
 static int mpq_bypass_sdmx = 1;
+#endif /* defined(CONFIG_MACH_KLTE_DCM) */
 module_param(mpq_bypass_sdmx, int, S_IRUGO | S_IWUSR);
 
 /* Max number of TS packets allowed as input for a single sdmx process */
@@ -96,7 +100,11 @@ static int mpq_sdmx_proc_limit = MAX_TS_PACKETS_FOR_SDMX_PROCESS;
 module_param(mpq_sdmx_proc_limit, int, S_IRUGO | S_IWUSR);
 
 /* Debug flag for secure demux process */
+#if defined(CONFIG_MACH_KLTE_DCM)
+static int mpq_sdmx_debug = 1;
+#else 
 static int mpq_sdmx_debug;
+#endif /* defined(CONFIG_MACH_KLTE_DCM) */
 module_param(mpq_sdmx_debug, int, S_IRUGO | S_IWUSR);
 
 /*
@@ -3771,6 +3779,10 @@ static int mpq_sdmx_filter_setup(struct mpq_demux *mpq_demux,
 			MPQ_DVB_ERR_PRINT(
 				"%s: FAILED to set key ladder, ret=%d\n",
 				__func__, ret);
+			#if defined(CONFIG_MACH_KLTE_DCM)
+			ret = -ENODEV;
+			goto sdmx_filter_setup_failed; /* MSM Patch https://www.codeaurora.org/cgit/quic/la//kernel/msm/commit/?id=b188396253321d7de36e45cc30d97e9305e38eed */ 
+			#endif /* defined(CONFIG_MACH_KLTE_DCM) */
 		}
 	}
 

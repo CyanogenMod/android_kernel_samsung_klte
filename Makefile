@@ -345,6 +345,11 @@ KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
 
+ifeq ($(CONFIG_CRYPTO_FIPS),)
+ READELF	= $(CROSS_COMPILE)readelf
+ export READELF
+endif
+
 # Use the wrapper for the compiler.  This wrapper scans for new
 # warnings and causes the build to stop upon encountering them.
 CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
@@ -808,6 +813,10 @@ define rule_vmlinux__
 		/bin/false;                                                  \
 	fi;
 	$(verify_kallsyms)
+
+	$(if $(CONFIG_CRYPTO_FIPS),						
+	@$(kecho) '  FIPS : Generating hmac of crypto and updating vmlinux... ';	
+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/fips_crypto_hmac.sh $(objtree)/vmlinux $(objtree)/System.map)
 endef
 
 

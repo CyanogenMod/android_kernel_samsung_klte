@@ -45,6 +45,7 @@ enum {
 #define HAVE_CBC_DONE 1
 #define HAVE_WCNSS_RX_BUFF_COUNT 1
 #define WLAN_MAC_ADDR_SIZE (6)
+#define CONFIG_WCNSS_REGISTER_DUMP_ON_BITE 1
 
 void wcnss_get_monotonic_boottime(struct timespec *ts);
 struct device *wcnss_wlan_get_device(void);

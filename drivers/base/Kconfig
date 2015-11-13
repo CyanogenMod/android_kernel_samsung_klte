@@ -247,6 +247,13 @@ config CMA
 
 if CMA
 
+config CMA_PAGE_COUNTING
+	bool "CMA page counting"
+	default n
+	help
+	  Counting cma pages in the anonymous & file active/inactive lists
+	  to subtract cma pages when calculating a lmk other_file threshold.
+
 config CMA_DEBUG
 	bool "CMA debug messages (DEVELOPMENT)"
 	depends on DEBUG_KERNEL

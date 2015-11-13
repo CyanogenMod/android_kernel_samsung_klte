@@ -42,6 +42,26 @@
 #define L_MODE V4L2_MPEG_VIDEO_H264_LOOP_FILTER_MODE_DISABLED_AT_SLICE_BOUNDARY
 #define CODING V4L2_MPEG_VIDEO_MPEG4_PROFILE_ADVANCED_CODING_EFFICIENCY
 
+/* Default 601 to 709 conversion coefficients for resolution: 176x144
+ * negative coeffs are converted to s4.9 format
+ * e.g. -22 converted to ((1<<13) - 22)
+ */
+#define MAX_MATRIX_COEFFS 9
+#define MAX_BIAS_COEFFS 3
+#define MAX_LIMIT_COEFFS 6
+/* 3x3 transformation matrix coefficients in s4.9 fixed point format */
+static u32 vpe_csc_601_to_709_matrix_coeff[MAX_MATRIX_COEFFS] = {
+	0x1B9, 0x1FCC, 0x1FA2, 0, 0x1CC, 0x34, 0, 0x22, 0x1CF
+};
+/* offset coefficients in s9 fixed point format */
+static u32 vpe_csc_601_to_709_bias_coeff[MAX_BIAS_COEFFS] = {
+    0x35, 0, 0x4
+};
+/* clamping value for Y/U/V([min,max] for Y/U/V) */
+static u32 vpe_csc_601_to_709_limit_coeff[MAX_LIMIT_COEFFS] = {
+	0x10, 0xEB, 0x10, 0xF0, 0x10, 0xF0
+};
+
 static const char *const mpeg_video_rate_control[] = {
 	"No Rate Control",
 	"VBR VFR",
@@ -1286,7 +1306,7 @@ static inline int venc_v4l2_to_hal(int id, int value)
 		default:
 			goto unknown_value;
 		}
-	/* H263 */
+		/* H263 */
 	case V4L2_CID_MPEG_VIDC_VIDEO_H263_PROFILE:
 		switch (value) {
 		case V4L2_MPEG_VIDC_VIDEO_H263_PROFILE_BASELINE:
@@ -1557,10 +1577,16 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 			case V4L2_CID_MPEG_VIDC_VIDEO_RATE_CONTROL_VBR_CFR:
 				update_ctrl.val =
 					V4L2_MPEG_VIDEO_BITRATE_MODE_VBR;
+				break;
 			case V4L2_CID_MPEG_VIDC_VIDEO_RATE_CONTROL_CBR_VFR:
 			case V4L2_CID_MPEG_VIDC_VIDEO_RATE_CONTROL_CBR_CFR:
 				update_ctrl.val =
 					V4L2_MPEG_VIDEO_BITRATE_MODE_CBR;
+				break;
+			default:
+				dprintk(VIDC_ERR,
+					"Unknown Rate control method (%d)", ctrl->val);
+				break;
 			}
 
 			final_mode = ctrl->val;
@@ -2565,6 +2591,35 @@ int msm_venc_s_parm(struct msm_vidc_inst *inst, struct v4l2_streamparm *a)
 exit:
 	return rc;
 }
+
+int msm_venc_s_csc(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	int count = 0;
+	struct hal_vpe_color_space_conversion vpe_csc;
+
+	dprintk(VIDC_DBG, "%s\n", __func__);
+
+	while (count < MAX_MATRIX_COEFFS) {
+		if (count < MAX_BIAS_COEFFS)
+			vpe_csc.csc_bias[count] =
+				vpe_csc_601_to_709_bias_coeff[count];
+		if (count < MAX_LIMIT_COEFFS)
+			vpe_csc.csc_limit[count] =
+				vpe_csc_601_to_709_limit_coeff[count];
+		vpe_csc.csc_matrix[count] =
+			vpe_csc_601_to_709_matrix_coeff[count];
+		count = count + 1;
+	}
+	rc = msm_comm_try_set_prop(inst,
+			HAL_PARAM_VPE_COLOR_SPACE_CONVERSION, &vpe_csc);
+	if (rc) {
+		dprintk(VIDC_ERR, "%s vpe csc set_prop skip\n",
+					__func__);
+	}
+	return rc;
+}
+
 int msm_venc_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 {
 	struct msm_vidc_format *fmt = NULL;
@@ -2582,6 +2637,10 @@ int msm_venc_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		return -EINVAL;
 	}
 	hdev = inst->core->device;
+
+//	if (msm_vidc_vpe_csc_601_to_709) {
+		msm_venc_s_csc(inst);
+//	}
 
 	if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		fmt = msm_comm_get_pixel_fmt_fourcc(venc_formats,
@@ -2750,13 +2809,13 @@ int msm_venc_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 			if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 				inst->bufq[OUTPUT_PORT].vb2_bufq.
 				plane_sizes[i] =
-				f->fmt.pix_mp.plane_fmt[i].sizeimage;
+			f->fmt.pix_mp.plane_fmt[i].sizeimage;
 			} else if (f->type ==
 				V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 				inst->bufq[CAPTURE_PORT].vb2_bufq.
 				plane_sizes[i] =
 				f->fmt.pix_mp.plane_fmt[i].sizeimage;
-			}
+		}
 		}
 	} else {
 		dprintk(VIDC_ERR,
@@ -3000,8 +3059,20 @@ static struct v4l2_ctrl **get_super_cluster(struct msm_vidc_inst *inst,
 	struct v4l2_ctrl **cluster = kmalloc(sizeof(struct v4l2_ctrl *) *
 			NUM_CTRLS, GFP_KERNEL);
 
+/* MMRND_AVRC. Start */
+// Avoid PREVENT
+#if 1
+        if (!size || !cluster || !inst)
+        {
+                if(cluster)
+                    kfree(cluster); // PREVENT Resource leak fix
+                return NULL;
+        }
+#else
 	if (!size || !cluster || !inst)
 		return NULL;
+#endif
+/* MMRND_AVRC. End */
 
 	for (c = 0; c < NUM_CTRLS; c++)
 		cluster[sz++] =  inst->ctrls[c];
@@ -3093,7 +3164,7 @@ int msm_venc_ctrl_init(struct msm_vidc_inst *inst)
 		dprintk(VIDC_WARN,
 				"Failed to setup super cluster\n");
 		return -EINVAL;
-	}
+		}
 
 	v4l2_ctrl_cluster(cluster_size, inst->cluster);
 

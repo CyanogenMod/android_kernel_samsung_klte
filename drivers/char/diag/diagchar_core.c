@@ -47,6 +47,8 @@
 #include <linux/coresight-stm.h>
 #include <linux/kernel.h>
 
+#include <linux/of.h>
+
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
@@ -80,6 +82,10 @@ static unsigned int threshold_client_limit = 30;
 /* This is the maximum number of pkt registrations supported at initialization*/
 int diag_max_reg = 600;
 int diag_threshold_reg = 750;
+
+#ifdef CONFIG_SAMSUNG_PRODUCT_SHIP
+static int enable_diag;
+#endif
 
 /* Timer variables */
 static struct timer_list drain_timer;
@@ -274,6 +280,11 @@ static int diagchar_close(struct inode *inode, struct file *file)
 
 	if (!driver)
 		return -ENOMEM;
+
+	if(driver->silent_log_pid) {
+		put_pid(driver->silent_log_pid);
+		driver->silent_log_pid = NULL;
+	}
 
 	/* clean up any DCI registrations, if this is a DCI client
 	* This will specially help in case of ungraceful exit of any DCI client
@@ -1087,6 +1098,10 @@ long diagchar_ioctl(struct file *filp,
 		result = 1;
 		break;
 	case DIAG_IOCTL_SWITCH_LOGGING:
+		/*
+		 * Get a pid of diag_mdlog(app) and save it.
+		 */
+		driver->silent_log_pid = get_pid(task_pid(current));
 		result = diag_switch_logging(ioarg);
 		break;
 	case DIAG_IOCTL_REMOTE_DEV:
@@ -1136,6 +1151,26 @@ long diagchar_ioctl(struct file *filp,
 	}
 	return result;
 }
+
+/*
+ * silent_log_panic_handler()
+ * If the silent log is enabled for CP and CP is in
+ * trouble, diag_mdlog (APP) should be terminated before
+ * a panic occurs, since it can flush logs to SD card
+ * when it is over. So, please use this function to termimate it.
+ */
+int silent_log_panic_handler(void)
+{
+	int ret = 0;
+	if(driver && driver->silent_log_pid) {
+		pr_info("%s: killing slient log...\n", __func__);
+		kill_pid(driver->silent_log_pid, SIGTERM, 1);
+		driver->silent_log_pid = NULL;
+		ret = 1;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(silent_log_panic_handler);
 
 static int diagchar_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
@@ -2109,6 +2144,16 @@ void diagfwd_bridge_fn(int type)
 inline void diagfwd_bridge_fn(int type) { }
 #endif
 
+#ifdef CONFIG_SAMSUNG_PRODUCT_SHIP
+static int check_diagchar_enabled(char *str)
+{
+	get_option(&str, &enable_diag);
+	pr_debug("%s : enable_diag = %s\n", __func__, ((enable_diag) ? "Yes":"No"));
+	return 0;
+}
+__setup("diag=", check_diagchar_enabled);
+#endif /* CONFIG_SAMSUNG_PRODUCT_SHIP */
+
 static int __init diagchar_init(void)
 {
 	dev_t dev;
@@ -2116,6 +2161,14 @@ static int __init diagchar_init(void)
 
 	pr_debug("diagfwd initializing ..\n");
 	ret = 0;
+
+#ifdef CONFIG_SAMSUNG_PRODUCT_SHIP
+	if (!enable_diag) {
+		pr_info("diagchar_core isn't enabled.\n");
+		return -EPERM;
+	}
+#endif /* CONFIG_SAMSUNG_PRODUCT_SHIP */
+
 	driver = kzalloc(sizeof(struct diagchar_dev) + 5, GFP_KERNEL);
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
 	diag_bridge = kzalloc(MAX_BRIDGES * sizeof(struct diag_bridge_dev),
@@ -2198,7 +2251,7 @@ static int __init diagchar_init(void)
 			goto fail;
 	} else {
 		printk(KERN_INFO "kzalloc failed\n");
-		goto fail;
+		goto fail2;
 	}
 
 	pr_info("diagchar initialized now");
@@ -2213,6 +2266,8 @@ fail:
 	diag_masks_exit();
 	diag_sdio_fn(EXIT);
 	diagfwd_bridge_fn(EXIT);
+	kfree(driver);
+fail2:
 	return -1;
 }
 
