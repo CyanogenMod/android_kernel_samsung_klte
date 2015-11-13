@@ -215,8 +215,5 @@ CONFIG_RCU_FAST_NO_HZ=y
 #optimize mmc block delay on resume
 CONFIG_MMC_BLOCK_DEFERRED_RESUME=y
 
-# ItsOn Config
-CONFIG_MODULES=y
-
 # SAMP : HOTNESS
 CONFIG_SAMP_HOTNESS=y
