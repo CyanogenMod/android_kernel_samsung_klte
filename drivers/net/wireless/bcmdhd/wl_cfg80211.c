@@ -1164,14 +1164,11 @@ wl_validate_wps_ie(char *wps_ie, s32 wps_ie_len, bool *pbc)
 			WL_DBG(("  attr WPS_ID_CONFIG_METHODS: %x\n", HTON16(val)));
 		} else if (subelt_id == WPS_ID_DEVICE_NAME) {
 			char devname[100];
-			size_t namelen = MIN(subelt_len, sizeof(devname) - 1);
-
-			if (namelen) {
-				memcpy(devname, subel, namelen);
-				devname[namelen] = '\0';
-				WL_DBG(("  attr WPS_ID_DEVICE_NAME: %s (len %u)\n",
-					devname, subelt_len));
-			}
+			size_t namelen = MIN(subelt_len, sizeof(devname));
+			memcpy(devname, subel, namelen);
+			devname[namelen-1] = '\0';
+			WL_DBG(("  attr WPS_ID_DEVICE_NAME: %s (len %u)\n",
+				devname, subelt_len));
 		} else if (subelt_id == WPS_ID_DEVICE_PWD_ID) {
 			valptr[0] = *subel;
 			valptr[1] = *(subel + 1);
@@ -10098,7 +10095,11 @@ wl_notify_sched_scan_results(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 			 * scan request in the form of cfg80211_scan_request. For timebeing, create
 			 * cfg80211_scan_request one out of the received PNO event.
 			 */
-			ssid[i].ssid_len = MIN(DOT11_MAX_SSID_LEN,
+			ssid[i].ssid_len = MIN(DOT11_MAX_SSID_LEN, netinfo->pfnsubnet.SSID_len);
+ 			memcpy(ssid[i].ssid, netinfo->pfnsubnet.SSID, ssid[i].ssid_len);
+ 			request->n_ssids++;
+
+			memcpy(ssid[i].ssid, netinfo->pfnsubnet.SSID,
 				netinfo->pfnsubnet.SSID_len);
 			memcpy(ssid[i].ssid, netinfo->pfnsubnet.SSID,
 				ssid[i].ssid_len);
