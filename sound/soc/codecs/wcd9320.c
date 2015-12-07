@@ -1537,15 +1537,14 @@ static const struct snd_kcontrol_new taiko_2_x_analog_gain_controls[] = {
 			analog_gain),
 };
 
-#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KLTE_KOR)
 extern unsigned int system_rev;
-#endif
+extern unsigned int hardware_type;
 
 static int taiko_hph_impedance_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-#if defined(CONFIG_MACH_KLTE_KOR)
-	if (system_rev >= 13) {
+#ifdef CONFIG_SAMSUNG_JACK
+	if (hardware_type == 1 && system_rev >= 13) {
 		uint32_t zl, zr;
 		bool hphr;
 		struct soc_multi_mixer_control *mc;
@@ -1558,9 +1557,7 @@ static int taiko_hph_impedance_get(struct snd_kcontrol *kcontrol,
 		wcd9xxx_mbhc_get_impedance(&priv->mbhc, &zl, &zr);
 		pr_debug("%s: zl %u, zr %u\n", __func__, zl, zr);
 		ucontrol->value.integer.value[0] = hphr ? zr : zl;
-	}
-#elif defined(CONFIG_MACH_KLTE_JPN)
-	if (system_rev >= 11) {
+	} else if (hardware_type == 2 && system_rev >= 11) {
 		uint32_t zl, zr;
 		bool hphr;
 		struct soc_multi_mixer_control *mc;
@@ -1575,7 +1572,6 @@ static int taiko_hph_impedance_get(struct snd_kcontrol *kcontrol,
 		ucontrol->value.integer.value[0] = hphr ? zr : zl;
 	}
 #else
-#if !defined(CONFIG_SAMSUNG_JACK)
 	uint32_t zl, zr;
 	bool hphr;
 	struct soc_multi_mixer_control *mc;
@@ -1588,7 +1584,6 @@ static int taiko_hph_impedance_get(struct snd_kcontrol *kcontrol,
 	wcd9xxx_mbhc_get_impedance(&priv->mbhc, &zl, &zr);
 	pr_debug("%s: zl %u, zr %u\n", __func__, zl, zr);
 	ucontrol->value.integer.value[0] = hphr ? zr : zl;
-#endif
 #endif
 	ucontrol->value.integer.value[0] = 0;
 	return 0;
@@ -7242,8 +7237,8 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 	else
 		rco_clk_rate = TAIKO_MCLK_CLK_9P6MHZ;
 
-#if defined(CONFIG_MACH_KLTE_KOR)
-	if (system_rev >= 13) {
+#ifdef CONFIG_SAMSUNG_JACK
+	if (hardware_type == 1 && system_rev >= 13) {
 		/* init and start mbhc */
 		ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 					taiko_enable_mbhc_micbias,
@@ -7253,9 +7248,7 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 			pr_err("%s: mbhc init failed %d\n", __func__, ret);
 			goto err_init;
 		}
-	}
-#elif defined(CONFIG_MACH_KLTE_JPN)
-	if (system_rev >= 11) {
+	} else if (hardware_type == 2 && system_rev >= 11) {
 		/* init and start mbhc */
 		ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 					taiko_enable_mbhc_micbias,
@@ -7267,7 +7260,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		}
 	}
 #else
-#if !defined(CONFIG_SAMSUNG_JACK)
 	/* init and start mbhc */
 	ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 				taiko_enable_mbhc_micbias,
@@ -7277,7 +7269,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		goto err_init;
 	}
-#endif
 #endif
 
 	taiko->codec = codec;
@@ -7424,21 +7415,17 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 
 	taiko_cleanup_irqs(taiko);
 
-#if defined(CONFIG_MACH_KLTE_KOR)
-	if (system_rev >= 13) {
+#ifdef CONFIG_SAMSUNG_JACK
+	if (hardware_type == 1 && system_rev >= 13) {
 		/* cleanup MBHC */
 		wcd9xxx_mbhc_deinit(&taiko->mbhc);
-	}
-#elif defined(CONFIG_MACH_KLTE_JPN)
-	if (system_rev >= 11) {
+	} else if (hardware_type == 2 && system_rev >= 11) {
 		/* cleanup MBHC */
 		wcd9xxx_mbhc_deinit(&taiko->mbhc);
 	}
 #else
-#if !defined(CONFIG_SAMSUNG_JACK)
 	/* cleanup MBHC */
 	wcd9xxx_mbhc_deinit(&taiko->mbhc);
-#endif
 #endif
 	/* cleanup resmgr */
 	wcd9xxx_resmgr_deinit(&taiko->resmgr);
