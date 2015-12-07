@@ -95,6 +95,14 @@ unsigned int __atags_pointer __initdata;
 unsigned int system_rev;
 EXPORT_SYMBOL(system_rev);
 
+/*
+ * 0 : kltexx
+ * 1 : klteskt, kltektt, kltelgt
+ * 2 : kltejpn
+ */
+unsigned int hardware_type = 0;
+EXPORT_SYMBOL(hardware_type);
+
 unsigned int system_serial_low;
 EXPORT_SYMBOL(system_serial_low);
 
@@ -599,6 +607,23 @@ static int __init msm_hw_rev_setup(char *p)
 			return 0;
 }
 early_param("samsung.board_rev", msm_hw_rev_setup);
+
+static char __initdata hardware_name[10];
+static int __init msm_hw_name_setup(char *p)
+{
+	strlcpy(hardware_name, p, sizeof(hardware_name));
+
+	if (!strncmp(hardware_name, "SM-G900S", 8) ||
+	    !strncmp(hardware_name, "SM-G900K", 8) ||
+	    !strncmp(hardware_name, "SM-G900L", 8)) {
+		hardware_type = 1;
+	} else if (!strncmp(hardware_name, "SM-G900J", 8)) {
+		hardware_type = 2;
+	}
+
+	return 0;
+}
+early_param("samsung.hardware", msm_hw_name_setup);
 
 static void __init
 setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
