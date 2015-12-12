@@ -809,7 +809,8 @@
 		qcom,sec-auxpcm-gpio-sync = <&msmgpio 80 0>;
 		qcom,sec-auxpcm-gpio-din  = <&msmgpio 81 0>;
 		qcom,sec-auxpcm-gpio-dout = <&msmgpio 82 0>;
-		qcom,micbias-en-msm-gpio = <&msmgpio 123 0>;
+		qcom,micbias-en-msm-gpio = <&pma8084_gpios 7 0>;
+		qcom,micbias-en-msm-jpn-gpio = <&msmgpio 123 0>;
 	};
 
 	spmi_bus: qcom,spmi@fc4c0000 {
