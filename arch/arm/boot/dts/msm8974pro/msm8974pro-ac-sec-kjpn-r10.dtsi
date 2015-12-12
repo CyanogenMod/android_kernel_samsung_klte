@@ -436,6 +436,7 @@
 			"MIC BIAS4 External", "Digital Mic5",
 			"DMIC6", "MIC BIAS3 External",
 			"MIC BIAS3 External", "Third Mic";
+		qcom,micbias-en-msm-gpio = <&msmgpio 123 0>;
 	};
 
 	det_zones: det_zones {

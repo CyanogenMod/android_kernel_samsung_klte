@@ -418,6 +418,7 @@
 	sound {
 		qcom,model = "msm8974-taiko-mtp-snd-card";
 		qcom,cdc-micbias2-headset-only;
+		qcom,micbias-en-msm-gpio = <&msmgpio 123 0>;
 
 		qcom,audio-routing =
 			"RX_BIAS", "MCLK",

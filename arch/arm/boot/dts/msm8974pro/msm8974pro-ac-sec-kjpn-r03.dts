@@ -26,6 +26,12 @@
         /* [31:24] chip-id, [23:16] platform-id, [15:8] national code, [7:0] operator revision, reserved */
 };
 
+&soc {
+	sound {
+		qcom,micbias-en-msm-gpio = <&msmgpio 123 0>;
+	};
+};
+
 &sdhc_1 {
 	qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 192000000 384000000>;
 };
