@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -555,7 +555,6 @@ static const struct intr_data intr_tbl_v2[] = {
 	{WCD9XXX_IRQ_EAR_PA_OCPL_FAULT, false},
 	{WCD9XXX_IRQ_HPH_L_PA_STARTUP, false},
 	{WCD9XXX_IRQ_HPH_R_PA_STARTUP, false},
-	{WCD9320_IRQ_EAR_PA_STARTUP, false},
 	{WCD9XXX_IRQ_RESERVED_0, false},
 	{WCD9XXX_IRQ_RESERVED_1, false},
 	{WCD9XXX_IRQ_MAD_AUDIO, false},
@@ -605,7 +604,7 @@ static int wcd9xxx_device_init(struct wcd9xxx *wcd9xxx)
 				wcd9xxx->codec_type->num_irqs,
 				wcd9xxx_num_irq_regs(wcd9xxx),
 				wcd9xxx_reg_read, wcd9xxx_reg_write,
-				wcd9xxx_bulk_read);
+				wcd9xxx_bulk_read, wcd9xxx_bulk_write);
 
 	if (wcd9xxx_core_irq_init(&wcd9xxx->core_res))
 		goto err;
@@ -1078,13 +1077,13 @@ static int __devinit wcd9xxx_i2c_probe(struct i2c_client *client,
 		if (!pdata) {
 			dev_dbg(&client->dev, "no platform data?\n");
 			ret = -EINVAL;
-			goto fail;
+			goto err_codec;
 		}
 		if (i2c_check_functionality(client->adapter,
 					    I2C_FUNC_I2C) == 0) {
 			dev_dbg(&client->dev, "can't talk I2C?\n");
 			ret = -EIO;
-			goto fail;
+			goto err_codec;
 		}
 		dev_set_drvdata(&client->dev, wcd9xxx);
 		wcd9xxx->dev = &client->dev;
