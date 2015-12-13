@@ -800,6 +800,22 @@ static int wcd9xxx_init_supplies(struct wcd9xxx *wcd9xxx,
 			goto err_get;
 		}
 
+		/* Enabling Codec Buck Voltage to avoid voltage swing from 1.8 - 2.1V during sleep */
+		if(strcmp("cdc-vdd-buck",wcd9xxx->supplies[i].supply) == 0)
+		{
+			ret = regulator_enable(wcd9xxx->supplies[i].consumer);
+			if (ret) {
+				pr_err("%s: Setting regulator voltage failed for "
+					"regulator %s err = %d\n", __func__,
+					wcd9xxx->supplies[i].supply, ret);
+				goto err_get;
+			} else {
+				pr_err("%s: Setting regulator voltage success for "
+					"regulator %s err = %d\n", __func__,
+					wcd9xxx->supplies[i].supply, ret);
+			}
+		}
+
 		ret = regulator_set_optimum_mode(wcd9xxx->supplies[i].consumer,
 						pdata->regulator[i].optimum_uA);
 		if (ret < 0) {
