@@ -251,7 +251,6 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 	struct page *page;
 	nid_t ino;
 	int err = 0;
-	unsigned int root_ino = F2FS_ROOT_INO(F2FS_I_SB(dir));
 
 	if (dentry->d_name.len > F2FS_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
@@ -267,12 +266,6 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 	inode = f2fs_iget(dir->i_sb, ino);
 	if (IS_ERR(inode))
 		return ERR_CAST(inode);
-
-	if ((dir->i_ino == root_ino) && f2fs_has_inline_dots(dir)) {
-		err = __recover_dot_dentries(dir, root_ino);
-		if (err)
-			goto err_out;
-	}
 
 	if (f2fs_has_inline_dots(inode)) {
 		err = __recover_dot_dentries(inode, dir->i_ino);
@@ -423,11 +416,14 @@ err_out:
 	 * If the symlink path is stored into inline_data, there is no
 	 * performance regression.
 	 */
-	if (!err)
+	if (!err) {
 		filemap_write_and_wait_range(inode->i_mapping, 0, p_len - 1);
 
-	if (IS_DIRSYNC(dir))
-		f2fs_sync_fs(sbi->sb, 1);
+		if (IS_DIRSYNC(dir))
+			f2fs_sync_fs(sbi->sb, 1);
+	} else {
+		f2fs_unlink(dir, dentry);
+	}
 
 	kfree(sd);
 	f2fs_fname_crypto_free_buffer(&disk_link);
