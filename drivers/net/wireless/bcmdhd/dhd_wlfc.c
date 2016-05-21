@@ -1,7 +1,7 @@
 /*
  * DHD PROP_TXSTATUS Module.
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_wlfc.c 487328 2014-06-25 12:24:21Z $
+ * $Id: dhd_wlfc.c 587005 2015-09-17 11:26:26Z $
  *
  */
 
@@ -1874,6 +1874,90 @@ _dhd_wlfc_find_mac_desc_id_from_mac(dhd_pub_t *dhdp, uint8* ea)
 }
 
 static int
+dhd_wlfc_suppressed_acked_update(dhd_pub_t *dhd, uint16 hslot, uint8 prec, uint8 hcnt)
+{
+	athost_wl_status_info_t* ctx;
+	wlfc_mac_descriptor_t* entry = NULL;
+	struct pktq *pq;
+	struct pktq_prec *q;
+	void *p, *b;
+
+	if (!dhd) {
+		DHD_ERROR(("%s: dhd(%p)\n", __FUNCTION__, dhd));
+		return BCME_BADARG;
+	}
+	ctx = (athost_wl_status_info_t*)dhd->wlfc_state;
+	if (!ctx) {
+		DHD_ERROR(("%s: ctx(%p)\n", __FUNCTION__, ctx));
+		return BCME_ERROR;
+	}
+
+	ASSERT(hslot < (WLFC_MAC_DESC_TABLE_SIZE + WLFC_MAX_IFNUM + 1));
+
+	if (hslot < WLFC_MAC_DESC_TABLE_SIZE)
+		entry  = &ctx->destination_entries.nodes[hslot];
+	else if (hslot < (WLFC_MAC_DESC_TABLE_SIZE + WLFC_MAX_IFNUM))
+		entry = &ctx->destination_entries.interfaces[hslot - WLFC_MAC_DESC_TABLE_SIZE];
+	else
+		entry = &ctx->destination_entries.other;
+
+	pq = &entry->psq;
+
+	ASSERT(((prec << 1) + 1) < pq->num_prec);
+
+	q = &pq->q[((prec << 1) + 1)];
+
+	b = NULL;
+	p = q->head;
+
+	while (p && (hcnt != WL_TXSTATUS_GET_FREERUNCTR(DHD_PKTTAG_H2DTAG(PKTTAG(p))))) {
+		b = p;
+		p = PKTLINK(p);
+	}
+
+	if (p == NULL) {
+		/* none is matched */
+		if (b) {
+			DHD_ERROR(("%s: can't find matching seq(%d)\n", __FUNCTION__, hcnt));
+		} else {
+			DHD_ERROR(("%s: queue is empty\n", __FUNCTION__));
+		}
+
+		return BCME_ERROR;
+	}
+
+	if (!b) {
+		/* head packet is matched */
+		if ((q->head = PKTLINK(p)) == NULL) {
+			q->tail = NULL;
+		}
+	} else {
+		/* middle packet is matched */
+		PKTSETLINK(b, PKTLINK(p));
+		if (PKTLINK(p) == NULL) {
+			q->tail = b;
+		}
+	}
+
+	q->len--;
+	pq->len--;
+	ctx->pkt_cnt_in_q[DHD_PKTTAG_IF(PKTTAG(p))][prec]--;
+	ctx->pkt_cnt_per_ac[prec]--;
+
+	PKTSETLINK(p, NULL);
+
+	if (WLFC_GET_AFQ(dhd->wlfc_mode)) {
+		_dhd_wlfc_enque_afq(ctx, p);
+	} else {
+		_dhd_wlfc_hanger_pushpkt(ctx->hanger, p, hslot);
+	}
+
+	entry->transit_count++;
+
+	return BCME_OK;
+}
+
+static int
 _dhd_wlfc_compressed_txstatus_update(dhd_pub_t *dhd, uint8* pkt_info, uint8 len, void** p_mac)
 {
 	uint8 status_flag;
@@ -1924,6 +2008,10 @@ _dhd_wlfc_compressed_txstatus_update(dhd_pub_t *dhd, uint8* pkt_info, uint8 len,
 		wlfc->stats.wlc_tossed_pkts += len;
 	}
 
+	else if (status_flag == WLFC_CTL_PKTFLAG_SUPPRESS_ACKED) {
+		wlfc->stats.pkt_freed += len;
+	}
+
 	if (dhd->proptxstatus_txstatus_ignore) {
 		if (!remove_from_hanger) {
 			DHD_ERROR(("suppress txstatus: %d\n", status_flag));
@@ -1932,6 +2020,9 @@ _dhd_wlfc_compressed_txstatus_update(dhd_pub_t *dhd, uint8* pkt_info, uint8 len,
 	}
 
 	while (count < len) {
+		if (status_flag == WLFC_CTL_PKTFLAG_SUPPRESS_ACKED) {
+			dhd_wlfc_suppressed_acked_update(dhd, hslot, fifo_id, hcnt);
+		}
 		if (WLFC_GET_AFQ(dhd->wlfc_mode)) {
 			ret = _dhd_wlfc_deque_afq(wlfc, hslot, hcnt, fifo_id, &pktbuf);
 		} else {
@@ -2504,7 +2595,9 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 	}
 
 	/* allocate space to track txstatus propagated from firmware */
-	dhd->wlfc_state = MALLOC(dhd->osh, sizeof(athost_wl_status_info_t));
+	dhd->wlfc_state = DHD_OS_PREALLOC(dhd, DHD_PREALLOC_DHD_WLFC_INFO,
+			sizeof(athost_wl_status_info_t));
+
 	if (dhd->wlfc_state == NULL) {
 		rc = BCME_NOMEM;
 		goto exit;
@@ -2521,7 +2614,8 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 	if (!WLFC_GET_AFQ(dhd->wlfc_mode)) {
 		wlfc->hanger = _dhd_wlfc_hanger_create(dhd->osh, WLFC_HANGER_MAXITEMS);
 		if (wlfc->hanger == NULL) {
-			MFREE(dhd->osh, dhd->wlfc_state, sizeof(athost_wl_status_info_t));
+			DHD_OS_PREFREE(dhd, DHD_PREALLOC_DHD_WLFC_INFO,
+				dhd->wlfc_state, sizeof(athost_wl_status_info_t));
 			dhd->wlfc_state = NULL;
 			rc = BCME_NOMEM;
 			goto exit;
@@ -3335,7 +3429,8 @@ dhd_wlfc_deinit(dhd_pub_t *dhd)
 
 
 	/* free top structure */
-	MFREE(dhd->osh, dhd->wlfc_state, sizeof(athost_wl_status_info_t));
+	DHD_OS_PREFREE(dhd, DHD_PREALLOC_DHD_WLFC_INFO,
+		dhd->wlfc_state, sizeof(athost_wl_status_info_t));
 	dhd->wlfc_state = NULL;
 	dhd->proptxstatus_mode = hostreorder ?
 		WLFC_ONLY_AMPDU_HOSTREORDER : WLFC_FCMODE_NONE;

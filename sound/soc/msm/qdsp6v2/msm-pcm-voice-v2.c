@@ -602,7 +602,7 @@ static int msm_sec_dha_put(struct snd_kcontrol *kcontrol,
 	|| defined(CONFIG_MACH_KLTE_CMCCDUOS) || defined(CONFIG_MACH_KLTE_CUDUOS) \
 	|| defined(CONFIG_MACH_MEGA23GEUR_OPEN)  || defined(CONFIG_MACH_MS01_EUR_3G) \
 	|| defined(CONFIG_MACH_MEGA2LTE_KTT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN) \
-	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART)
+	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART) || defined(CONFIG_MACH_KLTE_LTNDUOS)
 	uint32_t session_id = ucontrol->value.integer.value[14];
 #endif
 	short dha_param[12] = {0,};
@@ -615,7 +615,7 @@ static int msm_sec_dha_put(struct snd_kcontrol *kcontrol,
 	|| defined(CONFIG_MACH_KLTE_CMCCDUOS) || defined(CONFIG_MACH_KLTE_CUDUOS) \
 	|| defined(CONFIG_MACH_MEGA23GEUR_OPEN) || defined(CONFIG_MACH_MS01_EUR_3G) \
 	|| defined(CONFIG_MACH_MEGA2LTE_KTT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN) \
-	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART)
+	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART) || defined(CONFIG_MACH_KLTE_LTNDUOS)
 	pr_info("%s: session_id=%#x\n", __func__, session_id);
 	return voice_sec_set_dha_data(session_id,
 		dha_mode, dha_select, dha_param);
@@ -653,7 +653,7 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 	|| defined(CONFIG_MACH_KLTE_CMCCDUOS) || defined(CONFIG_MACH_KLTE_CUDUOS) \
 	|| defined(CONFIG_MACH_MEGA23GEUR_OPEN) || defined(CONFIG_MACH_MS01_EUR_3G) \
 	|| defined(CONFIG_MACH_MEGA2LTE_KTT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN) \
-	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART)
+	|| defined(CONFIG_MACH_MS01_EUR_LTE) || defined(CONFIG_MACH_MS01_KOR_LTE) || defined(CONFIG_DSDA_VIA_UART) || defined(CONFIG_MACH_KLTE_LTNDUOS)
 	SOC_SINGLE_MULTI_EXT("Sec Set DHA data", SND_SOC_NOPM, 0, VSID_MAX, 0, 15,
 				msm_sec_dha_get, msm_sec_dha_put),
 #else

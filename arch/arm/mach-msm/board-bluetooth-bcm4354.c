@@ -50,30 +50,39 @@
 #if defined(CONFIG_MACH_K3GDUOS_CTC)
 #define BT_HOST_WAKE_REV01 73
 #endif
-#define BT_HOST_WAKE 75
 
 #if defined(CONFIG_SEC_S_PROJECT)
 // general gpio
 #define BT_EN_GENERAL_GPIO
 #define GPIO_BT_EN 31
 #define BT_WAKE 91
+#define BT_HOST_WAKE 75
 #elif defined(CONFIG_MACH_CHAGALL_KDI)
 #define BT_EN_GENERAL_GPIO
 #define GPIO_BT_EN 63
 #define BT_WAKE 9
-#elif defined(CONFIG_MACH_KLIMT_VZW) || defined(CONFIG_MACH_CHAGALL)
+#define BT_HOST_WAKE 75
+#elif defined(CONFIG_MACH_KLIMT_VZW) || defined(CONFIG_MACH_CHAGALL) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 // general gpio
 #define BT_EN_GENERAL_GPIO
 #define GPIO_BT_EN 42
 #define BT_WAKE 41
+#define BT_HOST_WAKE 75
 #elif defined(CONFIG_SEC_PATEK_PROJECT)
 #define BT_EN_GENERAL_GPIO
 #define GPIO_BT_EN 25
 #define BT_WAKE 91
+#define BT_HOST_WAKE 75
+#elif defined(CONFIG_MACH_KACTIVELTE_KOR)
+#define BT_EN_PMIC_GPIO
+#define GPIO_BT_EN 0
+#define BT_WAKE 91
+#define BT_HOST_WAKE 18
 #else
 //HLTE Rev0.5 gpio expander
 #define GPIO_BT_EN 309
 #define BT_WAKE 91
+#define BT_HOST_WAKE 75
 #endif
 
 
@@ -88,11 +97,17 @@
 
 static struct rfkill *bt_rfkill;
 static int cnt = 0;
+static int gpio_bt_en = GPIO_BT_EN;
 
 static int gpio_bt_host_wake = GPIO_BT_HOST_WAKE;
 #if defined(CONFIG_MACH_K3GDUOS_CTC)
 extern unsigned int system_rev;
 #endif
+
+static struct of_device_id bt_power_match_table[] = {
+	{	.compatible = "bcm,bcm4354" },
+		{}
+};
 
 int get_gpio_hwrev(int gpio)
 {
@@ -195,7 +210,7 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
     pr_err("[BT] %s, gpio_bt_host_wake = %d", __func__, gpio_bt_host_wake);
 
     if (!blocked) {
-        pr_err("[BT] Bluetooth Power On.\n");
+        pr_err("[BT] Bluetooth Power On.(%d)\n", gpio_bt_en);
 
         gpio_set_value(get_gpio_hwrev(BT_WAKE), 1);
 
@@ -212,7 +227,7 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
         }
 #endif
 
-        ret = gpio_direction_output(GPIO_BT_EN, 1);
+        ret = gpio_direction_output(gpio_bt_en, 1);
         if (ret)
             pr_err("[BT] failed to set BT_EN.\n");
     } else {
@@ -225,9 +240,9 @@ static int bcm4354_bt_rfkill_set_power(void *data, bool blocked)
                     __func__, bt_uart_off_table[pin], rc);
         }
 #endif
-        pr_err("[BT] Bluetooth Power Off.\n");
+        pr_err("[BT] Bluetooth Power Off.(%d)\n", gpio_bt_en);
 
-        ret = gpio_direction_output(GPIO_BT_EN, 0);
+        ret = gpio_direction_output(gpio_bt_en, 0);
   	    if (ret)
             pr_err("[BT] failed to set BT_EN.\n");
 
@@ -266,17 +281,28 @@ static int bcm4354_bluetooth_probe(struct platform_device *pdev)
 #ifdef BT_UART_CFG
     int pin = 0;
 #endif
-    rc = gpio_request(GPIO_BT_EN, "bt_en");
+
+#ifdef BT_EN_PMIC_GPIO
+    if (pdev->dev.of_node) {
+        gpio_bt_en = of_get_named_gpio(pdev->dev.of_node,
+                        "bcm,bt-en-gpio", 0);
+        if (gpio_bt_en < 0) {
+            pr_err("[BT] %s:gpio_bt_en(%d) not provided in device tree", __func__, gpio_bt_en);
+            return gpio_bt_en;
+        }
+    }
+#endif
+    rc = gpio_request(gpio_bt_en, "bt_en");
     if (rc)
     {
-        pr_err("[BT] %s: gpio_request for GPIO_BT_EN is failed", __func__);
-        gpio_free(GPIO_BT_EN);
+        pr_err("[BT] %s: gpio_request for gpio_bt_en is failed", __func__);
+        gpio_free(gpio_bt_en);
     }
 
 #ifdef BT_EN_GENERAL_GPIO
-    gpio_tlmm_config(GPIO_CFG(GPIO_BT_EN, 0, GPIO_CFG_OUTPUT,
+    gpio_tlmm_config(GPIO_CFG(gpio_bt_en, 0, GPIO_CFG_OUTPUT,
         GPIO_CFG_PULL_DOWN, GPIO_CFG_8MA), GPIO_CFG_ENABLE);
-    gpio_set_value(GPIO_BT_EN, 0);
+    gpio_set_value(gpio_bt_en, 0);
 #endif
 
     /* temporailiy set HOST_WAKE OUT direction until FPGA work finishs */
@@ -329,7 +355,7 @@ static int bcm4354_bluetooth_remove(struct platform_device *pdev)
     rfkill_unregister(bt_rfkill);
     rfkill_destroy(bt_rfkill);
 
-    gpio_free(get_gpio_hwrev(GPIO_BT_EN));
+    gpio_free(get_gpio_hwrev(gpio_bt_en));
     gpio_free(get_gpio_hwrev(BT_WAKE));
 
 	cnt = 0;
@@ -342,6 +368,7 @@ static struct platform_driver bcm4354_bluetooth_platform_driver = {
     .driver = {
         .name = "bcm4354_bluetooth",
         .owner = THIS_MODULE,
+        .of_match_table = bt_power_match_table,
     },
 };
 

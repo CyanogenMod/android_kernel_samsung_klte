@@ -770,6 +770,10 @@ int msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			rc = -EFAULT;
 			break;
 		}
+		if(gpio_config.gpio_name < SENSOR_GPIO_RESET || gpio_config.gpio_name >= SENSOR_GPIO_MAX) {
+			rc = -EINVAL;
+			break;
+		}
 		pr_info("%s: setting gpio: %d to %d\n", __func__,
 			data->gpio_conf->gpio_num_info->gpio_num[gpio_config.gpio_name],
 			gpio_config.config_val);

@@ -1811,6 +1811,14 @@ int cyttsp5_samsung_factory_probe(struct device *dev)
 	dev_dbg(dev, "%s sfd->factory_dev->devt=%d\n",
 		__func__, sfd->factory_dev->devt);
 
+	rc = sysfs_create_link(&sfd->factory_dev->kobj,
+		&cd->md.input->dev.kobj, "input");
+	if (rc < 0) {
+		dev_err(sfd->dev,
+			"%s: Failed to create input symbolic link\n",
+			__func__);
+	}
+
 	rc = sysfs_create_group(&sfd->factory_dev->kobj,
 		&sec_touch_factory_attr_group);
 	if (rc) {

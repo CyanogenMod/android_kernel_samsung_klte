@@ -40,8 +40,11 @@
 #define MXT_N_PROJECT_FIRMWARE_NAME	"mXT1664S_n.fw"
 #elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) && defined(CONFIG_MACH_MATISSELTE_ATT)
 #define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1188S_att.fw"
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) && defined(CONFIG_MACH_MATISSELTE_VZW)
+#define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1188S_vzw.fw"
 #elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S)
 #define MXT_V_PROJECT_FIRMWARE_NAME	"mXT1188S.fw"
+#define MXT_V_1664S_PROJECT_FIRMWARE_NAME	"mXT1664S.fw"
 #endif
 
 #define MXT_FIRMWARE_INKERNEL_PATH	"tsp_atmel/"
@@ -56,6 +59,15 @@
 
 #define MXT_SW_RESET_TIME		300	/* msec */
 #define MXT_HW_RESET_TIME		80	/* msec */
+
+#if defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+#define USE_DUAL_X_MODE 1
+#define CHECK_IN_BOOTLOADER
+#define MXT_CHECK_1664S_BOOT_ID         0x14
+#define MXT_CHECK_1188S1_BOOT_ID        0x1D
+#else
+#define USE_DUAL_X_MODE 0
+#endif
 
 enum {
 	MXT_RESERVED_T0 = 0,
@@ -327,7 +339,11 @@ enum {
 #define DATA_PER_NODE	2
 
 #define REF_OFFSET_VALUE	16384
+#if defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+#define REF_MIN_VALUE		(19584 - REF_OFFSET_VALUE)
+#else
 #define REF_MIN_VALUE		(19744 - REF_OFFSET_VALUE)
+#endif
 #define REF_MAX_VALUE		(28884 - REF_OFFSET_VALUE)
 
 #define TSP_CMD_STR_LEN			32
@@ -644,8 +660,6 @@ struct mxt_data {
 	bool report_dummy_key;
 	bool ignore_menu_key;
 	bool ignore_back_key;
-	bool ignore_menu_key_by_back;
-	bool ignore_back_key_by_menu;
 	bool threshold_cmd_reversed;
 	int setdata;
 #endif

@@ -74,6 +74,12 @@ static int sdcardfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 		goto out;
 	}
 
+	if (dentry == lower_dentry) {
+		err = 0;
+		panic("sdcardfs: dentry is equal to lower_dentry\n");
+		goto out;
+	}
+
 	if (dentry < lower_dentry) {
 		spin_lock(&dentry->d_lock);
 		spin_lock(&lower_dentry->d_lock);

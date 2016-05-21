@@ -47,9 +47,9 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Unknown", "Battery", "UPS", "Mains", "USB",
 		"USB_DCP", "USB_CDP", "USB_ACA",
 		"BMS", "MISC", "Wireless", "CARDOCK", "UARTOFF", "OTG",
-		"LAN_HUB", "MHL_500", "MHL_900", "MHL_1500", "MHL_2000",
-		"MHL_USB", "MHL_USB_100", "SMART_OTG", "SMART_NOTG", "POWER_SHARING",
-		"HV_Prepare_Mains", "HV_Err", "HV_Unknown", "HV_Mains", "POGO"
+		"LAN_HUB", "MHL_500", "MHL_900", "MHL_1500", "MHL_USB", "SMART_OTG",
+		"SMART_NOTG", "POWER_SHARING", "HV_Mains", "POGO", "MHL_2000",
+		"MHL_USB_100", "HV_Prepare_Mains", "HV_Err", "HV_Unknown", "MDOCK_TA", "MDOCK_USB"
 	};
 	static char *status_text[] = {
 		"Unknown", "Charging", "Discharging", "Not charging", "Full"

@@ -87,6 +87,10 @@
 #define USBIN_AICL_BIT		BIT(2)
 
 #define CFG_E_REG			0x0E
+#define	HVDCP_ADAPTER_MASK		SMB135X_MASK(5, 4)
+#define HVDCP_ADAPTER_5V		0x00
+#define HVDCP_ADAPTER_9V		BIT(4)
+#define HVDCP_ENABLE_BIT		BIT(3)
 #define POLARITY_100_500_BIT		BIT(2)
 #define USB_CTRL_BY_PIN_BIT		BIT(1)
 #define USB_DUAL_STATE_BIT		BIT(0)
@@ -174,9 +178,9 @@
 #define DC_SHUTDOWN_BIT			BIT(5)
 #define USE_REGISTER_FOR_CURRENT	BIT(2)
 #define USB_100_500_AC_MASK		SMB135X_MASK(1, 0)
-#define USB_100_VAL			0x01
 #define USB_500_VAL			0x00
-#define USB_AC_VAL			0x02
+#define USB_100_VAL			0x02
+#define USB_AC_VAL			0x01
 
 #define CMD_CHG_REG			0x42
 #define CMD_CHG_EN_MASK			BIT(1)

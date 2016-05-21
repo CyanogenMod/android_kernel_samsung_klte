@@ -23,18 +23,24 @@
 
 #define ADC_SAMPLING_CNT	7
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 //#ifndef SSRM_TEST
 //#define SSRM_TEST
 //#endif
 #endif
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM)
 #if defined(CONFIG_ARCH_MSM8974PRO)
 #define FLASH_THERM_CH	LR_MUX9_PU1_AMUX_THM5
 #else
 #define FLASH_THERM_CH	LR_MUX9_PU2_AMUX_THM5
 #endif
+#elif defined(CONFIG_MACH_KLIMT_LTE_DCM)
+#define FLASH_THERM_CH	LR_MUX5_PU2_AMUX_THM2
 #endif
 
 #if defined(CONFIG_ARCH_MSM8974PRO)
@@ -50,7 +56,9 @@ struct sec_therm_info {
 
 	int curr_temperature;
 	int curr_temp_adc;
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM)|| defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	int curr_temperature_flash_led;
 	int curr_temp_adc_flash_led;
 #endif
@@ -59,7 +67,9 @@ struct sec_therm_info {
 static int sec_therm_get_adc_data(struct sec_therm_info *info);
 static int convert_adc_to_temper(struct sec_therm_info *info, unsigned int adc);
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static int sec_therm_get_adc_data_flash_led(struct sec_therm_info *info);
 #endif
 
@@ -111,7 +121,9 @@ static ssize_t sec_therm_show_temp_adc(struct device *dev,
 	return sprintf(buf, "%d\n", adc);
 }
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static ssize_t sec_therm_show_temperature_flash_led(struct device *dev,
 				   struct device_attribute *attr,
 				   char *buf)
@@ -152,7 +164,9 @@ static DEVICE_ATTR(temperature, S_IRUGO, sec_therm_show_temperature, NULL);
 #endif
 static DEVICE_ATTR(temp_adc, S_IRUGO, sec_therm_show_temp_adc, NULL);
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static DEVICE_ATTR(temperature_flash, S_IRUGO, sec_therm_show_temperature_flash_led, NULL);
 static DEVICE_ATTR(temp_adc_flash, S_IRUGO, sec_therm_show_temp_adc_flash_led, NULL);
 #endif
@@ -160,7 +174,9 @@ static DEVICE_ATTR(temp_adc_flash, S_IRUGO, sec_therm_show_temp_adc_flash_led, N
 static struct attribute *sec_therm_attributes[] = {
 	&dev_attr_temperature.attr,
 	&dev_attr_temp_adc.attr,
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	&dev_attr_temperature_flash.attr,
 	&dev_attr_temp_adc_flash.attr,
 #endif
@@ -217,7 +233,9 @@ err:
 
 }
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static int sec_therm_get_adc_data_flash_led(struct sec_therm_info *info)
 {
 	int rc = 0;
@@ -368,14 +386,18 @@ static void notify_change_of_temperature(struct sec_therm_info *info)
 {
 	char temp_buf[20];
 	char siop_buf[20];
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	char *envp[4];
 #else
 	char *envp[3];
 #endif
 	int env_offset = 0;
 	int siop_level = -1;
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	char temp_buf_flash[20];
 
 
@@ -417,7 +439,9 @@ static void sec_therm_polling_work(struct work_struct *work)
 		container_of(work, struct sec_therm_info, polling_work.work);
 	int adc;
 	int temper;
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	int temper_flash;
 	int adc_flash;
 #endif
@@ -431,7 +455,9 @@ static void sec_therm_polling_work(struct work_struct *work)
 	temper = convert_adc_to_temper(info, adc);
 	dev_info(info->dev, "%s: temper=%d\n", __func__, temper);
 
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
+	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
+	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	adc_flash = sec_therm_get_adc_data_flash_led(info);
 	dev_info(info->dev, "%s: adc_flash=%d\n", __func__, adc_flash);
 

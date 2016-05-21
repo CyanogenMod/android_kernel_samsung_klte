@@ -22,13 +22,18 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/err.h>
+#include <linux/input.h>
+#include "sensors_core.h"
 #ifdef CONFIG_ADSP_FACTORY
 #include <linux/kernel.h>
 #endif
+
 struct class *sensors_class;
 struct class *sensors_event_class;
 static struct device *symlink_dev;
 static atomic_t sensor_count;
+static struct device *sensor_dev;
+static struct input_dev *meta_input_dev;
 
 struct axis_remap {
 	int src_x:3;
@@ -158,6 +163,32 @@ void sensors_remove_symlink(struct kobject *target, const char *name)
 		sysfs_delete_link(&symlink_dev->kobj, target, name);
 }
 
+static ssize_t set_flush(struct device *dev, struct device_attribute *attr,
+	const char *buf, size_t size)
+{
+	int64_t dTemp;
+	u8 sensor_type = 0;
+
+	if (kstrtoll(buf, 10, &dTemp) < 0)
+		return -EINVAL;
+
+	sensor_type = (u8)dTemp;
+
+	input_report_rel(meta_input_dev, REL_DIAL, 1);
+	input_report_rel(meta_input_dev, REL_HWHEEL, sensor_type + 1);
+	input_sync(meta_input_dev);
+
+	pr_info("[SENSOR] flush %d\n", sensor_type);
+	return size;
+}
+
+static DEVICE_ATTR(flush, S_IWUSR | S_IWGRP, NULL, set_flush);
+
+static struct device_attribute *sensor_attr[] = {
+	&dev_attr_flush,
+	NULL,
+};
+
 static void set_sensor_attr(struct device *dev,
 		struct device_attribute *attributes[])
 {
@@ -165,7 +196,7 @@ static void set_sensor_attr(struct device *dev,
 
 	for (i = 0; attributes[i] != NULL; i++)
 		if ((device_create_file(dev, attributes[i])) < 0)
-			pr_err("[SENSOR CORE] fail device_create_file"\
+			pr_err("[SENSOR CORE] device_create_file failed"\
 				"(dev, attributes[%d])\n", i);
 }
 
@@ -183,7 +214,7 @@ int sensors_register(struct device *dev, void *drvdata,
 	dev = device_create(sensors_class, NULL, 0, drvdata, "%s", name);
 	if (IS_ERR(dev)) {
 		ret = PTR_ERR(dev);
-		pr_err("[SENSORS CORE] device_create failed![%d]\n", ret);
+		pr_err("[SENSORS CORE] device_create failed for %s [%d]\n", name, ret);
 		return ret;
 	}
 
@@ -204,18 +235,60 @@ void sensors_unregister(struct device *dev,
 
 void destroy_sensor_class(void)
 {
-#ifdef CONFIG_ADSP_FACTORY
 	if (sensors_class) {
+		if (sensor_dev) {
+			device_destroy(sensors_class, sensor_dev->devt);
+			sensor_dev = NULL;
+		}
 		class_destroy(sensors_class);
 		sensors_class = NULL;
 	}
-#endif
+
 	if (sensors_event_class) {
 		device_destroy(sensors_event_class, symlink_dev->devt);
 		class_destroy(sensors_event_class);
 		symlink_dev = NULL;
 		sensors_event_class = NULL;
 	}
+}
+
+int sensors_meta_init(void)
+{
+	int ret;
+
+	meta_input_dev = input_allocate_device();
+	if (!meta_input_dev) {
+		pr_err("[SENSOR CORE] failed alloc meta dev\n");
+		return -ENOMEM;
+	}
+
+	meta_input_dev->name = "meta_event";
+	input_set_capability(meta_input_dev, EV_REL, REL_HWHEEL);
+	input_set_capability(meta_input_dev, EV_REL, REL_DIAL);
+
+	ret = input_register_device(meta_input_dev);
+	if (ret < 0) {
+		pr_err("[SENSOR CORE] failed register meta dev\n");
+		input_free_device(meta_input_dev);
+	}
+
+	ret = sensors_create_symlink(&meta_input_dev->dev.kobj,
+		meta_input_dev->name);
+	if (ret < 0) {
+		pr_err("[SENSOR CORE] failed create meta symlink\n");
+		input_unregister_device(meta_input_dev);
+		input_free_device(meta_input_dev);
+	}
+
+	return ret;
+}
+
+void sensors_meta_clean(void)
+{
+	sensors_remove_symlink(&meta_input_dev->dev.kobj,
+		meta_input_dev->name);
+	input_unregister_device(meta_input_dev);
+	input_free_device(meta_input_dev);
 }
 
 #ifdef CONFIG_ADSP_FACTORY
@@ -257,15 +330,27 @@ static int __init sensors_class_init(void)
 		return PTR_ERR(symlink_dev);
 	}
 
+	/* Creating sensor_dev for flush sysfs node */
+	sensors_register(sensor_dev, NULL, sensor_attr, "sensor_dev");
+
 	atomic_set(&sensor_count, 0);
 	sensors_class->dev_uevent = NULL;
+
+	sensors_meta_init();
 
 	return 0;
 }
 
 static void __exit sensors_class_exit(void)
 {
+	if (meta_input_dev)
+		sensors_meta_clean();
+
 	if (sensors_class || sensors_event_class) {
+		if (sensor_dev) {
+			device_destroy(sensors_class, sensor_dev->devt);
+			sensor_dev = NULL;
+		}
 		class_destroy(sensors_class);
 		sensors_class = NULL;
 		class_destroy(sensors_event_class);

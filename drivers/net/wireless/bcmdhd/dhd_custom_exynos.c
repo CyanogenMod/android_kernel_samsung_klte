@@ -1,7 +1,7 @@
 /*
  * Platform Dependent file for Samsung Exynos
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_custom_exynos.c 489763 2014-07-08 02:05:45Z $
+ * $Id: dhd_custom_exynos.c 605818 2015-12-11 15:14:08Z $
  */
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -46,19 +46,31 @@
 #include <linux/platform_device.h>
 #include <linux/wlan_plat.h>
 
+#if !defined(CONFIG_ARCH_SWA100)&& !defined(CONFIG_MACH_UNIVERSAL7580)
 #include <mach/gpio.h>
+#endif /* !CONFIG_ARCH_SWA100 && !CONFIG_MACH_UNIVERSAL7580 */
+
+#ifndef CONFIG_ARCH_SWA100
 #include <mach/irqs.h>
 #include <linux/sec_sysfs.h>
+#endif /* not CONFIG_ARCH_SWA100 */
 
 #include <plat/gpio-cfg.h>
 
+#ifdef CONFIG_MACH_A7LTE
+#define PINCTL_DELAY 150
+#endif /* CONFIG_MACH_A7LTE */
 #ifdef CONFIG_BROADCOM_WIFI_RESERVED_MEM
 
 #define WLAN_STATIC_SCAN_BUF0		5
 #define WLAN_STATIC_SCAN_BUF1		6
 #define WLAN_STATIC_DHD_INFO_BUF	7
+#define WLAN_STATIC_DHD_WLFC_INFO	8
+#define WLAN_STATIC_DHD_LOG_DUMP_BUF	9
 #define WLAN_SCAN_BUF_SIZE		(64 * 1024)
-#define WLAN_DHD_INFO_BUF_SIZE	(16 * 1024)
+#define WLAN_DHD_INFO_BUF_SIZE			(24 * 1024)
+#define WLAN_STATIC_DHD_WLFC_INFO_SIZE		(64 * 1024)
+
 #define PREALLOC_WLAN_SEC_NUM		4
 #define PREALLOC_WLAN_BUF_NUM		160
 #define PREALLOC_WLAN_SECTION_HEADER	24
@@ -74,9 +86,10 @@
 #define DHD_SKB_4PAGE_BUFSIZE	((PAGE_SIZE*4)-DHD_SKB_HDRSIZE)
 
 #define WLAN_SKB_BUF_NUM	17
+#define DHD_LOG_DUMP_BUF_SIZE	(1024 * 1024)
 
 #if defined(CONFIG_ARGOS)
-extern int argos_irq_affinity_setup(unsigned int irq, int dev_num,
+extern int argos_irq_affinity_setup_label(unsigned int irq, const char *label,
                  struct cpumask *affinity_cpu_mask,
                  struct cpumask *default_cpu_mask);
 #endif /* CONFIG_ARGOS */
@@ -94,9 +107,11 @@ static struct wlan_mem_prealloc wlan_mem_array[PREALLOC_WLAN_SEC_NUM] = {
 	{NULL, (WLAN_SECTION_SIZE_3 + PREALLOC_WLAN_SECTION_HEADER)}
 };
 
-void *wlan_static_scan_buf0;
-void *wlan_static_scan_buf1;
-void *wlan_static_dhd_info_buf;
+void *wlan_static_scan_buf0 = NULL;
+void *wlan_static_scan_buf1 = NULL;
+void *wlan_static_dhd_info_buf = NULL;
+void *wlan_static_dhd_wlfc_buf = NULL;
+void *wlan_static_dhd_log_dump_buf = NULL;
 
 static void *dhd_wlan_mem_prealloc(int section, unsigned long size)
 {
@@ -117,6 +132,25 @@ static void *dhd_wlan_mem_prealloc(int section, unsigned long size)
 			return NULL;
 		}
 		return wlan_static_dhd_info_buf;
+	}
+
+	if (section == WLAN_STATIC_DHD_WLFC_INFO)  {
+		if (size > WLAN_STATIC_DHD_WLFC_INFO_SIZE) {
+			pr_err("request DHD_WLFC_INFO size(%lu) is bigger than"
+				" static size(%d).\n",
+				size, WLAN_STATIC_DHD_WLFC_INFO_SIZE);
+			return NULL;
+		}
+		return wlan_static_dhd_wlfc_buf;
+	}
+
+	if (section == WLAN_STATIC_DHD_LOG_DUMP_BUF) {
+		if (size > DHD_LOG_DUMP_BUF_SIZE) {
+			pr_err("request DHD_LOG_DUMP_BUF size(%lu) is bigger then"
+				" static size(%d).\n", size, DHD_LOG_DUMP_BUF_SIZE);
+			return NULL;
+		}
+		return wlan_static_dhd_log_dump_buf;
 	}
 
 	if ((section < 0) || (section > PREALLOC_WLAN_SEC_NUM))
@@ -169,6 +203,17 @@ static int dhd_init_wlan_mem(void)
 	if (!wlan_static_dhd_info_buf)
 		goto err_mem_alloc;
 
+	wlan_static_dhd_wlfc_buf = kmalloc(WLAN_STATIC_DHD_WLFC_INFO_SIZE, GFP_KERNEL);
+	if (!wlan_static_dhd_wlfc_buf) {
+		goto err_mem_alloc;
+	}
+
+	wlan_static_dhd_log_dump_buf = kmalloc(DHD_LOG_DUMP_BUF_SIZE, GFP_KERNEL);
+	if (!wlan_static_dhd_log_dump_buf) {
+		pr_err("Failed to alloc wlan_static_dhd_log_dump_buf\n");
+		goto err_mem_alloc;
+	}
+
 	pr_err("%s: WIFI MEM Allocated\n", __FUNCTION__);
 	return 0;
 
@@ -180,6 +225,10 @@ err_mem_alloc:
 		kfree(wlan_static_scan_buf1);
 	if (wlan_static_dhd_info_buf)
 		kfree(wlan_static_dhd_info_buf);
+	if (wlan_static_dhd_wlfc_buf)
+		kfree(wlan_static_dhd_wlfc_buf);
+	if (wlan_static_dhd_log_dump_buf)
+		kfree(wlan_static_dhd_log_dump_buf);
 
 	for (j = 0; j < i; j++)
 		kfree(wlan_mem_array[j].mem_ptr);
@@ -198,12 +247,32 @@ err_skb_alloc:
 static struct device *wlan_dev;
 static int wlan_pwr_on = -1;
 static int wlan_host_wake_irq = 0;
+#ifdef CONFIG_MACH_A7LTE
+extern struct device *mmc_dev_for_wlan;
+#endif /* CONFIG_MACH_A7LTE */
+#ifdef CONFIG_MACH_UNIVERSAL3475
+extern struct mmc_host *wlan_mmc;
+extern void mmc_ctrl_power(struct mmc_host *host, bool onoff);
+#endif /* CONFIG_MACH_UNIVERSAL3475 */
 
 static int dhd_wlan_power(int onoff)
 {
+#ifdef CONFIG_MACH_A7LTE
+	struct pinctrl *pinctrl = NULL;
+#endif /* CONFIG_MACH_A7LTE */
+
 	printk(KERN_INFO"------------------------------------------------");
 	printk(KERN_INFO"------------------------------------------------\n");
 	printk(KERN_INFO"%s Enter: power %s\n", __FUNCTION__, onoff ? "on" : "off");
+
+#ifdef CONFIG_MACH_A7LTE
+	if (onoff) {
+		pinctrl = devm_pinctrl_get_select(mmc_dev_for_wlan, "sdio_wifi_on");
+		if (IS_ERR(pinctrl))
+			printk(KERN_INFO "%s WLAN SDIO GPIO control error\n", __FUNCTION__);
+		msleep(PINCTL_DELAY);
+	}
+#endif /* CONFIG_MACH_A7LTE */
 
 	if (gpio_direction_output(wlan_pwr_on, onoff)) {
 		printk(KERN_ERR "%s failed to control WLAN_REG_ON to %s\n",
@@ -211,6 +280,17 @@ static int dhd_wlan_power(int onoff)
 		return -EIO;
 	}
 
+#ifdef CONFIG_MACH_A7LTE
+	if (!onoff) {
+		pinctrl = devm_pinctrl_get_select(mmc_dev_for_wlan, "sdio_wifi_off");
+		if (IS_ERR(pinctrl))
+			printk(KERN_INFO "%s WLAN SDIO GPIO control error\n", __FUNCTION__);
+	}
+#endif /* CONFIG_MACH_A7LTE */
+#ifdef CONFIG_MACH_UNIVERSAL3475
+	if (wlan_mmc)
+		mmc_ctrl_power(wlan_mmc, onoff);
+#endif /* CONFIG_MACH_UNIVERSAL3475 */
 	return 0;
 }
 
@@ -235,15 +315,39 @@ static int dhd_wlan_set_carddetect(int val)
 	return 0;
 }
 
+int dhd_get_system_rev(void)
+{
+	const char *wlan_node = "samsung,brcm-wlan";
+	struct device_node *root_node = NULL;
+	unsigned int base_system_rev_for_nv = 0;
+	int ret;
+
+	root_node = of_find_compatible_node(NULL, NULL, wlan_node);
+	if (!root_node) {
+		printk(KERN_ERR "couldn't get root node\n");
+		return -ENODEV;
+	}
+
+	ret = of_property_read_u32(root_node, "base_system_rev_for_nv",
+			&base_system_rev_for_nv);
+	if (ret) {
+		printk(KERN_INFO "couldn't get base_system_rev_for_nv\n");
+		return -ENODEV;
+	}
+
+	return base_system_rev_for_nv;
+}
+
 int __init dhd_wlan_init_gpio(void)
 {
 	const char *wlan_node = "samsung,brcm-wlan";
 	unsigned int wlan_host_wake_up = -1;
 	struct device_node *root_node = NULL;
 
+#ifndef CONFIG_ARCH_SWA100
 	wlan_dev = sec_device_create(NULL, "wlan");
 	BUG_ON(!wlan_dev);
-
+#endif /* not CONFIG_ARCH_SWA100 */
 	root_node = of_find_compatible_node(NULL, NULL, wlan_node);
 	if (!root_node) {
 		WARN(1, "failed to get device node of bcm4354\n");
@@ -263,8 +367,9 @@ int __init dhd_wlan_init_gpio(void)
 	}
 	gpio_direction_output(wlan_pwr_on, 0);
 	gpio_export(wlan_pwr_on, 1);
+#ifndef CONFIG_ARCH_SWA100
 	gpio_export_link(wlan_dev, "WLAN_REG_ON", wlan_pwr_on);
-
+#endif /* not CONFIG_ARCH_SWA100 */
 	/* ========== WLAN_HOST_WAKE ============ */
 	wlan_host_wake_up = of_get_gpio(root_node, 1);
 	if (!gpio_is_valid(wlan_host_wake_up)) {
@@ -278,8 +383,9 @@ int __init dhd_wlan_init_gpio(void)
 	}
 	gpio_direction_input(wlan_host_wake_up);
 	gpio_export(wlan_host_wake_up, 1);
+#ifndef CONFIG_ARCH_SWA100
 	gpio_export_link(wlan_dev, "WLAN_HOST_WAKE", wlan_host_wake_up);
-
+#endif /* not CONFIG_ARCH_SWA100 */
 	wlan_host_wake_irq = gpio_to_irq(wlan_host_wake_up);
 
 	return 0;
@@ -289,31 +395,35 @@ int __init dhd_wlan_init_gpio(void)
 void set_cpucore_for_interrupt(cpumask_var_t default_cpu_mask,
 	cpumask_var_t affinity_cpu_mask) {
 #if defined(CONFIG_MACH_UNIVERSAL5430)
-	argos_irq_affinity_setup(IRQ_SPI(226), 2, affinity_cpu_mask, default_cpu_mask);
-	argos_irq_affinity_setup(IRQ_SPI(2), 2, affinity_cpu_mask, default_cpu_mask);
+	argos_irq_affinity_setup_label(IRQ_SPI(226), "WIFI", affinity_cpu_mask, default_cpu_mask);
+	argos_irq_affinity_setup_label(IRQ_SPI(2), "WIFI", affinity_cpu_mask, default_cpu_mask);
 #endif
 }
 #endif /* CONFIG_ARGOS */
 
-void interrupt_set_cpucore(int set)
+void interrupt_set_cpucore(int set, unsigned int dpc_cpucore, unsigned int primary_cpucore)
 {
 	printk(KERN_INFO "%s: set: %d\n", __FUNCTION__, set);
 	if (set)
 	{
 #if defined(CONFIG_MACH_UNIVERSAL5422)
-		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(DPC_CPUCORE));
-		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(DPC_CPUCORE));
+		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(dpc_cpucore));
+		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(dpc_cpucore));
 #elif defined(CONFIG_MACH_UNIVERSAL5430)
-		irq_set_affinity(IRQ_SPI(226), cpumask_of(DPC_CPUCORE));
-		irq_set_affinity(IRQ_SPI(2), cpumask_of(DPC_CPUCORE));
+		irq_set_affinity(IRQ_SPI(226), cpumask_of(dpc_cpucore));
+		irq_set_affinity(IRQ_SPI(2), cpumask_of(dpc_cpucore));
+#elif defined(CONFIG_MACH_UNIVERSAL7580)
+		irq_set_affinity(IRQ_SPI(246), cpumask_of(dpc_cpucore));
 #endif
 	} else {
 #if defined(CONFIG_MACH_UNIVERSAL5422)
-		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(PRIMARY_CPUCORE));
-		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(PRIMARY_CPUCORE));
+		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(primary_cpucore));
+		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(primary_cpucore));
 #elif defined(CONFIG_MACH_UNIVERSAL5430)
-		irq_set_affinity(IRQ_SPI(226), cpumask_of(PRIMARY_CPUCORE));
-		irq_set_affinity(IRQ_SPI(2), cpumask_of(PRIMARY_CPUCORE));
+		irq_set_affinity(IRQ_SPI(226), cpumask_of(primary_cpucore));
+		irq_set_affinity(IRQ_SPI(2), cpumask_of(primary_cpucore));
+#elif defined(CONFIG_MACH_UNIVERSAL7580)
+		irq_set_affinity(IRQ_SPI(246), cpumask_of(primary_cpucore));
 #endif
 	}
 }
@@ -351,7 +461,7 @@ int __init dhd_wlan_init(void)
 	dhd_wlan_resources.end = wlan_host_wake_irq;
 
 #ifdef CONFIG_BROADCOM_WIFI_RESERVED_MEM
-	dhd_init_wlan_mem();
+	ret = dhd_init_wlan_mem();
 #endif
 
 	return ret;

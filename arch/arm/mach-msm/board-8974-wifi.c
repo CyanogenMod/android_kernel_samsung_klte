@@ -19,8 +19,17 @@
 #define WLAN_STATIC_SCAN_BUF0		5
 #define WLAN_STATIC_SCAN_BUF1		6
 #define WLAN_STATIC_DHD_INFO_BUF	7
-#define WLAN_SCAN_BUF_SIZE		(64 * 1024)
+#define WLAN_STATIC_DHD_WLFC_BUF	8
+#define WLAN_SCAN_BUF_SIZE		(128 * 1024)
+
+#if defined(CONFIG_64BIT)
+#define WLAN_DHD_INFO_BUF_SIZE  (24 * 1024)
+#else
 #define WLAN_DHD_INFO_BUF_SIZE	(16 * 1024)
+#endif /* CONFIG_64BIT */
+
+#define WLAN_DHD_WLFC_BUF_SIZE	(64 * 1024)
+
 #define PREALLOC_WLAN_SEC_NUM		4
 #define PREALLOC_WLAN_BUF_NUM		160
 #define PREALLOC_WLAN_SECTION_HEADER	24
@@ -54,12 +63,20 @@ static struct wlan_mem_prealloc wlan_mem_array[PREALLOC_WLAN_SEC_NUM] = {
 void *wlan_static_scan_buf0;
 void *wlan_static_scan_buf1;
 void *wlan_static_dhd_info_buf;
+void *wlan_static_dhd_wlfc_buf;
 
 #if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
 #define ENABLE_4335BT_WAR
 #endif
 
-#ifdef ENABLE_4335BT_WAR
+#if defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE)
+#ifdef CONFIG_SEC_H_PROJECT
+#define ENABLE_4339BT_WAR
+bool b0rev = 1;
+#endif
+#endif
+
+#if defined(ENABLE_4335BT_WAR) || defined(ENABLE_4339BT_WAR)
 static int bt_off = 0;
 extern int bt_is_running;
 #endif /* ENABLE_4335BT_WAR */
@@ -79,6 +96,10 @@ enum {
 };
 #endif /* defined(CONFIG_SEC_KS01_PROJECT) */
 
+#ifdef CONFIG_SEC_H_PROJECT
+#define FPGA_GPIO_BT_EN 42
+#endif
+
 static void *brcm_wlan_mem_prealloc(int section, unsigned long size)
 {
 	if (section == PREALLOC_WLAN_SEC_NUM)
@@ -96,6 +117,14 @@ static void *brcm_wlan_mem_prealloc(int section, unsigned long size)
 			return NULL;
 		}
 		return wlan_static_dhd_info_buf;
+	}
+
+	if (section == WLAN_STATIC_DHD_WLFC_BUF)  {
+		if (size > WLAN_DHD_WLFC_BUF_SIZE) {
+			pr_err("request DHD_WLFC size(%lu) is bigger than static size(%d).\n", size, WLAN_DHD_WLFC_BUF_SIZE);
+			return NULL;
+		}
+		return wlan_static_dhd_wlfc_buf;
 	}
 
 	if ((section < 0) || (section > PREALLOC_WLAN_SEC_NUM))
@@ -148,6 +177,10 @@ static int brcm_init_wlan_mem(void)
 	if (!wlan_static_dhd_info_buf)
 		goto err_mem_alloc;
 
+	wlan_static_dhd_wlfc_buf = kmalloc(WLAN_DHD_WLFC_BUF_SIZE, GFP_KERNEL);
+	if (!wlan_static_dhd_wlfc_buf)
+		goto err_mem_alloc;
+
 	printk(KERN_INFO"%s: WIFI MEM Allocated\n", __func__);
 	return 0;
 
@@ -176,7 +209,11 @@ static int brcm_init_wlan_mem(void)
 
 /* MSM8974 WLAN_EN GPIO Number */
 #if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || defined(CONFIG_SEC_KSPORTS_PROJECT)
+#if defined(CONFIG_MACH_KACTIVELTE_KOR)
+int GPIO_WL_REG_ON = 431;
+#else
 #define GPIO_WL_REG_ON 308
+#endif
 #elif defined(CONFIG_SEC_PATEK_PROJECT)
 #define GPIO_WL_REG_ON 26
 #elif defined(CONFIG_SEC_S_PROJECT)
@@ -244,6 +281,13 @@ int __init brcm_wifi_init_gpio(void)
 	unsigned gpio_cfg = GPIO_CFG(get_gpio_wl_host_wake(), 0, GPIO_CFG_INPUT,
 		GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA);
 
+#if defined(CONFIG_MACH_KACTIVELTE_KOR)
+	if ( system_rev < 3 ) {
+		GPIO_WL_REG_ON = 308;
+		printk("WLAN: %s: GPIO_WL_REG_ON = %d \n", __func__, GPIO_WL_REG_ON);
+	}
+#endif /* defined(CONFIG_MACH_KACTIVELTE_KOR) */
+
 #if !defined(CONFIG_SEC_KS01_PROJECT) && !defined(CONFIG_SEC_JACTIVE_PROJECT)
 #if !defined(CONFIG_SEC_K_PROJECT) && !defined(CONFIG_SEC_KACTIVE_PROJECT) && !defined(CONFIG_SEC_PATEK_PROJECT)
 	if (gpio_tlmm_config(config_gpio_wl_reg_on[0], GPIO_CFG_ENABLE))
@@ -304,24 +348,18 @@ static int brcm_wlan_power(int onoff)
 	printk(KERN_INFO"%s Enter: power %s\n", __func__, onoff ? "on" : "off");
 
 	if (onoff) {
-#ifdef ENABLE_4335BT_WAR
-		if(b0rev == true && ice_gpiox_get(FPGA_GPIO_BT_EN) == 0)
+#if defined(ENABLE_4335BT_WAR) || defined(ENABLE_4339BT_WAR)
+		if(b0rev == true && gpio_get_value(FPGA_GPIO_BT_EN) == 0)
 		{
 			bt_off = 1;
-			ice_gpiox_set(FPGA_GPIO_BT_EN, 1);
+			gpio_direction_output(FPGA_GPIO_BT_EN, 1);
 			printk("[brcm_wlan_power] Bluetooth Power On.\n");
 			msleep(50);
 		}
 		else {
 			bt_off = 0;
 		}
-#endif /* ENABLE_4335BT_WAR */
-		/*
-		if (gpio_request(GPIO_WL_REG_ON, "WL_REG_ON"))
-		{
-			printk("Failed to request for WL_REG_ON\n");
-		}
-		*/
+#endif
 
 #if defined(CONFIG_SEC_KS01_PROJECT) || defined(CONFIG_SEC_JACTIVE_PROJECT)
 		if (ice_gpiox_set(FPGA_GPIO_WLAN_EN, 1)) {
@@ -386,10 +424,10 @@ static int brcm_wlan_power(int onoff)
 		printk(KERN_INFO"WL_REG_ON off-step-2 : [%d]\n" , gpio_get_value(GPIO_WL_REG_ON));
 #endif
 	}
-#ifdef ENABLE_4335BT_WAR
+#if defined(ENABLE_4335BT_WAR) || defined(ENABLE_4339BT_WAR)
 	if(onoff && (bt_off == 1) && (bt_is_running == 0)) {
 		msleep(100);
-		ice_gpiox_set(FPGA_GPIO_BT_EN, 0);
+		gpio_direction_output(FPGA_GPIO_BT_EN, 0);
 		printk("[brcm_wlan_power] BT_REG_OFF.\n");
 	}
 #endif
@@ -565,4 +603,8 @@ int __init brcm_wlan_init(void)
 	return platform_device_register(&brcm_device_wlan);
 #endif
 }
+#if defined(CONFIG_DEFERRED_INITCALLS)
+deferred_initcall(brcm_wlan_init);
+#else
 device_initcall(brcm_wlan_init);
+#endif

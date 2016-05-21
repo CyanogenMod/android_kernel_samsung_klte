@@ -337,8 +337,26 @@ config SAMSUNG_BATTERY_DISALLOW_DEEP_SLEEP
 	  Say Y to include support
 	  Disallow deep sleep during charging for stablity.
 
+config DISABLE_SAVE_CAPACITY_MAX
+	bool "Disable to save capacity max in efs"
+	default n
+	depends on BATTERY_SAMSUNG
+	help
+	  Say Y to include support to disable it
+	  capacity_max is saved in /efs/Battery/batt_capacity_max
+	  capacity_max is restored after boot up
+	  You can find the code in healthd
+
 config EN_OOPS
 	bool "enable oops filter"
 	default n
 	help
 	  Say Y to enable oops filter
+
+# OTG
+
+config CONTROL_OTG_POPUP
+	bool "OTG Popup control for waterproof models"
+	default n
+	help
+	  Say Y here to enable support for OTG Popup control

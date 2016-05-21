@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2011 - 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2011 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 
@@ -13,8 +13,8 @@
 
 struct DebugStrbuf
 {
-  int offset;
-  char buffer[DEBUG_STRBUF_SIZE];
+    int offset;
+    char buffer[DEBUG_STRBUF_SIZE];
 };
 
 typedef struct DebugStrbuf DegugStrbuf;

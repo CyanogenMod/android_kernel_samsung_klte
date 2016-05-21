@@ -77,6 +77,11 @@
 #define GPIO_BT_UART_RXD BT_UART_RXD
 #define GPIO_BT_UART_TXD BT_UART_TXD
 #define GPIO_BT_HOST_WAKE BT_HOST_WAKE
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE)
+int bt_is_running=0;
+#endif
+
+EXPORT_SYMBOL(bt_is_running);
 
 static struct rfkill *bt_rfkill;
 
@@ -178,6 +183,9 @@ static int bcm4339_bt_rfkill_set_power(void *data, bool blocked)
 #endif
 
         gpio_set_value(get_gpio_hwrev(BT_EN), 1);
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE)
+			bt_is_running = 1;
+#endif
     } else {
 #ifdef BT_UART_CFG
         for (pin = 0; pin < ARRAY_SIZE(bt_uart_off_table); pin++) {
@@ -192,6 +200,9 @@ static int bcm4339_bt_rfkill_set_power(void *data, bool blocked)
 
         gpio_set_value(get_gpio_hwrev(BT_EN), 0);
 		gpio_set_value(get_gpio_hwrev(BT_WAKE), 0);
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE)
+			bt_is_running = 0;
+#endif
     }
     return 0;
 }
@@ -249,6 +260,9 @@ static int bcm4339_bluetooth_probe(struct platform_device *pdev)
 
 #ifdef BT_UART_CFG
     int pin = 0;
+#endif
+#if defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE) || defined(CONFIG_BCM4339) || defined(CONFIG_BCM4339_MODULE)
+	bt_is_running = 0;
 #endif
     rc = gpio_request(get_gpio_hwrev(BT_EN), "bcm4339_bten_gpio");
     if (unlikely(rc)) {

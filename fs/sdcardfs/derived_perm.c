@@ -30,12 +30,12 @@ static void inherit_derived_state(struct inode *parent, struct inode *child)
 	ci->userid = pi->userid;
 	ci->d_uid = pi->d_uid;
 	ci->d_gid = pi->d_gid;
-	ci->d_mode = pi->d_mode;
+	ci->under_android = pi->under_android;
 }
 
 /* helper function for derived state */
 void setup_derived_state(struct inode *inode, perm_t perm,
-                        userid_t userid, uid_t uid, gid_t gid, mode_t mode)
+                        userid_t userid, uid_t uid, gid_t gid, bool under_android)
 {
 	struct sdcardfs_inode_info *info = SDCARDFS_I(inode);
 	
@@ -43,7 +43,7 @@ void setup_derived_state(struct inode *inode, perm_t perm,
 	info->userid = userid;
 	info->d_uid = uid;
 	info->d_gid = gid;
-	info->d_mode = mode;
+	info->under_android = under_android;
 }
 
 void get_derived_permission(struct dentry *parent, struct dentry *dentry)
@@ -51,6 +51,9 @@ void get_derived_permission(struct dentry *parent, struct dentry *dentry)
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 	struct sdcardfs_inode_info *info = SDCARDFS_I(dentry->d_inode);
 	struct sdcardfs_inode_info *parent_info= SDCARDFS_I(parent->d_inode);
+#ifdef CONFIG_SDP
+	struct sdcardfs_dentry_info *parent_dinfo = SDCARDFS_D(parent);
+#endif
 	appid_t appid;
 
 	/* By default, each inode inherits from its parent. 
@@ -66,67 +69,41 @@ void get_derived_permission(struct dentry *parent, struct dentry *dentry)
 	//printk(KERN_INFO "sdcardfs: derived: %s, %s, %d\n", parent->d_name.name,
 	//				dentry->d_name.name, parent_info->perm);
 
-	if (sbi->options.derive == DERIVE_NONE) {
-		return;
-	}
-
 	/* Derive custom permissions based on parent and current node */
 	switch (parent_info->perm) {
 		case PERM_INHERIT:
 			/* Already inherited above */
 			break;
-		case PERM_LEGACY_PRE_ROOT:
+		case PERM_PRE_ROOT:
 			/* Legacy internal layout places users at top level */
 			info->perm = PERM_ROOT;
 			info->userid = simple_strtoul(dentry->d_name.name, NULL, 10);
+#ifdef CONFIG_SDP
+			if(parent_dinfo->under_knox && (parent_dinfo->userid >= 0)) {
+				info->userid = parent_dinfo->userid;
+			}
+#endif
 			break;
 		case PERM_ROOT:
 			/* Assume masked off by default. */
-			info->d_mode = 00770;
 			if (!strcasecmp(dentry->d_name.name, "Android")) {
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID;
-				info->d_mode = 00771;
-			} else if (sbi->options.split_perms) {
-				if (!strcasecmp(dentry->d_name.name, "DCIM")
-					|| !strcasecmp(dentry->d_name.name, "Pictures")) {
-					info->d_gid = AID_SDCARD_PICS;
-				} else if (!strcasecmp(dentry->d_name.name, "Alarms")
-						|| !strcasecmp(dentry->d_name.name, "Movies")
-						|| !strcasecmp(dentry->d_name.name, "Music")
-						|| !strcasecmp(dentry->d_name.name, "Notifications")
-						|| !strcasecmp(dentry->d_name.name, "Podcasts")
-						|| !strcasecmp(dentry->d_name.name, "Ringtones")) {
-					info->d_gid = AID_SDCARD_AV;
-				}
-            } else if (!strcasecmp(dentry->d_name.name, "knox")) {
-				info->perm = PERM_ANDROID_KNOX;
-				info->d_gid = AID_SDCARD_R;
-				info->d_mode = 00771;
+				info->under_android = true;
 			}
 			break;
 		case PERM_ANDROID:
 			if (!strcasecmp(dentry->d_name.name, "data")) {
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID_DATA;
-				info->d_mode = 00771;
 			} else if (!strcasecmp(dentry->d_name.name, "obb")) {
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID_OBB;
-				info->d_mode = 00771;
 				// FIXME : this feature will be implemented later.
 				/* Single OBB directory is always shared */
 			} else if (!strcasecmp(dentry->d_name.name, "media")) {
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID_MEDIA;
-				info->d_mode = 00771;
-			} else if (!strcasecmp(dentry->d_name.name, "user")) {
-				/* User directories must only be accessible to system, protected
-				 * by sdcard_all. Zygote will bind mount the appropriate user-
-				 * specific path. */
-				info->perm = PERM_ANDROID_USER;
-				info->d_gid = AID_SDCARD_ALL;
-				info->d_mode = 00770;
 			}
 			break;
 		/* same policy will be applied on PERM_ANDROID_DATA 
@@ -138,56 +115,49 @@ void get_derived_permission(struct dentry *parent, struct dentry *dentry)
 			if (appid != 0) {
 				info->d_uid = multiuser_get_uid(parent_info->userid, appid);
 			}
-			info->d_mode = 00770;
-			break;
-		case PERM_ANDROID_USER:
-			/* Root of a secondary user */
-			info->perm = PERM_ROOT;
-			info->userid = simple_strtoul(dentry->d_name.name, NULL, 10);
-			info->d_gid = AID_SDCARD_R;
-			info->d_mode = 00771;
-			break;
-
-        /** KNOX permission */
-		case PERM_ANDROID_KNOX:
-			info->perm = PERM_ANDROID_KNOX_USER;
-			info->userid = simple_strtoul(dentry->d_name.name, NULL, 10);
-			info->d_gid = AID_SDCARD_R;
-			info->d_mode = 00771;
-			break;
-
-		case PERM_ANDROID_KNOX_USER:
-			if (!strcasecmp(dentry->d_name.name, "Android")) {
-				info->perm = PERM_ANDROID_KNOX_ANDROID;
-				info->d_mode = 00771;
-			}
-			break;
-               case PERM_ANDROID_KNOX_ANDROID:
-			if (!strcasecmp(dentry->d_name.name, "data")) {
-				info->perm = PERM_ANDROID_KNOX_DATA;
-				info->d_mode = 00771;
-			} else if (!strcasecmp(dentry->d_name.name, "shared")) {
-				info->perm = PERM_ANDROID_KNOX_SHARED;
-				info->d_gid = AID_SDCARD_RW;
-				info->d_uid = multiuser_get_uid(parent_info->userid, 0);
-				info->d_mode = 00777;
-			}
-			break;
-
-		case PERM_ANDROID_KNOX_SHARED:
-			break;
-
-		case PERM_ANDROID_KNOX_DATA:
-			appid = get_appid(sbi->pkgl_id, dentry->d_name.name);
-			if (appid != 0) {
-				info->d_uid = multiuser_get_uid(parent_info->userid, appid);
-			} else {
-				info->d_uid = multiuser_get_uid(parent_info->userid, 0);
-			}
-			info->d_mode = 00770;
 			break;
 	}
 } 
+
+/* set vfs_inode from sdcardfs_inode */
+void fix_derived_permission(struct inode *inode) {
+	struct sdcardfs_inode_info *info = SDCARDFS_I(inode);
+	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(inode->i_sb);
+	struct sdcardfs_mount_options *opts = &sbi->options;
+	mode_t visible_mode;
+	mode_t owner_mode;
+	mode_t filtered_mode;
+
+	inode->i_uid = info->d_uid;
+
+	if (info->d_gid == AID_SDCARD_RW) {
+        /* As an optimization, certain trusted system components only run
+         * as owner but operate across all users. Since we're now handing
+         * out the sdcard_rw GID only to trusted apps, we're okay relaxing
+         * the user boundary enforcement for the default view. The UIDs
+         * assigned to app directories are still multiuser aware. */
+		inode->i_gid = AID_SDCARD_RW;
+	} else {
+		inode->i_gid = multiuser_get_uid(info->userid, info->d_gid);
+	}
+
+	visible_mode = 00775 & ~opts->mask;
+	if (info->perm == PERM_PRE_ROOT) {
+        /* Top of multi-user view should always be visible to ensure
+         * secondary users can traverse inside. */
+		visible_mode = 00711;
+	} else if (info->under_android) {
+		if (info->d_gid == AID_SDCARD_RW) {
+			visible_mode = visible_mode & ~00006;
+		} else {
+			visible_mode = visible_mode & ~00007;
+		}
+	}
+
+	owner_mode = inode->i_mode & 0700;
+	filtered_mode = visible_mode & (owner_mode | (owner_mode >> 3) | (owner_mode >> 6));
+	inode->i_mode = ((inode->i_mode & S_IFMT) | filtered_mode); 
+}
 
 /* main function for updating derived permission */
 inline void update_derived_permission(struct dentry *dentry)
@@ -222,13 +192,9 @@ int need_graft_path(struct dentry *dentry)
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 
 	if(parent_info->perm == PERM_ANDROID && 
-			!strcasecmp(dentry->d_name.name, "obb")) {
-
-		/* /Android/obb is the base obbpath of DERIVED_UNIFIED */
-		if(!(sbi->options.derive == DERIVE_UNIFIED 
-				&& parent_info->userid == 0)) {
-			ret = 1;
-		}
+			!strcasecmp(dentry->d_name.name, "obb") &&
+			sbi->options.multi_user) {
+		ret = 1;
 	}
 	dput(parent);
 	return ret;
@@ -282,18 +248,15 @@ int is_base_obbpath(struct dentry *dentry)
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 
 	spin_lock(&SDCARDFS_D(dentry)->lock); 
-	/* DERIVED_LEGACY */
-	if(parent_info->perm == PERM_LEGACY_PRE_ROOT && 
+	/* if multi_user is true */
+	if(sbi->options.multi_user && parent_info->perm == PERM_PRE_ROOT && 
 			!strcasecmp(dentry->d_name.name, "obb")) {
 		ret = 1;
 	} 
-	/* DERIVED_UNIFIED :/Android/obb is the base obbpath */
-	else if (parent_info->perm == PERM_ANDROID && 
+	/* if multi_user is false, /Android/obb is the base obbpath */
+	else if (!sbi->options.multi_user && parent_info->perm == PERM_ANDROID && 
 			!strcasecmp(dentry->d_name.name, "obb")) {
-		if((sbi->options.derive == DERIVE_UNIFIED 
-				&& parent_info->userid == 0)) {
-			ret = 1;
-		}
+		ret = 1;
 	}
 	spin_unlock(&SDCARDFS_D(dentry)->lock); 
 	dput(parent);
@@ -334,5 +297,3 @@ int setup_obb_dentry(struct dentry *dentry, struct path *lower_path)
 	}
 	return err;
 }
-
-

@@ -751,6 +751,7 @@ static int __init parse_tag_serialnr(const struct tag *tag)
 
 __tagtable(ATAG_SERIAL, parse_tag_serialnr);
 
+#if !defined(CONFIG_MACH_KS01EUR)
 static int __init msm_serialnr_setup(char *p)
 {
 #ifdef CONFIG_EXTEND_SERIAL_NUM_16
@@ -766,6 +767,7 @@ static int __init msm_serialnr_setup(char *p)
 	return 0;
 }
 early_param("androidboot.serialno", msm_serialnr_setup);
+#endif
 
 static int __init parse_tag_revision(const struct tag *tag)
 {
@@ -1097,6 +1099,9 @@ static const char *hwcap_str[] = {
 	"vfpv4",
 	"idiva",
 	"idivt",
+	"vfpd32",
+	"lpae",
+	"evtstrm",
 	NULL
 };
 

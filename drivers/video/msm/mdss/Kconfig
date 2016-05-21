@@ -194,6 +194,10 @@ config REGULATOR_LP8720
 	bool "Support Regulator LP8720"
 	default n
 
+config NEW_UX_MDNIE
+	bool "Support LOS_NEW_UX_MDNIE"
+	default n
+
 config DUAL_LCD
 	bool "Support DUAL LCD"
 	select FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL
@@ -343,3 +347,6 @@ config MDSS_UD_FLIP
 	bool "Support MDSS UD flip"
 	default n
 
+config PANEL_RECOVERY
+	bool "Support recovery when check rddpm err"
+	default n

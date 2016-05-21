@@ -111,12 +111,12 @@
 					39 00 00 00 00 00 03 F0 A5 A5
 					39 01 00 00 00 00 03 F1 A5 A5
 					];
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "dsi_hs_mode";
 		qcom,panel-display-off-seq = [
 				05 00 00 00 24 00 02 28 00			/* wait 40ms(0x24) */
 				05 01 00 00 78 00 02 10 00			/* wait 120ms(0x78) */
 			];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 			samsung,panel-test-key-enable-cmds 	= [ 39 00 00 00 00 00 03 F0 5A 5A];
 			samsung,panel-test-key-disable-cmds = [ 39 01 00 00 00 00 03 F0 A5 A5];

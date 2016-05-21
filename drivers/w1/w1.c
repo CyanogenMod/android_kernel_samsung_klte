@@ -110,13 +110,15 @@ static void w1_slave_release(struct device *dev)
 
 	dev_dbg(dev, "%s: Releasing %s.\n", __func__, sl->name);
 	printk(KERN_ERR "%s: Releasing %s.\n", __func__, sl->name);
-
+#if defined(CONFIG_SEC_H_PROJECT)
+	pr_info("%s: slave released,don't report\n",__func__);
+#else
 	/* add for sending uevent*/
 	pr_info("%s: uevent send 0\n", __func__);
 	input_report_switch(sl->master->bus_master->input, SW_W1, 0);
 	input_sync(sl->master->bus_master->input);
 	/* end */
-
+#endif
 	while (atomic_read(&sl->refcnt)) {
 		dev_dbg(dev, "Waiting for %s to become free: refcnt=%d.\n",
 				sl->name, atomic_read(&sl->refcnt));

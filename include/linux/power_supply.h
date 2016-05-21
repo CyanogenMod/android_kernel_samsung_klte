@@ -188,18 +188,19 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_MHL_500,			/* 15 */
 	POWER_SUPPLY_TYPE_MHL_900,			/* 16 */
 	POWER_SUPPLY_TYPE_MHL_1500,			/* 17 */
-	POWER_SUPPLY_TYPE_MHL_2000,			/* 18 */
-	POWER_SUPPLY_TYPE_MHL_USB,			/* 19 */
-	POWER_SUPPLY_TYPE_MHL_USB_100,		/* 20 */
-	POWER_SUPPLY_TYPE_SMART_OTG,		/* 21 */
-	POWER_SUPPLY_TYPE_SMART_NOTG,		/* 22 */
-	POWER_SUPPLY_TYPE_POWER_SHARING,	/* power sharing cable (23) */
-	POWER_SUPPLY_TYPE_HV_PREPARE_MAINS,	/* Prepare Adaptive Charger (24) */
-	POWER_SUPPLY_TYPE_HV_ERR,			/* Adaptive Charger Err (25) */
-	POWER_SUPPLY_TYPE_HV_UNKNOWN,		/* Adaptive Charger Unknown (26) */
-	POWER_SUPPLY_TYPE_HV_MAINS,			/* Adaptive Charger (27) */
-	POWER_SUPPLY_TYPE_MDOCK_TA,			/* MMdock charger (28) */
-	POWER_SUPPLY_TYPE_POGODOCK,			/* POGO Dock Charger (29) */
+	POWER_SUPPLY_TYPE_MHL_USB,			/* 18 */
+	POWER_SUPPLY_TYPE_SMART_OTG,		/* 19 */
+	POWER_SUPPLY_TYPE_SMART_NOTG,		/* 20 */
+	POWER_SUPPLY_TYPE_POWER_SHARING,	/* power sharing cable (21) */
+	POWER_SUPPLY_TYPE_HV_MAINS,			/* Adaptive Charger (22) */
+	POWER_SUPPLY_TYPE_POGODOCK,			/* POGO Dock Charger (23) */
+	POWER_SUPPLY_TYPE_MHL_2000,			/* 24 */
+	POWER_SUPPLY_TYPE_MHL_USB_100,		/* 25 */
+	POWER_SUPPLY_TYPE_HV_PREPARE_MAINS,	/* Prepare Adaptive Charger (26) */
+	POWER_SUPPLY_TYPE_HV_ERR,			/* Adaptive Charger Err (27) */
+	POWER_SUPPLY_TYPE_HV_UNKNOWN,		/* Adaptive Charger Unknown (28) */
+	POWER_SUPPLY_TYPE_MDOCK_TA,			/* MMdock charger (29) */
+	POWER_SUPPLY_TYPE_MDOCK_USB,		/* MMdock + USB (30) */
 	POWER_SUPPLY_TYPE_MAX,
 };
 

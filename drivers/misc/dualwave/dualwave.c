@@ -491,6 +491,7 @@ static int __init dualwave_init(void)
 		kset_put(g_ptDualWaveKset);
 		printk(KERN_INFO "khhan ***** failed to kobj init and add %s %d ***** \n", __func__, __LINE__);
 		err_status = -3;
+		kfree(g_ptDualWaveKobj);
 		return -1;
 	}
 
@@ -500,6 +501,7 @@ static int __init dualwave_init(void)
 	{
 		printk(KERN_INFO "khhan ***** failed to call kobject_event (%d) %s %d ***** \n", retval, __func__, __LINE__);
 		err_status = -4;
+		kfree(g_ptDualWaveKobj);
 		return -1;
 	}
 

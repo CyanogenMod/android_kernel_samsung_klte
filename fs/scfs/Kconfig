@@ -13,3 +13,6 @@ config SCFS_LOWER_PAGECACHE_INVALIDATION
 	tristate "SCFS lower page cache invalidation"
 	default n
 
+config SCFS_USE_CRYPTO
+	tristate "SCFS use crypto API"
+	default n

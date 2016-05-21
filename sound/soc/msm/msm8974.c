@@ -26,11 +26,11 @@
 #include <sound/pcm.h>
 #include <sound/jack.h>
 #include <sound/q6afe-v2.h>
+#include <sound/q6core.h>
 #include <sound/pcm_params.h>
 #include <asm/mach-types.h>
 #include <mach/subsystem_notif.h>
 #include "qdsp6v2/msm-pcm-routing-v2.h"
-#include "qdsp6v2/q6core.h"
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9320.h"
 
@@ -81,17 +81,24 @@ static int msm8974_auxpcm_rate = 8000;
 #define EXT_CLASS_AB_DIS_DELAY 1000
 #define EXT_CLASS_AB_DELAY_DELTA 1000
 
-#if defined (CONFIG_SND_SOC_MAX98504)
+#if defined (CONFIG_SND_SOC_MAX98504) || defined (CONFIG_SND_SOC_MAX98506)
+#if defined (CONFIG_TERT_MI2S_ENABLE)
+#define GPIO_TERT_MI2S_SCK    74
+#define GPIO_TERT_MI2S_WS     75
+#define GPIO_TERT_MI2S_DATA0  76
+#define GPIO_TERT_MI2S_DATA1  77
+#else
 #define GPIO_SECOND_MI2S_SCK    79
 #define GPIO_SECOND_MI2S_WS     80
 #define GPIO_SECOND_MI2S_DATA0  81
 #define GPIO_SECOND_MI2S_DATA1  82
 #endif
+#endif
 #define NUM_OF_AUXPCM_GPIOS 4
 
 static void *adsp_state_notifier;
 
-#define ADSP_STATE_READY_TIMEOUT_MS 3000
+#define ADSP_STATE_READY_TIMEOUT_MS 50
 
 static inline int param_is_mask(int p)
 {
@@ -143,7 +150,7 @@ defined(CONFIG_MACH_KS01KTT) || defined(CONFIG_MACH_KS01LGT)
 	.detect_extn_cable = true,
 #if defined(CONFIG_SEC_FACTORY)
 	/* Micbias for MBHC is always on in factory test */
-	.micbias_enable_flags = (1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET | 
+	.micbias_enable_flags = (1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET |
 	1 << MBHC_MICBIAS_ENABLE_REGULAR_HEADSET),
 #else
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
@@ -257,17 +264,36 @@ static int ear_jack_fsa8038_en = 0;
 int speaker_status = 0;
 EXPORT_SYMBOL(speaker_status);
 #endif
-#if defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_CHAGALL_KDI) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
+#if defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KACTIVELTE_DCM) \
+|| defined(CONFIG_MACH_CHAGALL_KDI) || defined(CONFIG_MACH_KLIMT_LTE_DCM) || defined(CONFIG_MACH_KACTIVELTE_KOR)
 static int fsa_en_gpio;
 #endif
 
-#if defined (CONFIG_SND_SOC_MAX98504)
+#if defined (CONFIG_SND_SOC_MAX98504) || defined (CONFIG_SND_SOC_MAX98506)
 struct request_gpio {
 	unsigned gpio_no;
 	char *gpio_name;
 };
 
 static struct request_gpio pri_mi2s_gpio[] = {
+#if defined (CONFIG_TERT_MI2S_ENABLE)
+	{
+		.gpio_no = GPIO_TERT_MI2S_SCK,
+		.gpio_name = "TERT_MI2S_SCK",
+	},
+	{
+		.gpio_no = GPIO_TERT_MI2S_WS,
+		.gpio_name = "TERT_MI2S_WS",
+	},
+	{
+		.gpio_no = GPIO_TERT_MI2S_DATA0,
+		.gpio_name = "TERT_MI2S_DATA0",
+	},
+	{
+		.gpio_no = GPIO_TERT_MI2S_DATA1,
+		.gpio_name = "TERT_MI2S_DATA1",
+	},
+#else
 	{
 		.gpio_no = GPIO_SECOND_MI2S_SCK,
 		.gpio_name = "SECOND_MI2S_SCK",
@@ -284,6 +310,7 @@ static struct request_gpio pri_mi2s_gpio[] = {
 		.gpio_no = GPIO_SECOND_MI2S_DATA1,
 		.gpio_name = "SECOND_MI2S_DATA1",
 	},
+#endif
 };
 /* MI2S clock */
 struct mi2s_clk {
@@ -935,12 +962,12 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Headset Mic", msm_earmic_bias_event),
 #else
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-#endif	
+#endif
 #if defined(CONFIG_LDO_SUBMIC_BIAS)
 	SND_SOC_DAPM_MIC("Sub Mic", msm_submic_bias_event),
 #else
 	SND_SOC_DAPM_MIC("Sub Mic", NULL),
-#endif	
+#endif
 	SND_SOC_DAPM_MIC("Third Mic", NULL),
 
 	SND_SOC_DAPM_MIC("Digital Mic1", NULL),
@@ -1110,10 +1137,10 @@ static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	switch (ucontrol->value.integer.value[0]) {
-	case 8000:
+	case 0:
 		msm_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 16000:
+	case 1:
 		msm_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -1690,23 +1717,22 @@ static int msm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-#if defined(CONFIG_SND_SOC_MAX98504) || defined(CONFIG_SND_SOC_MAX98505)
+#if defined (CONFIG_SND_SOC_MAX98504) || defined(CONFIG_SND_SOC_MAX98505) \
+ || defined (CONFIG_SND_SOC_MAX98506)
 static int msm8974_mi2s_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 				struct snd_pcm_hw_params *params)
 {
-	struct snd_interval *rate = hw_param_interval(params,
-					SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *channels = hw_param_interval(params,
-						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *rate =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+
 	pr_debug("%s: enter\n", __func__);
 
 	rate->min = rate->max = 48000;
-
-
-    param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT,
-    		SNDRV_PCM_FORMAT_S16_LE);
-
-    channels->min = channels->max = 2;
+	channels->min = channels->max = 2;
+	param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT,
+			SNDRV_PCM_FORMAT_S16_LE);
 
 	return 0;
 }
@@ -1716,13 +1742,13 @@ static int msm8974_mi2s_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 static int msm_be_fm_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 				struct snd_pcm_hw_params *params)
 {
-	struct snd_interval *rate = hw_param_interval(params,
-					SNDRV_PCM_HW_PARAM_RATE);
-
+	struct snd_interval *rate =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	struct snd_interval *channels =
-	    hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	pr_debug("%s()\n", __func__);
+
 	rate->min = rate->max = 48000;
 	channels->min = channels->max = 2;
 
@@ -2228,7 +2254,7 @@ static void msm8974_snd_shudown(struct snd_pcm_substream *substream)
 
 }
 
-#if defined (CONFIG_SND_SOC_MAX98504)
+#if defined (CONFIG_SND_SOC_MAX98504) || defined (CONFIG_SND_SOC_MAX98506)
 static int msm8974_pri_mi2s_free_gpios(void)
 {
 	int	i;
@@ -2259,20 +2285,24 @@ static struct afe_clk_cfg lpass_mi2s_disable = {
 
 static void msm8974_mi2s_shutdown(struct snd_pcm_substream *substream)
 {
-	
-
 	if (atomic_dec_return(&pri_mi2s_clk.mi2s_rsc_ref) == 0) {
-		int ret =0;
-		pr_debug("[MAX98504_DEBUG] %s: free mi2s resources\n", __func__);
-			if(substream->stream==0)
-				ret = afe_set_lpass_clock(AFE_PORT_ID_SECONDARY_MI2S_RX, &lpass_mi2s_disable);	
-			else if(substream->stream==1)
-				ret = afe_set_lpass_clock(AFE_PORT_ID_SECONDARY_MI2S_TX, &lpass_mi2s_disable);		
-       		
-       		if (ret < 0) {	
-      			pr_err("%s: afe_set_lpass_clock failed\n", __func__);	
-       	
-      		}	
+		int ret = 0;
+		u16 port_id = 0;
+		pr_debug("[MAX9850x_DEBUG] %s: free mi2s resources\n", __func__);
+
+#if defined (CONFIG_TERT_MI2S_ENABLE)
+		port_id = AFE_PORT_ID_TERTIARY_MI2S_RX;
+#else
+		port_id = AFE_PORT_ID_SECONDARY_MI2S_RX;
+#endif
+		if(substream->stream == 0)
+			ret = afe_set_lpass_clock(port_id, &lpass_mi2s_disable);
+		else if(substream->stream == 1)
+			ret = afe_set_lpass_clock(port_id, &lpass_mi2s_disable);
+
+		if (ret < 0) {
+			pr_err("%s: afe_set_lpass_clock failed\n", __func__);
+		}
 		msm8974_pri_mi2s_free_gpios();
 	}
 }
@@ -2287,7 +2317,7 @@ static int msm8974_configure_pri_mi2s_gpio(void)
 				pri_mi2s_gpio[i].gpio_name);
 
 		pr_debug("%s: gpio = %d, gpio name = %s, rtn = %d\n", __func__,
-		pri_mi2s_gpio[i].gpio_no, pri_mi2s_gpio[i].gpio_name, rtn);		
+		pri_mi2s_gpio[i].gpio_no, pri_mi2s_gpio[i].gpio_name, rtn);
 		if (rtn) {
 			pr_err("%s: Failed to request gpio %d\n",
 				   __func__,
@@ -2302,9 +2332,11 @@ static int msm8974_configure_pri_mi2s_gpio(void)
 
 	return rtn;
 }
+
 static int msm8974_mi2s_startup(struct snd_pcm_substream *substream)
 {
 	int ret = 0;
+	u16 port_id = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
@@ -2313,32 +2345,39 @@ static int msm8974_mi2s_startup(struct snd_pcm_substream *substream)
 
 	if (atomic_inc_return(&pri_mi2s_clk.mi2s_rsc_ref) == 1) {
 		pr_info("%s: acquire mi2s resources\n", __func__);
-		msm8974_configure_pri_mi2s_gpio();	
-			if(substream->stream==0)
-				ret = afe_set_lpass_clock(AFE_PORT_ID_SECONDARY_MI2S_RX, &lpass_mi2s_enable);	
-			else if(substream->stream==1)
-				ret = afe_set_lpass_clock(AFE_PORT_ID_SECONDARY_MI2S_TX, &lpass_mi2s_enable); 
-       		if (ret < 0) {	
-      			pr_err("%s: afe_set_lpass_clock failed\n", __func__);	
-       		return ret;	
-      		}	
+		msm8974_configure_pri_mi2s_gpio();
+
+#if defined (CONFIG_TERT_MI2S_ENABLE)
+		port_id = AFE_PORT_ID_TERTIARY_MI2S_RX;
+#else
+		port_id = AFE_PORT_ID_SECONDARY_MI2S_RX;
+#endif
+		if(substream->stream == 0)
+			ret = afe_set_lpass_clock(port_id, &lpass_mi2s_enable);
+		else if(substream->stream == 1)
+			ret = afe_set_lpass_clock(port_id, &lpass_mi2s_enable);
+		if (ret < 0) {
+			pr_err("%s: afe_set_lpass_clock failed\n", __func__);
+			return ret;
+		}
+
 		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_CBS_CFS);
 		if (ret < 0)
 			dev_err(cpu_dai->dev, "set format for CPU dai"
 				" failed\n");
 
-		ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-                		SND_SOC_DAIFMT_CBS_CFS);
+		ret = snd_soc_dai_set_fmt(codec_dai,
+				SND_SOC_DAIFMT_I2S |
+				SND_SOC_DAIFMT_NB_NF |
+				SND_SOC_DAIFMT_CBS_CFS);
 		if (ret < 0)
 			dev_err(codec_dai->dev, "set format for codec dai"
 				 " failed\n");
 
-		ret  = 0;
+		ret = 0;
 	}
 	return ret;
 }
-
-
 
 static struct snd_soc_ops msm8974_mi2s_be_ops = {
 	.startup = msm8974_mi2s_startup,
@@ -2351,8 +2390,6 @@ static struct snd_soc_ops msm8974_be_ops = {
 	.hw_params = msm_snd_hw_params,
 	.shutdown = msm8974_snd_shudown,
 };
-
-
 
 static int msm8974_slimbus_2_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
@@ -3316,7 +3353,7 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ignore_suspend = 1,
 	},
-	/* Incall Music 2 BACK END DAI Link */	
+	/* Incall Music 2 BACK END DAI Link */
 	{
 		.name = LPASS_BE_VOICE2_PLAYBACK_TX,
 		.stream_name = "Voice2 Farend Playback",
@@ -3329,20 +3366,46 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.be_hw_params_fixup = msm_be_hw_params_fixup,
 		.ignore_suspend = 1,
 	},
-#ifdef CONFIG_SND_SOC_MAX98504	
+#if defined (CONFIG_SND_SOC_MAX98504) || defined (CONFIG_SND_SOC_MAX98506)
+#if defined (CONFIG_TERT_MI2S_ENABLE)
+	{
+		.name = LPASS_BE_TERT_MI2S_TX,
+		.stream_name = "Tertiary MI2S Capture",
+		.cpu_dai_name = "msm-dai-q6-mi2s.2",
+		.platform_name = "msm-pcm-routing",
+#if defined (CONFIG_SND_SOC_MAX98504)
+		.codec_name 	= "max98504.18-0031",//"msm-stub-codec.1",
+		.codec_dai_name = "max98504-aif1",//"msm-stub-tx",
+#elif defined (CONFIG_SND_SOC_MAX98506)
+		.codec_name 	= "max98506.18-0031",
+		.codec_dai_name = "max98506-aif1",
+#endif
+		.no_pcm = 1,
+		.be_id = MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
+		.be_hw_params_fixup = msm8974_mi2s_be_hw_params_fixup,
+		.ops = &msm8974_mi2s_be_ops,
+		.ignore_suspend = 1,
+	},
+#else
 	{
 		.name = LPASS_BE_SEC_MI2S_TX,
 		.stream_name = "Secondary MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.1",
 		.platform_name = "msm-pcm-routing",
+#if defined (CONFIG_SND_SOC_MAX98504)
 		.codec_name 	= "max98504.18-0031",//"msm-stub-codec.1",
 		.codec_dai_name = "max98504-aif1",//"msm-stub-tx",
+#elif defined (CONFIG_SND_SOC_MAX98506)
+		.codec_name 	= "max98506.18-0031",
+		.codec_dai_name = "max98506-aif1",
+#endif
 		.no_pcm = 1,
 		.be_id = MSM_BACKEND_DAI_SECONDARY_MI2S_TX,
 		.be_hw_params_fixup = msm8974_mi2s_be_hw_params_fixup,
 		.ops = &msm8974_mi2s_be_ops,
 	},
-#endif	
+#endif
+#endif
 };
 
 static struct snd_soc_dai_link msm8974_hdmi_dai_link[] = {
@@ -3824,7 +3887,8 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 #endif
 
 
-#if defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_CHAGALL_KDI) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
+#if defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_MACH_KACTIVELTE_DCM) \
+|| defined(CONFIG_MACH_CHAGALL_KDI) || defined(CONFIG_MACH_KLIMT_LTE_DCM) || defined(CONFIG_MACH_KACTIVELTE_KOR)
 	/* enable FSA8039 for jack detection */
 	pr_info("%s: Check to enable FSA8039\n", __func__);
 	fsa_en_gpio = of_get_named_gpio(pdev->dev.of_node,
@@ -3949,7 +4013,7 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err2;
 	}
-#if defined (CONFIG_SND_SOC_MAX98504)
+#if defined (CONFIG_SND_SOC_MAX98504) || defined (CONFIG_SND_SOC_MAX98506)
 	atomic_set(&pri_mi2s_clk.mi2s_rsc_ref, 0);
 #endif
 

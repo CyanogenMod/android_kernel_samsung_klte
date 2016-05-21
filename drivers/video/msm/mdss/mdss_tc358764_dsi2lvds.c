@@ -397,7 +397,7 @@ void mdss_dsi_tc358764_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 		if (gpio_is_valid(msd.lcd_en_gpio))
 			gpio_set_value_cansleep(msd.lcd_en_gpio,0);
-#if defined(CONFIG_MACH_MATISSELTE_USC)
+#if defined(CONFIG_MACH_MATISSELTE_USC) || defined(CONFIG_MACH_MATISSELTE_OPEN)
 		if (gpio_is_valid(msd.bl_ldi_en)) {
 			gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
@@ -709,7 +709,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 
 	return 0;
 }
-static int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format)
 {
 	int rc = 0;
@@ -951,7 +951,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
-	static const char *on_cmds_state, *off_cmds_state;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -1217,28 +1216,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
-	on_cmds_state = of_get_property(np,
-				"qcom,mdss-dsi-on-command-state", NULL);
-	if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
-		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-	} else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
-		ctrl_pdata->dsi_on_state = DSI_HS_MODE;
-	} else {
-		pr_debug("%s: ON cmds state not specified. Set Default\n",
-							__func__);
-		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-	}
-
-	off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL);
-	if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
-		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-	} else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
-		ctrl_pdata->dsi_off_state = DSI_HS_MODE;
-	} else {
-		pr_debug("%s: ON cmds state not specified. Set Default\n",
-							__func__);
-		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-	}
 
 	return 0;
 error:

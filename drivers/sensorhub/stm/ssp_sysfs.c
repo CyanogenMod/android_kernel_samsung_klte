@@ -37,6 +37,7 @@ int get_msdelay(int64_t dDelayRate) {
 
 	if (dDelayRate > 200000000)
 		dDelayRate = 200000000;
+
 	return div_s64(dDelayRate, 1000000);
 }
 

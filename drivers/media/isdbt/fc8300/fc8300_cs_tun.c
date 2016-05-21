@@ -767,9 +767,9 @@ static void fc8300_13seg_init(HANDLE handle, DEVICEID devid, u8 filter_cal)
 	fc8300_write(handle, devid, 0x90, 0xb2);
 
 	fc8300_write(handle, devid, 0xb2, 0x00);
-	fc8300_write(handle, devid, 0xb3, 0x01);
+	fc8300_write(handle, devid, 0xb3, 0x04);
 	fc8300_write(handle, devid, 0xb4, 0x00);
-	fc8300_write(handle, devid, 0xb5, 0x02);
+	fc8300_write(handle, devid, 0xb5, 0x04);
 	fc8300_write(handle, devid, 0xb6, 0x00);
 	fc8300_write(handle, devid, 0xb7, 0x07);
 	fc8300_write(handle, devid, 0xb8, 0x00);

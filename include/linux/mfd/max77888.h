@@ -72,7 +72,7 @@ struct max77888_charger_platform_data {
 };
 #endif
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 #define MAX8997_MOTOR_REG_CONFIG2	0x2
 #define MOTOR_LRA			(1<<7)
 #define MOTOR_EN			(1<<6)
@@ -117,7 +117,7 @@ struct max77888_platform_data {
 //	bool (*is_default_uart_path_cp) (void);
 	struct max77888_regulator_data *regulators;
 	int num_regulators;
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	/* haptic motor data */
 	struct max77888_haptic_platform_data *haptic_data;
 #endif

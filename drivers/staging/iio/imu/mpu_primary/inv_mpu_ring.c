@@ -46,7 +46,9 @@ static int inv_push_marker_to_buffer(struct inv_mpu_state *st, u16 hdr)
 	u8 buf[IIO_BUFFER_BYTES];
 
 	memcpy(buf, &hdr, sizeof(hdr));
+	mutex_lock(&st->iio_buf_write_lock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&st->iio_buf_write_lock);
 
 	return 0;
 }
@@ -61,9 +63,15 @@ static int inv_push_8bytes_buffer(struct inv_mpu_state *st, u16 hdr,
 	memcpy(buf, &hdr, sizeof(hdr));
 	for (i = 0; i < 3; i++)
 		memcpy(&buf[2 + i * 2], &d[i], sizeof(d[i]));
+
+	/* Raw data and timestamp need to be pushed together in iio buffer,
+	 * otherwise marker could be pushed in between raw data and timestamp which disturbs parsing at HAL
+	 */
+	mutex_lock(&st->iio_buf_write_lock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
 	memcpy(buf, &t, sizeof(t));
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&st->iio_buf_write_lock);
 
 	return 0;
 }
@@ -77,12 +85,14 @@ static int inv_push_16bytes_buffer(struct inv_mpu_state *st, u16 hdr, u64 t,
 
 	memcpy(buf, &hdr, sizeof(hdr));
 	memcpy(buf + 4, &q[0], sizeof(q[0]));
+	mutex_lock(&st->iio_buf_write_lock);
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
 	for (i = 0; i < 2; i++)
 		memcpy(buf + 4 * i, &q[i + 1], sizeof(q[i]));
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
 	memcpy(buf, &t, sizeof(t));
 	iio_push_to_buffer(indio_dev->buffer, buf, 0);
+	mutex_unlock(&st->iio_buf_write_lock);
 
 	return 0;
 }

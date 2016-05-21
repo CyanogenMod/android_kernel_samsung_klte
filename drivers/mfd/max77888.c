@@ -39,6 +39,7 @@
 #define I2C_ADDR_PMIC	(0xCC >> 1)	/* Charger, Flash LED */
 #define I2C_ADDR_MUIC	(0x4A >> 1)
 #define I2C_ADDR_HAPTIC	(0x90 >> 1)
+#define I2C_ADDR_TEST	(0xCE >> 1)	/* TEST register */
 
 #ifdef CONFIG_MUIC_RESET_PIN_ENABLE
 int muic_reset_pin = 0;
@@ -112,6 +113,18 @@ int max77888_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf)
 }
 EXPORT_SYMBOL_GPL(max77888_bulk_write);
 
+static int max77888_read_word(struct i2c_client *i2c, u8 reg)
+{
+	struct max77888_dev *max77888 = i2c_get_clientdata(i2c);
+	int ret;
+
+	mutex_lock(&max77888->iolock);
+	ret = i2c_smbus_read_word_data(i2c, reg);
+	mutex_unlock(&max77888->iolock);
+
+	return ret;
+}
+
 int max77888_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
 {
 	struct max77888_dev *max77888 = i2c_get_clientdata(i2c);
@@ -133,14 +146,14 @@ static int of_max77888_dt(struct device *dev, struct max77888_platform_data *pda
 {
 	struct device_node *np = dev->of_node;
 	int retval = 0;
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	struct max77888_haptic_platform_data  *haptic_data;
 	haptic_data = kzalloc(sizeof(struct max77888_haptic_platform_data), GFP_KERNEL);
 	if (haptic_data == NULL)
 		return -ENOMEM;
 #endif
 	if(!np) {
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	kfree(haptic_data);
 #endif
 		return -EINVAL;
@@ -176,7 +189,7 @@ static int of_max77888_dt(struct device *dev, struct max77888_platform_data *pda
 	pr_info("%s: irq-gpio_flags: %u \n", __func__, pdata->irq_gpio_flags);
 	pr_info("%s: irq-base: %u \n", __func__, pdata->irq_base);
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	of_property_read_u32(np, "haptic,max_timeout", &haptic_data->max_timeout);
 	of_property_read_u32(np, "haptic,duty", &haptic_data->duty);
 	of_property_read_u32(np, "haptic,period", &haptic_data->period);
@@ -196,6 +209,9 @@ static int max77888_i2c_probe(struct i2c_client *i2c,
 	struct max77888_dev *max77888;
 	struct max77888_platform_data *pdata; 
 	u8 reg_data;
+	u16 reg_data16;
+	u8 str_data[10] = {0,};
+	int i;
 	int ret = 0;
 
 	msleep(500);
@@ -284,6 +300,54 @@ static int max77888_i2c_probe(struct i2c_client *i2c,
 
 	max77888->haptic = i2c_new_dummy(i2c->adapter, I2C_ADDR_HAPTIC);
 	i2c_set_clientdata(max77888->haptic, max77888);
+
+	// Set TEST Reigster Slave address
+	max77888->test = i2c_new_dummy(i2c->adapter, I2C_ADDR_TEST);
+	i2c_set_clientdata(max77888->test, max77888);
+
+	// Start Over-write wrong-Trimmed bit //
+
+	// 1. Test Register Access Enabled
+	max77888_write_reg(max77888->i2c, 0xFE, 0xC5);
+	// 2. Enable TST_KEY
+	max77888_write_reg(max77888->test, 0xB3, 0x0C);
+	// 3. Read 0x2E with word unit.
+	reg_data16 = max77888_read_word(max77888->test, 0x2E);
+	// 4. Check Bit5 of First bit(Bit13)
+	if ((reg_data16 & 0x2000) == 0) {
+		// Wrong Trimmed
+		// 5. Read and Store
+		// 5-1. Read and Store from 0x21 to 0x2A
+		for (i = 0x21; i <= 0x2A; i++) {
+			if (i == 0x25) {
+				continue;
+			}
+			reg_data16 = max77888_read_word(max77888->test, i);
+			str_data[i-0x21] = (reg_data16 >> 8);
+		}
+		// 5-2. Read and Store 0x2E
+		reg_data16 = max77888_read_word(max77888->test, i);
+		reg_data = (reg_data16 >> 8);
+
+		// 6. Write Stored data from 0x21 to 0x2A.
+		for (i = 0x21; i <= 0x2A; i++) {
+			if ( i == 0x25) {
+				continue;
+			}
+			max77888_write_reg(max77888->test, i, str_data[i-0x21]);
+		}
+		// 7. Write 0x2E
+		max77888_write_reg(max77888->test, 0x2E, (reg_data | 0x20));
+
+		// 8. Write 0x20 to 0x40.
+		max77888_write_reg(max77888->test, 0x20, 0x40);
+	}
+
+	// 9. Disable TST_KEY, Write 0xB3 to 0x00
+	max77888_write_reg(max77888->test, 0xB3, 0x00);
+
+	// 10. Test Register Access Disabled, Write 0xFE to 0x00
+	max77888_write_reg(max77888->i2c, 0xFE, 0x00);
 
 	ret = max77888_irq_init(max77888);
 	if (ret < 0)

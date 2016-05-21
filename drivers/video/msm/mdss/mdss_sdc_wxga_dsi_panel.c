@@ -540,7 +540,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	
+
 	pr_err("%s:@@@@@@@@@@@@@@@@@@@ bklt_ctrl:%d :bl_level=%d\n", __func__,ctrl_pdata->bklt_ctrl,bl_level);
 	/*
 	 * Some backlight controllers specify a minimum duty cycle
@@ -573,13 +573,15 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 }
 #if !defined(CONFIG_MACH_DEGASLTE_SPR)
 extern void pwm_backlight_enable(void);
-
+#endif
 static int samsung_dsi_panel_event_handler(int event)
 {
+	static int first_init = 0;
 	pr_debug("SS DSI Event Handler");
 		switch (event) {
 			case MDSS_EVENT_BACKLIGHT_LATE_ON:
 				if(msd.dstat.wait_bl_on) {
+#if !defined(CONFIG_MACH_DEGASLTE_SPR)
 					msleep(32);
 					if (gpio_is_valid(msd.bl_rst_gpio)) {
 						gpio_tlmm_config(GPIO_CFG(msd.bl_rst_gpio, 0,
@@ -589,8 +591,21 @@ static int samsung_dsi_panel_event_handler(int event)
 					msleep(1);
 					pwm_backlight_enable();
 					msleep(1);
+					if (!first_init) {
+						mdss_fb_set_backlight(msd.mfd, 255);
+						first_init = 1;
+					}
 					pr_info("SS DSI Event Handler Backlight Late on");
 					}
+#else
+					if (!first_init) {
+						/* This value should be equal to what the Android Application 
+						set as default on CSC setting apply */
+						mdss_fb_set_backlight(msd.mfd, 102);
+						first_init = 1;
+					}
+					pr_info("SS DSI Event Handler Backlight Late on");
+#endif
 					msd.dstat.wait_bl_on = 0;
 				}
 			break;
@@ -601,7 +616,7 @@ static int samsung_dsi_panel_event_handler(int event)
 	}
 	return 0;
 }
-#endif
+
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
@@ -654,7 +669,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 #endif
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
-#if defined(CONFIG_SEC_T10_PROJECT) || defined(CONFIG_SEC_RUBENS_PROJECT)
+#if defined(CONFIG_SEC_T10_PROJECT) || defined(CONFIG_SEC_RUBENS_PROJECT) || defined(CONFIG_SEC_MILLET_PROJECT)
 	if (gpio_is_valid(msd.bl_rst_gpio)) {
 			gpio_tlmm_config(GPIO_CFG(msd.bl_rst_gpio, 0,
 				GPIO_CFG_OUTPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
@@ -761,7 +776,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 
 	return 0;
 }
-static int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format)
 {
 	int rc = 0;
@@ -987,7 +1002,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
-	static const char *on_cmds_state, *off_cmds_state;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -1042,7 +1056,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mipi.dst_format =
 			DSI_VIDEO_DST_FORMAT_RGB888;
 	}
-	
+
 	pdest = of_get_property(np,
 			"qcom,mdss-dsi-panel-destination", NULL);
 	if (strlen(pdest) != 9) {
@@ -1094,7 +1108,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 /*			rc = of_property_read_u32(np,
 				"qcom,mdss-dsi-bl-pmic-pwm-frequency", &tmp);
 			if (rc) {
-				pr_err("%s:%d, Error, panel pwm_period\n",		
+				pr_err("%s:%d, Error, panel pwm_period\n",
 					__func__, __LINE__);
 			return -EINVAL;
 			}
@@ -1125,7 +1139,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-interleave-mode", &tmp);
 	pinfo->mipi.interleave_mode = (!rc ? tmp : 0);
- 
+
 	pinfo->mipi.vsync_enable = of_property_read_bool(np,
 		"qcom,mdss-dsi-te-check-enable");
 	pinfo->mipi.hw_vsync_mode = of_property_read_bool(np,
@@ -1174,7 +1188,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-color-order", &tmp);
 	pinfo->mipi.rgb_swap = (!rc ? tmp : DSI_RGB_SWAP_RGB);
-	
+
 	rc = of_property_read_u32(np, "qcom,mdss-force-clk-lane-hs", &tmp);
 	pinfo->mipi.force_clk_lane_hs = (!rc ? tmp : 0);
 
@@ -1273,29 +1287,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
-
-	on_cmds_state = of_get_property(np,
-				"qcom,mdss-dsi-on-command-state", NULL);
-	if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
-		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-	} else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
-		ctrl_pdata->dsi_on_state = DSI_HS_MODE;
-	} else {
-		pr_debug("%s: ON cmds state not specified. Set Default\n",
-							__func__);
-		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-	}
-
-	off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL);
-	if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
-		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-	} else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
-		ctrl_pdata->dsi_off_state = DSI_HS_MODE;
-	} else {
-		pr_debug("%s: ON cmds state not specified. Set Default\n",
-							__func__);
-		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-	}
 
 	return 0;
 error:
@@ -1567,9 +1558,7 @@ static void err_fg_work_func(struct work_struct *work)
 		}
 		ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
 	}
-#if !defined(CONFIG_MACH_DEGASLTE_SPR)
 	ctrl_pdata->event_handler(MDSS_EVENT_BACKLIGHT_LATE_ON);
-#endif 
 	disable_irq_nosync(err_fg_gpio);
 	enable_irq(err_fg_gpio);
 	mdelay(20);
@@ -2038,9 +2027,9 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 	ctrl_pdata->panel_reset = mdss_dsi_sdc_panel_reset;
 	ctrl_pdata->registered = mdss_dsi_panel_registered;
-#if  !defined(CONFIG_MACH_DEGASLTE_SPR)
+
 	ctrl_pdata->event_handler = samsung_dsi_panel_event_handler;
-#endif
+
 #if defined(CONFIG_LCD_CLASS_DEVICE)
 	lcd_device = lcd_device_register("panel", &pdev->dev, NULL,
 					&mdss_dsi_disp_props);

@@ -1168,6 +1168,7 @@ static int qpnp_flash_regulator_operate(struct qpnp_led_data *led, bool on)
 		goto regulator_turn_off;
 
 	if (!regulator_on && !led->flash_cfg->flash_on) {
+#ifndef SAMSUNG_USE_EXTERNAL_CHARGER
 		for (i = 0; i < led->num_leds; i++) {
 			if (led_array[i].flash_cfg->flash_reg_get) {
 				if (led_array[i].flash_cfg->flash_wa_reg_get) {
@@ -1229,6 +1230,7 @@ static int qpnp_flash_regulator_operate(struct qpnp_led_data *led, bool on)
 			}
 			break;
 			}
+#endif
 	    for (i = 0; i < led->num_leds; i++) {
 #ifdef SAMSUNG_USE_EXTERNAL_CHARGER
 		qpnp_flash_reg_en(led, true);

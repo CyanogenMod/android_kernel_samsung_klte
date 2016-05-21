@@ -120,7 +120,11 @@ static void initialize_variable(struct ssp_data *data)
 	data->uProxCanc = 0;
 	data->uProxHiThresh = 0;
 	data->uProxLoThresh = 0;
+#if defined(CONFIG_SEC_K_PROJECT)	
+	data->uGyroDps = GYROSCOPE_DPS2000;
+#else
 	data->uGyroDps = GYROSCOPE_DPS500;
+#endif
 	data->uIr_Current = 0;
 
 	data->mcu_device = NULL;

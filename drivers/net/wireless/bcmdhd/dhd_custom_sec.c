@@ -1,7 +1,7 @@
 /*
  * Customer HW 4 dependant file
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -175,10 +175,10 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"IR", "XZ", 11},	/* Universal if Country code is IRAN, (ISLAMIC REPUBLIC OF) */
 	{"SD", "XZ", 11},	/* Universal if Country code is SUDAN */
 	{"SY", "XZ", 11},	/* Universal if Country code is SYRIAN ARAB REPUBLIC */
-	{"GL", "XZ", 11},	/* Universal if Country code is GREENLAND */
 	{"PS", "XZ", 11},	/* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
 	{"TL", "XZ", 11},	/* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
 	{"MH", "XZ", 11},	/* Universal if Country code is MARSHALL ISLANDS */
+	{"GL", "GP", 2},
 	{"AL", "AL", 2},
 	{"DZ", "GB", 6},
 	{"AS", "AS", 12},
@@ -192,17 +192,16 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"AZ", "AZ", 2},
 	{"BS", "BS", 2},
 	{"BH", "BH", 4},
-	{"BD", "AO", 0},
+	{"BD", "BD", 1},
 	{"BY", "BY", 3},
 	{"BE", "BE", 4},
 	{"BM", "BM", 12},
 	{"BA", "BA", 2},
-	{"BR", "BR", 4},
+	{"BR", "BR", 2},
 	{"VG", "VG", 2},
 	{"BN", "BN", 4},
 	{"BG", "BG", 4},
 	{"KH", "KH", 2},
-	{"CA", "US", 0},
 	{"KY", "KY", 3},
 	{"CN", "CN", 38},
 	{"CO", "CO", 17},
@@ -220,16 +219,16 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"GR", "GR", 4},
 	{"GD", "GD", 2},
 	{"GP", "GP", 2},
-	{"GU", "GU", 12},
+	{"GU", "GU", 30},
 	{"HK", "HK", 2},
 	{"HU", "HU", 4},
 	{"IS", "IS", 4},
 	{"IN", "IN", 3},
 	{"ID", "ID", 1},
 	{"IE", "IE", 5},
-	{"IL", "IL", 7},
+	{"IL", "IL", 14},
 	{"IT", "IT", 4},
-	{"JP", "JP", 45},
+	{"JP", "JP", 968},
 	{"JO", "JO", 3},
 	{"KE", "SA", 0},
 	{"KW", "KW", 5},
@@ -240,7 +239,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"LI", "LI", 4},
 	{"LT", "LT", 4},
 	{"LU", "LU", 3},
-	{"MO", "MO", 2},
+	{"MO", "SG", 0},
 	{"MK", "MK", 2},
 	{"MW", "MW", 1},
 	{"MY", "MY", 3},
@@ -250,12 +249,11 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"MR", "MR", 2},
 	{"MU", "MU", 2},
 	{"YT", "YT", 2},
-	{"MX", "MX", 20},
+	{"MX", "MX", 44},
 	{"MD", "MD", 2},
 	{"MC", "MC", 1},
 	{"ME", "ME", 2},
 	{"MA", "MA", 2},
-	{"NP", "ID", 5},
 	{"NL", "NL", 4},
 	{"AN", "GD", 2},
 	{"NZ", "NZ", 4},
@@ -268,7 +266,7 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"PH", "PH", 5},
 	{"PL", "PL", 4},
 	{"PT", "PT", 4},
-	{"PR", "PR", 20},
+	{"PR", "PR", 38},
 	{"RE", "RE", 2},
 	{"RO", "RO", 4},
 	{"SN", "MA", 2},
@@ -284,27 +282,36 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"TT", "TT", 3},
 	{"TR", "TR", 7},
 	{"AE", "AE", 6},
-	{"UG", "UG", 2},
 	{"GB", "GB", 6},
-	{"UY", "UY", 1},
-	{"VI", "VI", 13},
+	{"UY", "VE", 3},
+	{"VI", "PR", 38},
 	{"VA", "VA", 2},
 	{"VE", "VE", 3},
 	{"VN", "VN", 4},
 	{"ZM", "LA", 2},
 	{"EC", "EC", 21},
 	{"SV", "SV", 25},
-	{"KR", "KR", 48},
-	{"RU", "RU", 13},
-	{"UA", "UA", 8},
+	{"KR", "KR", 70},
+	{"RU", "RU", 988},
+	{"UA", "UA", 16},
 	{"GT", "GT", 1},
-	{"FR", "FR", 5},
 	{"MN", "MN", 1},
 	{"NI", "NI", 2},
 	{"UZ", "MA", 2},
 	{"ZA", "ZA", 6},
 	{"EG", "EG", 13},
 	{"TN", "TN", 1},
+	{"AO", "AD", 0},
+	{"BT", "BJ", 0},
+	{"BW", "BJ", 0},
+	{"LY", "LI", 4},
+	{"BO", "NG", 0},
+	{"UM", "PR", 38},
+	/* Support FCC 15.407 (Part 15E) Changes, effective June 2 2014 */
+	/* US/988, Q2/993 country codes with higher power on UNII-1 5G band */
+	{"US", "US", 988},
+	{"CU", "US", 988},
+	{"CA", "Q2", 993},
 #endif /* default ccode/regrev */
 };
 
@@ -895,6 +902,12 @@ vid_info_t vid_info[] = {
 	{ 2, { 0x99, }, { "semcove" } },
 	{ 0, { 0x00, }, { "samsung" } }
 };
+#elif defined(BCM43430_CHIP)
+vid_info_t vid_info[] = {
+	{ 3, { 0x33, 0x33, }, { "semco" } },
+	{ 3, { 0x00, 0x22, }, { "murata" } },
+	{ 0, { 0x00, }, { "samsung" } }
+};
 #elif defined(BCM4334_CHIP)
 vid_info_t vid_info[] = {
 	{ 6, { 0x00, 0x00, 0x00, 0x33, 0x33, }, { "semco" } },
@@ -1435,16 +1448,16 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 #endif /* MIMO_ANTENNA_SETTING */
 
 #ifdef USE_WFA_CERT_CONF
-int sec_get_param(dhd_pub_t *dhd, int mode)
+int sec_get_param_wfa_cert(dhd_pub_t *dhd, int mode, uint* read_val)
 {
 	struct file *fp = NULL;
 	char *filepath = NULL;
-	int val, ret = 0;
+	int val = 0;
 
 	if (!dhd || (mode < SET_PARAM_BUS_TXGLOM_MODE) ||
 		(mode >= PARAM_LAST_VALUE)) {
 		DHD_ERROR(("[WIFI_SEC] %s: invalid argument\n", __FUNCTION__));
-		return -EINVAL;
+		return BCME_ERROR;
 	}
 
 	switch (mode) {
@@ -1464,53 +1477,34 @@ int sec_get_param(dhd_pub_t *dhd, int mode)
 			filepath = "/data/.txbf.info";
 			break;
 #endif /* USE_WL_TXBF */
+#ifdef PROP_TXSTATUS
+		case SET_PARAM_PROPTX:
+			filepath = "/data/.proptx.info";
+			break;
+#endif /* PROP_TXSTATUS */
 		default:
-			return -EINVAL;
+			DHD_ERROR(("[WIFI_SEC] %s: File to find file name for index=%d\n",
+				__FUNCTION__, mode));
+			return BCME_ERROR;
 	}
 
 	fp = filp_open(filepath, O_RDONLY, 0);
 	if (IS_ERR(fp) || (fp == NULL)) {
-		ret = -EIO;
+		DHD_ERROR(("[WIFI_SEC] %s: File [%s] doesn't exist \n",
+			__FUNCTION__, filepath));
+		return BCME_ERROR;
 	} else {
-		ret = kernel_read(fp, fp->f_pos, (char *)&val, 4);
+		if (kernel_read(fp, fp->f_pos, (char *)&val, 4) < 0) {
+			filp_close(fp, NULL);
+			/* File operation is failed so we will return error code */
+			DHD_ERROR(("[WIFI_SEC] %s: read failed, file path=%s\n",
+				__FUNCTION__, filepath));
+			return BCME_ERROR;
+		}
 		filp_close(fp, NULL);
 	}
 
-	if (ret < 0) {
-		/* File operation is failed so we will return default value */
-		switch (mode) {
-			case SET_PARAM_BUS_TXGLOM_MODE:
-				val = CUSTOM_GLOM_SETTING;
-				break;
-			case SET_PARAM_ROAMOFF:
-#ifdef ROAM_ENABLE
-				val = 0;
-#elif defined(DISABLE_BUILTIN_ROAM)
-				val = 1;
-#else
-				val = 0;
-#endif /* ROAM_ENABLE */
-				break;
-#ifdef USE_WL_FRAMEBURST
-			case SET_PARAM_FRAMEBURST:
-				val = 1;
-				break;
-#endif /* USE_WL_FRAMEBURST */
-#ifdef USE_WL_TXBF
-			case SET_PARAM_TXBF:
-				val = 1;
-				break;
-#endif /* USE_WL_TXBF */
-		}
-
-		DHD_INFO(("[WIFI_SEC] %s: File open failed, file path=%s,"
-			" default value=%d\n",
-			__FUNCTION__, filepath, val));
-		return val;
-	}
-
 	val = bcm_atoi((char *)&val);
-	DHD_INFO(("[WIFI_SEC] %s: %s = %d\n", __FUNCTION__, filepath, val));
 
 	switch (mode) {
 		case SET_PARAM_ROAMOFF:
@@ -1520,11 +1514,20 @@ int sec_get_param(dhd_pub_t *dhd, int mode)
 #ifdef USE_WL_TXBF
 		case SET_PARAM_TXBF:
 #endif /* USE_WL_TXBF */
-			val = val ? 1 : 0;
+#ifdef PROP_TXSTATUS
+		case SET_PARAM_PROPTX:
+#endif /* PROP_TXSTATUS */
+		if (val < 0 || val > 1) {
+			DHD_ERROR(("[WIFI_SEC] %s: value[%d] is out of range\n",
+				__FUNCTION__, *read_val));
+			return BCME_ERROR;
+		}
 			break;
+		default:
+			return BCME_ERROR;
 	}
-
-	return val;
+	*read_val = (uint)val;
+	return BCME_OK;
 }
 #endif /* USE_WFA_CERT_CONF */
 #ifdef WRITE_WLANINFO
@@ -1610,13 +1613,13 @@ uint32 sec_save_wlinfo(char *firm_ver, char *dhd_ver, char *nvram_p)
 		if (strlen(temp_buf)) {
 			nvram_buf = temp_buf;
 			bcmstrtok(&nvram_buf, "\n", 0);
-			DHD_INFO(("[WIFI_SEC] nvram tolkening : %s(%d) \n",
+			DHD_INFO(("[WIFI_SEC] nvram tolkening : %s(%zu) \n",
 				temp_buf, strlen(temp_buf)));
 			snprintf(version_info+str_len, tstr_len(temp_buf, NV_PREFIX),
 				NV_PREFIX " %s\n", temp_buf);
 			str_len = strlen(version_info);
 			DHD_INFO(("[WIFI_SEC] NVRAM version_info : %s\n", version_info));
-			DHD_INFO(("[WIFI_SEC] NVRAM version_info len : %d, nvram len : %d\n",
+			DHD_INFO(("[WIFI_SEC] NVRAM version_info len : %d, nvram len : %zu\n",
 				str_len, strlen(temp_buf)));
 		} else {
 			DHD_ERROR(("[WIFI_SEC] NVRAM info is missing.\n"));
@@ -1625,7 +1628,7 @@ uint32 sec_save_wlinfo(char *firm_ver, char *dhd_ver, char *nvram_p)
 		DHD_ERROR(("[WIFI_SEC] Not exist nvram path\n"));
 	}
 
-	DHD_INFO(("[WIFI_SEC] version_info : %s, strlen : %d\n",
+	DHD_INFO(("[WIFI_SEC] version_info : %s, strlen : %zu\n",
 		version_info, strlen(version_info)));
 
 	fp = filp_open(filepath, O_RDONLY, 0);
@@ -1655,4 +1658,16 @@ uint32 sec_save_wlinfo(char *firm_ver, char *dhd_ver, char *nvram_p)
 	return ret;
 }
 #endif /* WRITE_WLANINFO */
+
+#ifdef SUPPORT_MULTIPLE_BOARD_REV_FROM_HW
+unsigned int system_hw_rev;
+static int __init get_hw_rev(char *arg)
+{
+	get_option(&arg, &system_hw_rev);
+	printk("dhd : hw_rev : %d\n", system_hw_rev);
+	return 0;
+}
+
+early_param("androidboot.hw_rev", get_hw_rev);
+#endif /* SUPPORT_MULTIPLE_BOARD_REV_FROM_HW */
 #endif /* CUSTOMER_HW4 */

@@ -1153,6 +1153,7 @@ struct ext4_sb_info {
 	unsigned int s_mount_flags;
 	unsigned int s_def_mount_opt;
 	ext4_fsblk_t s_sb_block;
+	atomic64_t s_r_blocks_count;
 	uid_t s_resuid;
 	gid_t s_resgid;
 	unsigned short s_mount_state;

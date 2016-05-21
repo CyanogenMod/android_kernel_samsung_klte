@@ -39,6 +39,7 @@
 #include <linux/earlysuspend.h>
 
 #include "irda_fw_version103.h"
+#include "irda_fw_version104.h"
 
 #include <mach/gpio.h>
 #include <linux/ir_remote_con_mc96.h>
@@ -123,8 +124,8 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 	int i, ret = 0, frame_count;
 	u8 buf_ir_test[8];
 	const u8 calc_chksum[] = {0x3A, 0x02, 0x10, 0x00, 0xF0, 0x20, 0xFF, 0xDF};
-	const u8 *IRDA_fw = IRDA_binary_103;
-	frame_count = FRAME_COUNT_103;
+	const u8 *IRDA_fw = IRDA_binary_104;
+	frame_count = FRAME_COUNT_104;
 
 	gpio_tlmm_config(GPIO_CFG(data->pdata->irda_irq_gpio,  0, GPIO_CFG_INPUT,
 			GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
@@ -150,13 +151,13 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 		ret = i2c_master_recv(client, buf_ir_test, MC96_READ_LENGTH);
 		if (ret < 0) {
 			pr_err(KERN_ERR " %s: err %d\n", __func__, ret);
+			msleep(60);
 			continue;
 		}
 		if((buf_ir_test[0] << 8 | buf_ir_test[1]) == 0x0001) {
 			printk(KERN_CRIT "%s: Perform checksum calculation next\n", __func__);
 			break;
 		}
-		msleep(60);
 	}
 	if (i == FW_RW_RETRY) {
 		printk(KERN_CRIT "%s: Chip not responding, powerdown device\n", __func__);
@@ -168,14 +169,13 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 	print_hex_dump(KERN_CRIT, "(1)IRDA Master Rx: ", 16, 1,
 			DUMP_PREFIX_ADDRESS, buf_ir_test, 8, 1);
 #endif
-	msleep(60);
 	for(i = 0; i < FW_RW_RETRY; i++) {
+		msleep(60);
 		ret = i2c_master_send(client, calc_chksum, MC96_READ_LENGTH);
 		if(ret < 0)
 			continue;
 		else
 			break;
-		msleep(50);
 	}
 	if(i == FW_RW_RETRY) {
 		printk(KERN_CRIT "%s: checksum calculation fail, ret: %d\n", __func__, ret);
@@ -201,8 +201,8 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 	print_hex_dump(KERN_CRIT, "(2)IRDA Master Rx: ", 16, 1,
 			DUMP_PREFIX_ADDRESS, buf_ir_test, 8, 1);
 #endif
-	/* if first two bytes are 0x6EBA, FW download isn't needed */
-	if((buf_ir_test[0] << 8 | buf_ir_test[1]) == 0x6EBA) {
+	/* FW 1.4 0x6E93, FW 1.3 0x6EBA */
+	if((buf_ir_test[0] << 8 | buf_ir_test[1]) == 0x6E93) {
 		printk(KERN_CRIT "%s: irda fw fine, exit now\n", __func__);
 		download_pass = 1;
 		goto powerdown_dev;
@@ -235,8 +235,8 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 #endif
 
 	ret = buf_ir_test[0] << 8 | buf_ir_test[1];
-	if (ret == 0x6EBA) {
-		printk(KERN_CRIT "1. %s: boot down complete\n", __func__);
+	if (ret == 0x6E93) {
+		printk(KERN_CRIT "%s:IRDA new FW 1.4 loaded \n", __func__);
 		download_pass = 1;
 		goto powerdown_dev;
 	} else
@@ -336,9 +336,11 @@ static void irda_remocon_work(struct ir_remocon_data *ir_data, int count)
 	struct i2c_client *client = data->client;
 
 	int buf_size = count+2;
-	int ret, retry, ng_retry;
-//	int sleep_timing;
-//	int end_data;
+	int ret, retry, ng_retry, sng_retry;
+#if defined(CONFIG_ANDROID_FFF)
+	int sleep_timing;
+	int end_data;
+#endif
 	int emission_time;
 	int ack_pin_onoff;
 
@@ -346,7 +348,7 @@ static void irda_remocon_work(struct ir_remocon_data *ir_data, int count)
 		count_number = 0;
 
 	count_number++;
-	ng_retry = 0;
+	ng_retry = sng_retry = 0;
 	gpio_tlmm_config(GPIO_CFG(ir_data->pdata->irda_irq_gpio,  0, GPIO_CFG_INPUT,
 		GPIO_CFG_PULL_UP, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 
@@ -396,16 +398,26 @@ resend_data:
 		}
 	}
 	ack_number = ack_pin_onoff;
-
-	mutex_unlock(&data->mutex);
-
-	data->count = 2;
-	emission_time = \
-		(1000 * (data->ir_sum) / (data->ir_freq));
-	if (emission_time > 0)
+#if defined(CONFIG_ANDROID_FFF)
+	end_data = data->signal[count-2] << 8 | data->signal[count-1];
+	emission_time = (1000 * (data->ir_sum - end_data) / (data->ir_freq)) + 10;
+	sleep_timing = emission_time - 110;
+	if (sleep_timing > 0)
+		usleep(sleep_timing);
+#ifdef DEBUG
+	printk(KERN_CRIT "%s end data %d sleep timing %d\n", __func__, end_data, sleep_timing);
+#endif
+	msleep(125);
+#endif
+	emission_time = (1000 * (data->ir_sum) / (data->ir_freq));
+	if (emission_time > 0) {
+#if defined(CONFIG_ANDROID_FFF)
+		usleep(emission_time);
+#else
 		msleep(emission_time);
-		pr_info("%s: emission_time = %d\n",
-					__func__, emission_time);
+#endif
+	}
+	pr_info("%s: emission_time = %d\n", __func__, emission_time);
 	for(retry = 0; retry < 10; retry++) {
 		if (gpio_get_value(data->pdata->irda_irq_gpio)) {
 			pr_info("%s : %d Sending IR OK!\n",
@@ -414,8 +426,8 @@ resend_data:
 			break;
 		} else {
 			if(retry == 9) {
-				ng_retry++;
-				if(ng_retry < 2) {
+				sng_retry++;
+				if(sng_retry < 2) {
 					data->pdata->ir_wake_en(data->pdata,0);
 					gpio_set_value(data->pdata->irda_led_en, 0);
 					irda_vdd_onoff(0);
@@ -433,7 +445,8 @@ resend_data:
 			msleep(50);
 		}
 	}
-
+	mutex_unlock(&data->mutex);
+	data->count = 2;
 	ack_number += ack_pin_onoff;
 #ifndef USE_STOP_MODE
 	data->on_off = 0;
@@ -460,9 +473,12 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 {
 	struct ir_remocon_data *data = dev_get_drvdata(dev);
 	unsigned int _data;
-	int count, i, ret;
+	int i, ret;
 
 	ret = 0;
+#ifdef DEBUG
+	printk(KERN_CRIT "irda store string: %s\n", buf);
+#endif
 #ifdef CONFIG_MACH_MATISSELTE_USC
 	gpio_tlmm_config(GPIO_CFG(data->pdata->irda_wake_en,  0, GPIO_CFG_OUTPUT,
 		GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
@@ -494,18 +510,29 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 					msleep(80);
 					data->on_off = 1;
 				}
-				data->signal[2] = _data >> 16;
-				data->signal[3] = (_data >> 8) & 0xFF;
-				data->signal[4] = _data & 0xFF;
-				data->count += 3;
+#if defined(CONFIG_ANDROID_FFF)
+				data->signal[(data->count)++] = 0x40; // Mode
+#endif
+				data->signal[(data->count)++] = _data >> 16;
+				data->signal[(data->count)++] = (_data >> 8) & 0xFF;
+				data->signal[(data->count)++] = _data & 0xFF;
 			} else {
 				data->ir_sum += _data;
-				count = data->count;
-				data->signal[count] = _data >> 8;
-				data->signal[count+1] = _data & 0xFF;
-				data->count += 2;
+#if defined(CONFIG_ANDROID_FFF)
+				if(_data > 0x7FFF) {
+					data->signal[(data->count)++] = _data >> 24;
+					data->signal[(data->count)++] = _data >> 16;
+					data->signal[(data->count)++] = _data >> 8;
+					data->signal[(data->count)++] = _data & 0xFF;
+				} else {
+					data->signal[(data->count)++] = _data >> 8;
+					data->signal[(data->count)++] = _data & 0xFF;
+				}
+#else
+				data->signal[(data->count)++] = _data >> 8;
+				data->signal[(data->count)++] = _data & 0xFF;
+#endif
 			}
-
 			while (_data > 0) {
 				buf++;
 				_data /= 10;

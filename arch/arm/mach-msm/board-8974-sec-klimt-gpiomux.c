@@ -62,6 +62,9 @@ static struct gpiomux_setting gpio_suspend_config[] = {
 	}
 
 static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
+#if defined(CONFIG_MACH_KLIMT_LTE_DCM)
+	GPIOMUX_SET_NC(8),
+#endif
 	GPIOMUX_SET_NC(9),
 	GPIOMUX_SET_NC(18),
 	GPIOMUX_SET_NC(43),
@@ -70,9 +73,14 @@ static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(59),
 	GPIOMUX_SET_NC(63),
 	GPIOMUX_SET_NC(69),
+#if !defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	GPIOMUX_SET_NC(74),
 	GPIOMUX_SET_NC(79),
 	GPIOMUX_SET_NC(81),
+#endif
+#if defined(CONFIG_MACH_KLIMT_LTE_DCM)
+	GPIOMUX_SET_NC(77),
+#endif
 	GPIOMUX_SET_NC(85),
 	GPIOMUX_SET_NC(89),
 	GPIOMUX_SET_NC(90),
@@ -232,11 +240,13 @@ static struct gpiomux_setting gpio_spi_config = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
+#if !defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static struct gpiomux_setting gpio_spi_cs1_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
 	.pull = GPIOMUX_PULL_UP,
 };
+#endif
 
 static struct gpiomux_setting gpio_spi_cs3_config = {
 	.func = GPIOMUX_FUNC_1,
@@ -807,12 +817,14 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_cs2_config,
 		},
 	},
+#if !defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	{
 		.gpio      = 8,		/* BLSP1 QUP SPI_CS1_N */
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_cs1_config,
 		},
 	},
+#endif
 #endif
 	{
 		.gpio      = 6,		/* BLSP1 QUP2 I2C_DAT */
@@ -1499,6 +1511,7 @@ static struct msm_gpiomux_config speaker_enable_config[] __initdata = {
 	},	
 };
 
+#if !defined(CONFIG_MACH_KLIMT_LTE_DCM)
 static struct msm_gpiomux_config if_con_sense_18_config[] __initdata = {
 	{
 		.gpio	= 77,		/* IF_CON_SENSE_18 */
@@ -1508,6 +1521,7 @@ static struct msm_gpiomux_config if_con_sense_18_config[] __initdata = {
 		},
 	},
 };
+#endif
 
 static struct msm_gpiomux_config msm_taiko_config[] __initdata = {
 	{
@@ -1820,7 +1834,9 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_install(msm_taiko_config, ARRAY_SIZE(msm_taiko_config));
 	msm_gpiomux_install(tx_gtr_thres_enable_config, ARRAY_SIZE(tx_gtr_thres_enable_config));
 	msm_gpiomux_install(speaker_enable_config, ARRAY_SIZE(speaker_enable_config));
+#if !defined(CONFIG_MACH_KLIMT_LTE_DCM)
 	msm_gpiomux_install(if_con_sense_18_config, ARRAY_SIZE(if_con_sense_18_config));
+#endif	
 	msm_gpiomux_install(msm_hsic_hub_configs,
 				ARRAY_SIZE(msm_hsic_hub_configs));
 

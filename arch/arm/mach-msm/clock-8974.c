@@ -5184,21 +5184,28 @@ static struct clk_lookup msm_clocks_8974_common[] __initdata = {
 	CLK_LOOKUP("core_clk", gcc_blsp1_uart3_apps_clk.c, "f991f000.serial"),
 	CLK_LOOKUP("core_clk", gcc_blsp1_uart4_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp1_uart5_apps_clk.c, ""),
+
+
 #ifdef CONFIG_FELICA
+	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f995f000.serial"),
+	CLK_LOOKUP("core_clk", gcc_blsp2_uart3_apps_clk.c, "f995f000.serial"),
+#if defined (CONFIG_MACH_HLTEDCM) || defined (CONFIG_MACH_HLTEKDI) || defined (CONFIG_MACH_JS01LTEDCM)
 	CLK_LOOKUP("iface_clk", gcc_blsp1_ahb_clk.c, "f9922000.serial"),
 	CLK_LOOKUP("core_clk", gcc_blsp1_uart6_apps_clk.c, "f9922000.serial"),
-
+#elif defined (CONFIG_MACH_KLTE_KDI) || defined (CONFIG_MACH_KLTE_DCM)
+	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9962000.serial"),        // REV 04 change.
+	CLK_LOOKUP("core_clk", gcc_blsp2_uart6_apps_clk.c, "f9962000.serial"),    // REV 04 change.
+#endif
 #else
+	CLK_LOOKUP("core_clk", gcc_blsp2_uart3_apps_clk.c, ""),
+	CLK_LOOKUP("core_clk", gcc_blsp2_uart6_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp1_uart6_apps_clk.c, ""),
 #endif
 
-#if defined(CONFIG_I2C_ACTUATOR) || defined(CONFIG_FELICA)
-	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9965000.i2c"),
-	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9966000.i2c"),
-#else
+
 	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9965000.i2c"), /* BLSP#9 */
 	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9966000.i2c"), /* BLSP#10 */
-#endif
+
 	CLK_LOOKUP("core_clk", gcc_blsp2_qup1_i2c_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp2_qup1_spi_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp2_qup2_i2c_apps_clk.c, ""),
@@ -5209,19 +5216,11 @@ static struct clk_lookup msm_clocks_8974_common[] __initdata = {
 	CLK_LOOKUP("core_clk", gcc_blsp2_qup4_spi_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp2_qup6_spi_apps_clk.c, ""),
 
-#ifdef CONFIG_FELICA
-	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f995f000.serial"),
-	CLK_LOOKUP("core_clk", gcc_blsp2_uart3_apps_clk.c, "f995f000.serial"),
-	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9962000.serial"),        // REV 04 change.
-	CLK_LOOKUP("core_clk", gcc_blsp2_uart6_apps_clk.c, "f9962000.serial"),    // REV 04 change.
-#else
 #ifdef CONFIG_SEC_NFC_SENN3AB
 	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f995f000.serial"),
 	CLK_LOOKUP("core_clk", gcc_blsp2_uart3_apps_clk.c, "f995f000.serial"),
 #endif
-	CLK_LOOKUP("core_clk", gcc_blsp2_uart3_apps_clk.c, ""),
-	CLK_LOOKUP("core_clk", gcc_blsp2_uart6_apps_clk.c, ""),
-#endif
+
 	CLK_LOOKUP("core_clk", gcc_blsp2_uart4_apps_clk.c, ""),
 	CLK_LOOKUP("core_clk", gcc_blsp2_uart5_apps_clk.c, ""),
 

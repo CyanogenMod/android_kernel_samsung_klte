@@ -1052,6 +1052,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_send_relative_addr(host, &card->rca);
 		if (err)
 			return err;
+		host->card = card;
 	}
 
 	if (!oldcard) {
@@ -1121,7 +1122,6 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
-	host->card = card;
 	return 0;
 
 free_card:
@@ -1130,8 +1130,10 @@ free_card:
 	else
 		pr_info("%s: card status is 0x%.8x\n", __func__, status);
 
-	if (!oldcard)
+	if (!oldcard) {
+		host->card = NULL;
 		mmc_remove_card(card);
+	}
 
 	return err;
 }
@@ -1228,7 +1230,8 @@ static int mmc_sd_suspend(struct mmc_host *host)
 	 * Disable clock scaling before suspend and enable it after resume so
 	 * as to avoid clock scaling decisions kicking in during this window.
 	 */
-	mmc_disable_clk_scaling(host);
+	if (mmc_can_scale_clk(host))
+		mmc_disable_clk_scaling(host);
 
 	mmc_claim_host(host);
 	if (!mmc_host_is_spi(host))

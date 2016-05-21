@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2012 - 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2012 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 #include "implementation_defs.h"
@@ -12,8 +12,8 @@ void
 debug_strbuf_reset(
         struct DebugStrbuf *buf)
 {
-  buf->offset = 0;
-  buf->buffer[0] = 0;
+    buf->offset = 0;
+    buf->buffer[0] = 0;
 }
 
 
@@ -22,15 +22,15 @@ debug_strbuf_get_block(
         struct DebugStrbuf *buf,
         int size)
 {
-  char *p = NULL;
+    char *p = NULL;
 
-  if (size + 1 < (sizeof buf->buffer) - buf->offset)
+    if (size + 1 < (sizeof buf->buffer) - buf->offset)
     {
-      p = buf->buffer + buf->offset;
-      buf->offset += size + 1;
+        p = buf->buffer + buf->offset;
+        buf->offset += size + 1;
     }
 
-  return p;
+    return p;
 }
 
 
@@ -40,8 +40,8 @@ debug_strbuf_buffer_get(
         char **str_p,
         int *len_p)
 {
-  *str_p = buf->buffer + buf->offset;
-  *len_p = (sizeof buf->buffer) - buf->offset;
+    *str_p = buf->buffer + buf->offset;
+    *len_p = (sizeof buf->buffer) - buf->offset;
 }
 
 
@@ -50,7 +50,7 @@ debug_strbuf_buffer_commit(
         struct DebugStrbuf *buf,
         int len)
 {
-  ASSERT(buf->offset + len <= sizeof buf->buffer);
+    ASSERT(buf->offset + len <= sizeof buf->buffer);
 
-  buf->offset += len;
+    buf->offset += len;
 }

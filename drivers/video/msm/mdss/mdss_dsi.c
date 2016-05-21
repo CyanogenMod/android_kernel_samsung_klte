@@ -62,7 +62,9 @@ int get_lcd_pcd_detected(void);
 #if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
 void xlog(const char *name, u32 data0, u32 data1, u32 data2, u32 data3, u32 data4, u32 data5);
 #endif
+#if !defined(CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL)
 extern int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,char *dst_format);
+#endif
 
 static int mdss_dsi_regulator_init(struct platform_device *pdev)
 {
@@ -675,6 +677,7 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata)
 			pr_err("%s: unable to config tlmm = %d\n",
 				__func__, ctrl_pdata->disp_te_gpio);
 			gpio_free(ctrl_pdata->disp_te_gpio);
+			mutex_unlock(&ctrl_pdata->mutex);
 			return -ENODEV;
 		}
 	}
@@ -956,7 +959,7 @@ static int mdss_dsi_ulps_config_sub(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 error:
 	return ret;
 }
-
+#if !defined(CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL)
 static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 				int mode)
 {
@@ -976,12 +979,13 @@ static int mdss_dsi_update_panel_config(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	}
 
 	ctrl_pdata->panel_mode = pinfo->mipi.mode;
-	mdss_panel_get_dst_fmt(pinfo->bpp, pinfo->mipi.mode,
+	mdss_panel_dt_get_dst_fmt(pinfo->bpp, pinfo->mipi.mode,
 			pinfo->mipi.pixel_packing, &(pinfo->mipi.dst_format));
 	pinfo->cont_splash_enabled = 0;
 
 	return ret;
 }
+#endif
 static int mdss_dsi_ulps_config(struct mdss_dsi_ctrl_pdata *ctrl,
 	int enable)
 {
@@ -1238,7 +1242,8 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata)
 			return ret;
 		}
         }
-#if !defined(FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_HD_PANEL)
+#if !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_HD_PANEL) && \
+	! defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
 	if (pdata->panel_info.type == MIPI_VIDEO_PANEL &&
 			ctrl_pdata->off_cmds.link_state == DSI_LP_MODE) {
 		mdss_dsi_sw_reset(pdata);
@@ -1466,24 +1471,24 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	switch (event) {
 	case MDSS_EVENT_UNBLANK:
 		rc = mdss_dsi_on(pdata);
-        	mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode,pdata);
-		if (ctrl_pdata->dsi_on_state == DSI_LP_MODE)
+		mdss_dsi_op_mode_config(pdata->panel_info.mipi.mode,
+							pdata);
+		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
 	case MDSS_EVENT_PANEL_ON:
 		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
 		ctrl_pdata->mdp_tg_on = 1;
-		if (ctrl_pdata->dsi_on_state == DSI_HS_MODE)
+		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		break;
 	case MDSS_EVENT_BLANK:
-		if (ctrl_pdata->dsi_off_state == DSI_HS_MODE)
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_blank(pdata);
 		break;
 	case MDSS_EVENT_PANEL_OFF:
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
-//		ctrl_pdata->mdp_tg_on = 0;         /* Its not required here suggested by QCom */
-		if (ctrl_pdata->dsi_off_state == DSI_LP_MODE)
+		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata);
 		rc = mdss_dsi_off(pdata);
 		break;
@@ -1514,12 +1519,12 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
 
 #if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
-		if (ctrl_pdata->dsi_off_state == DSI_HS_MODE){
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE){
 			ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
                         rc = mdss_dsi_blank(pdata);
 		}
 #else
-		if (ctrl_pdata->dsi_off_state == DSI_LP_MODE)
+		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
                     rc = mdss_dsi_blank(pdata);
 #endif
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
@@ -1572,7 +1577,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		&& !defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
 		ctrl_pdata->mdp_tg_on = 1;
 	/*Event is send only if cont_splash feature is enabled */
-		if (ctrl_pdata->dsi_off_state == DSI_HS_MODE) {
+		if (ctrl_pdata->off_cmds.link_state == DSI_HS_MODE) {
 			/* Panel is Enabled in Bootloader */
 			ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
 			rc = mdss_dsi_blank(pdata);
@@ -1590,10 +1595,12 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
 			(struct mdss_panel_recovery *)arg);
 		break;
+#if !defined(CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL)
 	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
 		rc = mdss_dsi_update_panel_config(ctrl_pdata,
 					(int)(unsigned long) arg);
 		break;
+#endif
 	default:
 		if(ctrl_pdata->event_handler)
 			rc = ctrl_pdata->event_handler(event);
@@ -1654,64 +1661,8 @@ static struct device_node *mdss_dsi_pref_prim_panel(
 static struct device_node *mdss_dsi_find_panel_of_node(
 		struct platform_device *pdev, char *panel_cfg)
 {
-	int len, i;
-	int ctrl_id = pdev->id - 1;
-	char panel_name[MDSS_MAX_PANEL_LEN];
-	char ctrl_id_stream[3] =  "0:";
-	char *stream = NULL, *pan = NULL;
-	struct device_node *dsi_pan_node = NULL, *mdss_node = NULL;
+	struct device_node *dsi_pan_node = NULL;
 
-	len = strlen(panel_cfg);
-#if defined(CONFIG_MACH_KS01EUR)
-	if (1) {
-#else
-	if(0){
-#endif
-		/* no panel cfg chg, parse dt */
-		pr_debug("%s:%d: no cmd line cfg present\n",
-			 __func__, __LINE__);
-		goto end;
-	} else {
-		if (ctrl_id == 1)
-			strlcpy(ctrl_id_stream, "1:", 3);
-
-		stream = strnstr(panel_cfg, ctrl_id_stream, len);
-		if (!stream) {
-			pr_err("controller config is not present\n");
-			goto end;
-		}
-		stream += 2;
-
-		pan = strnchr(stream, strlen(stream), ':');
-		if (!pan) {
-			strlcpy(panel_name, stream, MDSS_MAX_PANEL_LEN);
-		} else {
-			for (i = 0; (stream + i) < pan; i++)
-				panel_name[i] = *(stream + i);
-			panel_name[i] = 0;
-		}
-
-		pr_debug("%s:%d:%s:%s\n", __func__, __LINE__,
-			 panel_cfg, panel_name);
-
-		mdss_node = of_parse_phandle(pdev->dev.of_node,
-					     "qcom,mdss-mdp", 0);
-
-		if (!mdss_node) {
-			pr_err("%s: %d: mdss_node null\n",
-			       __func__, __LINE__);
-			return NULL;
-		}
-		dsi_pan_node = of_find_node_by_name(mdss_node,
-						    panel_name);
-		if (!dsi_pan_node) {
-			pr_err("%s: invalid pan node, selecting prim panel\n",
-			       __func__);
-			goto end;
-		}
-		return dsi_pan_node;
-	}
-end:
 	dsi_pan_node = mdss_dsi_pref_prim_panel(pdev);
 
 	return dsi_pan_node;
@@ -1740,7 +1691,8 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 	}
 #if !defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION) && \
 	!defined(CONFIG_FB_MSM_MIPI_SAMSUNG_TFT_VIDEO_WQXGA_PT_PANEL) && \
-	!defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
+	!defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL) && \
+	!defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
 	if (get_lcd_attached() == 0) {
 		pr_err("%s : lcd is not attached..\n",__func__);
 		return -ENODEV;
@@ -2017,7 +1969,6 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	int  i, len;
 	struct device_node *dsi_ctrl_np = NULL;
 	struct platform_device *ctrl_pdev = NULL;
-	bool dynamic_fps;
 	const char *data;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 
@@ -2115,63 +2066,15 @@ int dsi_panel_device_register(struct device_node *pan_node,
 		pan_node, "qcom,mdss-dsi-panel-broadcast-mode");
 */
 
-	dynamic_fps = of_property_read_bool(pan_node,
-					  "qcom,mdss-dsi-pan-enable-dynamic-fps");
-	if (dynamic_fps) {
-		pinfo->dynamic_fps = true;
-		data = of_get_property(pan_node,
-					  "qcom,mdss-dsi-pan-fps-update", NULL);
-		if (data) {
-			if (!strcmp(data, "dfps_suspend_resume_mode")) {
-				pinfo->dfps_update =
-						DFPS_SUSPEND_RESUME_MODE;
-				pr_debug("%s: dfps mode: suspend/resume\n",
-								__func__);
-			} else if (!strcmp(data,
-					    "dfps_immediate_clk_mode")) {
-				pinfo->dfps_update =
-						DFPS_IMMEDIATE_CLK_UPDATE_MODE;
-				pr_debug("%s: dfps mode: Immediate clk\n",
-								__func__);
-			} else if (!strcmp(data,
-					    "dfps_immediate_porch_mode")) {
-				pinfo->dfps_update =
-					DFPS_IMMEDIATE_PORCH_UPDATE_MODE;
-				pr_debug("%s: dfps mode: Immediate porch\n",
-								__func__);
-			} else {
-				pr_debug("%s: dfps to default mode\n",
-								__func__);
-				pinfo->dfps_update =
-						DFPS_SUSPEND_RESUME_MODE;
-				pr_debug("%s: dfps mode: suspend/resume\n",
-								__func__);
-			}
-		} else {
-			pr_debug("%s: dfps update mode not configured\n",
-								__func__);
-				pinfo->dynamic_fps =
-								false;
-				pr_debug("%s: dynamic FPS disabled\n",
-								__func__);
-		}
-		pinfo->new_fps = pinfo->mipi.frame_rate;
-	}
-
 	pinfo->panel_max_fps = mdss_panel_get_framerate(pinfo);
 	pinfo->panel_max_vtotal = mdss_panel_get_vtotal(pinfo);
 
-#if !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL)
+#if 1
 	ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
 		"qcom,enable-gpio", 0);
 #else
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL)
-	ctrl_pdata->disp_en_gpio = of_get_named_gpio(pan_node,
-		"qcom,platform-enable-gpio", 0);
-#else
 	ctrl_pdata->disp_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-enable-gpio", 0);
-#endif
 #endif
 	pr_err("%s:%d, Disp_en_gpio (%d)",__func__, __LINE__,ctrl_pdata->disp_en_gpio );
 
@@ -2631,15 +2534,17 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	if (pinfo->cont_splash_enabled) {
 		pr_info("%s : splash enabled..panel_power_on (1)\n", __func__);
 		pinfo->panel_power_on = 1;
-		rc = mdss_dsi_panel_power_on(&(ctrl_pdata->panel_data), 1);
-		if (rc) {
-			pr_err("%s: Panel power on failed\n", __func__);
-			return rc;
+		if(ctrl_pdata->ndx == DSI_CTRL_0) {
+			rc = mdss_dsi_panel_power_on(&(ctrl_pdata->panel_data), 1);
+			if (rc) {
+				pr_err("%s: Panel power on failed\n", __func__);
+				return rc;
+			}
 		}
 
 		mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
 #if (defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL) || \
-	defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)) && !defined(CONFIG_MACH_KS01EUR)
+	defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL))
 		ctrl_pdata->ctrl_state |= (CTRL_STATE_PANEL_INIT | CTRL_STATE_MDP_ACTIVE);
 #else
 		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;

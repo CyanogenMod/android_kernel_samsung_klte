@@ -93,6 +93,10 @@ struct sec_charger_info {
 	int reg_data;
 	int irq_base;
 	bool is_slow_charging;
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+	bool is_mdock;
+	bool is_smartotg;
+#endif
 	struct delayed_work slow_work;
 };
 

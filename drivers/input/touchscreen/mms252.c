@@ -185,7 +185,7 @@ static int tsp_power_enabled;
 #if defined(CONFIG_MACH_MILLET3G_CHN_OPEN)
 #define FW_VERSION_DATE "140415"
 #endif
-#define FW_VERSION_EL 0x16
+#define FW_VERSION_EL 0x18
 
 #define MAX_FW_PATH 255
 #define TSP_FW_FILENAME "melfas_fw.bin"
@@ -4169,6 +4169,12 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	if (ret)
 		dev_err(&client->dev, "Failed to create sysfs group\n");
 
+	ret = sysfs_create_link(&fac_dev_ts->kobj, &info->input_dev->dev.kobj, "input");
+	if (ret < 0) {
+		dev_err(&client->dev,
+				"%s: Failed to create input symbolic link\n",
+				__func__);
+	}
 #endif
 	return 0;
 

@@ -106,14 +106,14 @@
 				23 01 00 00 00 00 02 FF 01	   /* Hsync On */
 				29 01 00 00 00 00 03 FC A5 A5 /* Level3 key Disable */
 			];
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "dsi_hs_mode";
 		qcom,panel-display-off-seq = [
 				05 01 00 00 0A 00 02 28 00
 				/* !! Needs 10ms(=0x0A) wait !!*/
 				05 01 00 00 78 00 02 10 00
 				/* !! Needs 120ms(=0x78) wait !!*/
 		];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 		/*
 			the last byte in read commands  represent READ LENGH,

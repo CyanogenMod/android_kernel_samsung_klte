@@ -81,6 +81,9 @@ struct sii8240_platform_data {
 	int charging_type;
 	void (*int_gpio_config)(bool);
 	/* void (*vbus_present)(bool on); */
+#ifdef CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK 
+	bool is_multimediadock;
+#endif
 #ifdef CONFIG_SAMSUNG_MHL_UNPOWERED
 	int (*get_vbus_status)(void);
 	void (*sii9234_otg_control)(bool onoff);

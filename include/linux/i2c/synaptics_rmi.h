@@ -76,5 +76,12 @@ struct synaptics_rmi4_platform_data {
 #ifdef SYNAPTICS_RMI_INFORM_CHARGER	
 	void (*register_cb)(struct synaptics_rmi_callbacks *);
 #endif
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+	void (*hsync_onoff)(bool onoff);
+#endif
 };
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_PREVENT_HSYNC_LEAKAGE)
+extern void mdss_dsi_panel_hsync_onoff(bool onoff);
+#endif
+
 #endif

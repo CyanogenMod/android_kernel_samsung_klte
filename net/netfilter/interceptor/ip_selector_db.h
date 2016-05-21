@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2013 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 #ifndef IP_SELECTOR_DB_H
@@ -12,18 +12,18 @@
 
 struct IPSelectorDbEntry
 {
-  uint32_t action;
-  uint32_t id;
-  uint32_t priority;
+    uint32_t action;
+    uint32_t id;
+    uint32_t priority;
 
-  struct IPSelectorDbEntry *next;
+    struct IPSelectorDbEntry *next;
 };
 
 #define IP_SELECTOR_DB_PARTS 2
 
 struct IPSelectorDb
 {
-  struct IPSelectorDbEntry *heads[IP_SELECTOR_DB_PARTS];
+    struct IPSelectorDbEntry *heads[IP_SELECTOR_DB_PARTS];
 };
 
 

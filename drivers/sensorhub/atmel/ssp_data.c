@@ -32,6 +32,36 @@
 #define MCU_SLEEP_FACTORY_DATA_LENGTH		FACTORY_DATA_MAX
 #define GESTURE_FACTORY_DATA_LENGTH     4
 
+static void get_timestamp(struct ssp_data *data, int iSensorData,
+	struct sensor_value *sensorsdata, struct ssp_time_diff *sensortime)
+{
+	if ((iSensorData == PROXIMITY_SENSOR) || (iSensorData == GESTURE_SENSOR)
+		|| (iSensorData == STEP_DETECTOR) || (iSensorData == SIG_MOTION_SENSOR)
+		|| (iSensorData == STEP_COUNTER)) {
+		sensorsdata->timestamp = data->timestamp;
+		return;
+	}
+
+	if (((sensortime->irq_diff * 10) >
+		(data->adDelayBuf[iSensorData] * 18))
+		&& ((sensortime->irq_diff * 10) <
+		(data->adDelayBuf[iSensorData] * 100))) {
+		u64 move_timestamp;
+		u64 shift_timestamp =
+			div64_long(data->adDelayBuf[iSensorData], 2);
+		for (move_timestamp = data->lastTimestamp[iSensorData] +
+			data->adDelayBuf[iSensorData];
+			move_timestamp < (data->timestamp - shift_timestamp);
+			move_timestamp += data->adDelayBuf[iSensorData]) {
+			sensorsdata->timestamp = move_timestamp;
+			data->report_sensor_data[iSensorData](data,
+				sensorsdata);
+		}
+	}
+	sensorsdata->timestamp = data->timestamp;
+}
+
+
 /*************************************************************************/
 /* SSP parsing the dataframe                                             */
 /*************************************************************************/
@@ -264,6 +294,7 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 {
 	int iDataIdx, iSensorData;
 	struct sensor_value *sensorsdata;
+	struct ssp_time_diff sensortime;
 
 	sensorsdata = kzalloc(sizeof(*sensorsdata), GFP_KERNEL);
 	if (sensorsdata == NULL)
@@ -280,11 +311,29 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 				kfree(sensorsdata);
 				return ERROR;
 			}
-
+			sensortime.irq_diff = data->timestamp -
+				data->lastTimestamp[iSensorData];
 			data->get_sensor_data[iSensorData](pchRcvDataFrame,
 				&iDataIdx, sensorsdata);
-			data->report_sensor_data[iSensorData](data,
-				sensorsdata);
+			get_timestamp(data, iSensorData, sensorsdata,
+				&sensortime);
+
+			if (sensortime.irq_diff > 1000000)
+				data->report_sensor_data[iSensorData](data,
+					sensorsdata);
+			else if ((iSensorData == PROXIMITY_SENSOR) ||
+				(iSensorData == PROXIMITY_RAW) ||
+				(iSensorData == GESTURE_SENSOR) ||
+				(iSensorData == SIG_MOTION_SENSOR) ||
+				(iSensorData == STEP_DETECTOR) ||
+				(iSensorData == STEP_COUNTER))
+				data->report_sensor_data[iSensorData](data,
+					sensorsdata);
+			else
+				pr_info("[SSP]: %s irq_diff is under 1ms(%d)\n",
+					__func__, iSensorData);
+
+			data->lastTimestamp[iSensorData] = data->timestamp;
 		} else if (pchRcvDataFrame[iDataIdx] ==
 			MSG2AP_INST_SELFTEST_DATA) {
 			iDataIdx++;

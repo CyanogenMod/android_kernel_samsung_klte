@@ -65,8 +65,7 @@ static struct inode *ecryptfs_alloc_inode(struct super_block *sb)
 	inode_info->lower_file = NULL;
 #ifdef CONFIG_SDP
 	// get userid from super block
-	inode_info->userid = ecryptfs_super_block_get_userid(sb);
-	inode_info->crypt_stat.userid = inode_info->userid;
+	inode_info->crypt_stat.engine_id = -1;
 #endif
 	inode = &inode_info->vfs_inode;
 out:
@@ -167,16 +166,24 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 		else
 			seq_printf(m, ",ecryptfs_sig=%s", walker->sig);
 	}
+	mutex_unlock(&mount_crypt_stat->global_auth_tok_list_mutex);
+
 #ifdef CONFIG_SDP
-	if(ecryptfs_is_valid_userid(mount_crypt_stat->userid)){
-		seq_printf(m, ",userid=%d", mount_crypt_stat->userid);
-	}
+	seq_printf(m, ",userid=%d", mount_crypt_stat->userid);
+
 	if (mount_crypt_stat->flags & ECRYPTFS_MOUNT_SDP_ENABLED){
 		seq_printf(m, ",sdp_enabled");
 	}
+	if (mount_crypt_stat->partition_id >= 0){
+	    seq_printf(m, ",partition_id=%d", mount_crypt_stat->partition_id);
+	}
 #endif
-	mutex_unlock(&mount_crypt_stat->global_auth_tok_list_mutex);
 
+#ifdef CONFIG_DLP
+	if (mount_crypt_stat->flags & ECRYPTFS_MOUNT_DLP_ENABLED){
+		seq_printf(m, ",dlp_enabled");
+	}
+#endif
 	seq_printf(m, ",ecryptfs_cipher=%s",
 		mount_crypt_stat->global_default_cipher_name);
 
@@ -187,7 +194,7 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 	if (mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
 		seq_printf(m, ",ecryptfs_enable_filtering");
 #endif
-#ifdef CONFIG_CRYPTO_FIPS
+#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	if (mount_crypt_stat->flags & ECRYPTFS_ENABLE_CC)
 		seq_printf(m, ",ecryptfs_enable_cc");
 #endif
@@ -204,18 +211,6 @@ static int ecryptfs_show_options(struct seq_file *m, struct dentry *root)
 
 	return 0;
 }
-#ifdef CONFIG_SDP
-static int ecryptfs_drop_inode(struct inode *inode) {
-	struct ecryptfs_crypt_stat *crypt_stat =
-		    &ecryptfs_inode_to_private(inode)->crypt_stat;
-
-	if (crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
-		ecryptfs_printk(KERN_INFO, "dropping sensitive inode\n");
-		return 1;
-	}
-	return generic_drop_inode(inode);
-}
-#endif
 
 const struct super_operations ecryptfs_sops = {
 	.alloc_inode = ecryptfs_alloc_inode,
@@ -223,8 +218,5 @@ const struct super_operations ecryptfs_sops = {
 	.statfs = ecryptfs_statfs,
 	.remount_fs = NULL,
 	.evict_inode = ecryptfs_evict_inode,
-	.show_options = ecryptfs_show_options,
-#ifdef CONFIG_SDP
-	.drop_inode = ecryptfs_drop_inode,
-#endif
+	.show_options = ecryptfs_show_options
 };

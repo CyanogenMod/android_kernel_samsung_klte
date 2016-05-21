@@ -1,7 +1,7 @@
 /*
  * Linux OS Independent Layer
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.c 476208 2014-05-08 05:18:26Z $
+ * $Id: linux_osl.c 519634 2014-12-08 13:23:52Z $
  */
 
 #define LINUX_PORT
@@ -297,10 +297,9 @@ int osl_static_mem_init(osl_t *osh, void *adapter)
 				ASSERT(osh->magic == OS_HANDLE_MAGIC);
 				kfree(osh);
 				return -ENOMEM;
+			} else {
+				printk("alloc static buf at %p!\n", bcm_static_buf);
 			}
-			else
-				printk("alloc static buf at %x!\n", (unsigned int)bcm_static_buf);
-
 
 			sema_init(&bcm_static_buf->static_sem, 1);
 
@@ -790,7 +789,7 @@ osl_pktget_static(osl_t *osh, uint len)
 			bcm_static_skb->pkt_use[i] = 1;
 
 			skb = bcm_static_skb->skb_4k[i];
-			skb->tail = skb->data + len;
+			skb_set_tail_pointer(skb, len);
 			skb->len = len;
 
 			up(&bcm_static_skb->osl_pkt_sem);
@@ -808,7 +807,7 @@ osl_pktget_static(osl_t *osh, uint len)
 		if (i != STATIC_PKT_MAX_NUM) {
 			bcm_static_skb->pkt_use[i + STATIC_PKT_MAX_NUM] = 1;
 			skb = bcm_static_skb->skb_8k[i];
-			skb->tail = skb->data + len;
+			skb_set_tail_pointer(skb, len);
 			skb->len = len;
 
 			up(&bcm_static_skb->osl_pkt_sem);
@@ -821,7 +820,7 @@ osl_pktget_static(osl_t *osh, uint len)
 		bcm_static_skb->pkt_use[STATIC_PKT_MAX_NUM * 2] = 1;
 
 		skb = bcm_static_skb->skb_16k;
-		skb->tail = skb->data + len;
+		skb_set_tail_pointer(skb, len);
 		skb->len = len;
 
 		up(&bcm_static_skb->osl_pkt_sem);

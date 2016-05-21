@@ -334,6 +334,7 @@ void cypress_power_onoff(struct cypress_touchkey_info *info, int onoff)
 			if (IS_ERR(max77826_ldo15)) {
 				dev_err(&info->client->dev,
 					"Regulator(max77826_ldo15) get failed rc = %ld\n", PTR_ERR(max77826_ldo15));
+				max77826_ldo15 = NULL;
 				return;
 			}
 

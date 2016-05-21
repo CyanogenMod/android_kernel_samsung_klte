@@ -26,7 +26,7 @@
 enum vibrator_model {
 	NO_VIBRATOR,
 	HAPTIC_PWM,
-	HAPTIC_MOTOR,/* tspdrv flow will support this model as inbuilt */
+	HAPTIC_MOTOR,
 };
 
 struct vibrator_platform_data {
@@ -34,23 +34,27 @@ struct vibrator_platform_data {
 	unsigned int haptic_pwr_en_gpio;/* gpio number of haptic power enable */
 	unsigned int vib_en_gpio;/* gpio number of vibrator enable */
 	unsigned int is_pmic_haptic_pwr_en;	/* 1 -> pmic gpio used,\
-						0 -> msm gpio used */
+						   0 -> msm gpio used */
 	unsigned int is_pmic_vib_en;		/* 1 -> pmic gpio used,\
-						0 -> msm gpio used */
+						   0 -> msm gpio used */
 	unsigned int is_pmic_vib_pwm ;
 	enum vibrator_model vib_model;
-	struct pwm_device	*pwm_dev;					
+	struct pwm_device	*pwm_dev;
 	unsigned int pwm_period_us;
 	unsigned int duty_us;
 	void (*power_onoff)(int onoff);
 	struct clk *gp2_clk;
+
+	unsigned int changed_chip;
+	unsigned int changed_en_gpio;
 #if defined(CONFIG_MOTOR_DRV_DRV2603)
 	unsigned int drv2603_en_gpio;
 #endif
 #if defined(CONFIG_MOTOR_DRV_MAX77888)
 	unsigned int max77888_en_gpio;
 #endif
-
+	unsigned int intensity;
+	unsigned int state;
 };
 
 struct vibrator_platform_data_motor {
@@ -59,21 +63,22 @@ struct vibrator_platform_data_motor {
 
 #if defined(CONFIG_HAPTIC_ISA1200)
 
-	struct vibrator_platform_data_isa1200 {
-		unsigned int motor_en;
-		unsigned int vib_clk;
-		struct i2c_client *client;
+struct vibrator_platform_data_isa1200 {
+	unsigned int motor_en;
+	unsigned int vib_clk;
+	struct i2c_client *client;
 #if defined(CONFIG_MACH_MATISSE3G_OPEN) || defined (CONFIG_SEC_MATISSELTE_COMMON) || defined (CONFIG_MACH_T10_3G_OPEN)
-		void (*power_onoff)(int onoff);
+	void (*power_onoff)(int onoff);
 #endif
-	};
+	unsigned int intensity;
+};
 #endif
 
 #if defined(CONFIG_DRV2604_VIBRATOR)
-	struct vibrator_platform_data_drv2604 {
-		 unsigned int motor_en;
-		 struct i2c_client *client;
-	};
+struct vibrator_platform_data_drv2604 {
+	unsigned int motor_en;
+	struct i2c_client *client;
+};
 
 #endif
 

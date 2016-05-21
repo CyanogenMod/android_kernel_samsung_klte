@@ -67,10 +67,6 @@ endif
 ifeq ($(CONFIG_SEC_K_PROJECT),y)
     ifeq ($(CONFIG_MACH_KLTE_KOR),y)
         # dtbs for KOR
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r03.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r04.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r05.dtb
-        dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r06.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r07.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r08.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kkor-r09.dtb
@@ -102,18 +98,13 @@ ifeq ($(CONFIG_SEC_K_PROJECT),y)
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kchn-r10.dtb
     else ifeq ($(CONFIG_MACH_KLTE_JPN),y)
 	# dtbs for JPN
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r03.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r04.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r05.dtb    
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r06.dtb
-	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r07.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r08.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r09.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r10.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r11.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r12.dtb
 	dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-kjpn-r13.dtb
-	else
+    else
         # default dtbs
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r03.dtb
         dtb-$(CONFIG_SEC_K_PROJECT)	+= msm8974pro-ac-sec-k-r04.dtb
@@ -147,36 +138,52 @@ ifeq ($(CONFIG_SEC_LOCALE_KOR),y)
 	dtb-y += msm8974-sec-hltekor-r06.dtb
 	dtb-y += msm8974-sec-hltekor-r07.dtb
 else ifeq ($(CONFIG_SEC_LOCALE_JPN),y)
-	dtb-y	+= msm8974-sec-hltejpn-r03.dtb
-	dtb-y	+= msm8974-sec-hltejpn-r04.dtb
 	dtb-y	+= msm8974-sec-hltejpn-r05.dtb
 	dtb-y	+= msm8974-sec-hltejpn-r06.dtb
 	dtb-y	+= msm8974-sec-hltejpn-r07.dtb
 	dtb-y	+= msm8974-sec-hltejpn-r08.dtb
 else
 	ifeq ($(CONFIG_MACH_H3GDUOS),y)
-		dtb-y	+= msm8974-sec-h3gchnduos-r03.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r04.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r05.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r06.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r07.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r08.dtb
-		dtb-y	+= msm8974-sec-h3gchnduos-r09.dtb
+		ifeq ($(CONFIG_MACH_H3GDUOS_CU),y)
+			dtb-y	+= msm8974-sec-h3gchncu-r07.dtb
+			dtb-y	+= msm8974-sec-h3gchncu-r09.dtb
+		else
+			dtb-y	+= msm8974-sec-h3gchnduos-r07.dtb
+			dtb-y	+= msm8974-sec-h3gchnduos-r08.dtb
+		endif
 else
 	ifeq ($(CONFIG_MACH_JSGLTE_CHN_CMCC),y)
+		dtb-y	+= msm8974-sec-jsglte-r01.dtb
 		dtb-y	+= msm8974-sec-jsglte-r02.dtb
 		dtb-y	+= msm8974-sec-jsglte-r03.dtb
 		dtb-y	+= msm8974-sec-jsglte-r04.dtb
 	else
-		dtb-y += msm8974-sec-hlte-r04.dtb
-		dtb-y += msm8974-sec-hlte-r05.dtb
-		dtb-y += msm8974-sec-hlte-r06.dtb
-		dtb-y += msm8974-sec-hlte-r07.dtb
-		dtb-y += msm8974-sec-hlte-r09.dtb
+		ifeq ($(CONFIG_MACH_H3G_CHN_CMCC),y)
+			dtb-y += msm8974-sec-hlte-chn-r06.dtb
+			dtb-y += msm8974-sec-hlte-chn-r07.dtb
+			dtb-y += msm8974-sec-hlte-chn-r09.dtb
+		else
+			ifeq ($(CONFIG_MACH_H3G_CHN_OPEN),y)
+				dtb-y += msm8974-sec-hlte-chn-r03.dtb
+				dtb-y += msm8974-sec-hlte-chn-r07.dtb
+				dtb-y += msm8974-sec-hlte-chn-r09.dtb
+			else
+				ifeq ($(CONFIG_MACH_HLTE_CHN_CMCC),y)
+					dtb-y += msm8974-sec-hlte-chn-r07.dtb
+					dtb-y += msm8974-sec-hlte-chn-r09.dtb
+				else
+					dtb-y += msm8974-sec-hlte-r05.dtb
+					dtb-y += msm8974-sec-hlte-r06.dtb
+					dtb-y += msm8974-sec-hlte-r07.dtb
+					dtb-y += msm8974-sec-hlte-r09.dtb
+				endif
+			endif
+		endif
 	endif
   endif
 endif
 endif
+
 ifeq ($(CONFIG_SEC_FRESCO_PROJECT),y)
 ifeq ($(CONFIG_SEC_LOCALE_KOR),y)
 	dtb-y += msm8974-sec-frescoltekor-r07.dtb
@@ -202,6 +209,9 @@ ifeq ($(CONFIG_SEC_LOCALE_JPN),y)
 ifeq ($(CONFIG_MACH_CHAGALL_KDI),y)
 	# dtbs for JPN KDI (8974Pro)
 	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974pro-ac-sec-chagalljpn-r00.dtb
+	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974pro-ac-sec-chagalljpn-r01.dtb
+	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974pro-ac-sec-chagalljpn-r02.dtb
+	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974pro-ac-sec-chagalljpn-r03.dtb
 else
 	# dtbs for JPN
 	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974-sec-chagalljpn-r00.dtb
@@ -214,11 +224,17 @@ else
 	dtb-$(CONFIG_SEC_CHAGALL_PROJECT)	+= msm8974-sec-chagall-r03.dtb
 endif
 endif
+ifeq ($(CONFIG_SEC_LOCALE_JPN),y)
+	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimtjpn-r03.dtb
+	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimtjpn-r04.dtb
+	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimtjpn-r05.dtb
+else
 	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimt-r00.dtb
 	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimt-r01.dtb
 	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimt-r02.dtb
 	dtb-$(CONFIG_SEC_KLIMT_PROJECT)	+= msm8974-sec-klimt-r03.dtb
-	dtb-$(CONFIG_SEC_V2_PROJECT)	+= msm8974-sec-v2lte-r00.dtb
+endif
+#	dtb-$(CONFIG_SEC_V2_PROJECT)	+= msm8974-sec-v2lte-r00.dtb
 	dtb-$(CONFIG_SEC_V2_PROJECT)	+= msm8974-sec-v2lte-r01.dtb
 	dtb-$(CONFIG_SEC_V2_PROJECT)	+= msm8974-sec-v2lte-r02.dtb
 ifeq ($(CONFIG_SEC_F_PROJECT),y)
@@ -272,6 +288,12 @@ ifeq ($(CONFIG_SEC_LOCALE_KOR),y)
 else ifeq ($(CONFIG_SEC_LOCALE_JPN),y)
     # dtbs for JPN
     dtb-$(CONFIG_SEC_KACTIVE_PROJECT)	+= msm8974pro-ac-sec-kactiveltedcm-r02.dtb
+else ifeq ($(CONFIG_MACH_KACTIVELTE_KOR),y)
+    dtb-y += msm8974pro-ac-sec-kactiveltekor-r02.dtb
+    dtb-y += msm8974pro-ac-sec-kactiveltekor-r03.dtb
+    dtb-y += msm8974pro-ac-sec-kactiveltekor-r04.dtb
+    dtb-y += msm8974pro-ac-sec-kactiveltekor-r05.dtb
+    dtb-y += msm8974pro-ac-sec-kactiveltekor-r06.dtb
 else
     # default dtbs
     dtb-$(CONFIG_SEC_KACTIVE_PROJECT)	+= msm8974pro-ac-sec-kactivelte-r00.dtb
@@ -316,7 +338,7 @@ endif
 #        dtb-$(CONFIG_ARCH_MSM8226)	+= apq8026-v2-mtp.dtb
 #	 dtb-$(CONFIG_ARCH_MSM8226)	+= apq8026-v2-720p-mtp.dtb
 #	 dtb-$(CONFIG_ARCH_MSM8226)	+= apq8026-v2-1080p-mtp.dtb
-	 dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-v1-mtp-r01.dtb
+#	 dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-v1-mtp-r01.dtb
 ifeq ($(CONFIG_MACH_MILLET3G_CHN_OPEN),y)
          dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-sec-millet3g-chn-open-r00.dtb
 else ifeq ($(CONFIG_MACH_MILLET3G_EUR),y)

@@ -103,19 +103,6 @@ static struct gpiomux_setting nc_cfg = {
 };
 #endif
 
-#if defined(CONFIG_MACH_MILLETLTE_TMO)
-#define NC_GPIO_CONFIG_TMO(gpio_num) { \
-		.gpio = gpio_num, \
-		.settings ={[GPIOMUX_SUSPENDED] = &nc_cfg_tmo,}\
-}
-
-static struct gpiomux_setting nc_cfg_tmo = {
-	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
-};
-#endif
-
 #if defined(CONFIG_MACH_MILLETLTE_CAN)
 #define NC_GPIO_CONFIG_CAN(gpio_num) { \
 		.gpio = gpio_num, \
@@ -1623,9 +1610,7 @@ static struct msm_gpiomux_config milletwifi_nc_gpio_cfgs[] __initdata = {
 static struct msm_gpiomux_config milletltevzw_att_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(2),
 	NC_GPIO_CONFIG(3),
-#if defined(CONFIG_MACH_MILLETLTE_TMO)
-	NC_GPIO_CONFIG_TMO(22),
-#elif defined(CONFIG_MACH_MILLETLTE_CAN)
+#if defined(CONFIG_MACH_MILLETLTE_CAN)
 	NC_GPIO_CONFIG_CAN(22),
 #else
 	NC_GPIO_CONFIG(22),

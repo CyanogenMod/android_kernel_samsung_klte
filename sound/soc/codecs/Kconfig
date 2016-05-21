@@ -42,6 +42,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_MAX98504 if I2C
 	select SND_SOC_MAX98504A if I2C
 	select SND_SOC_MAX98505 if I2C
+	select SND_SOC_MAX98506 if I2C
 	select SND_SOC_MAX9850 if I2C
 	select SND_SOC_MAX9877 if I2C
 	select SND_SOC_PCM3008
@@ -243,11 +244,24 @@ config SND_SOC_MAX98505
 	help
 	MAX98505 driver
 
+config SND_SOC_MAX98506
+	bool "Support MAX98506"
+	depends on I2C
+	help
+	MAX98505 driver
+
 config SND_SOC_MAXIM_DSM
 	bool "Support MAXIM DSM"
-	depends on SND_SOC_MAX98504 || SND_SOC_MAX98505
+	depends on SND_SOC_MAX98504 || SND_SOC_MAX98505 || SND_SOC_MAX98506
 	help
 	MAXIM DSM driver
+
+config SND_SOC_MAXIM_DSM_CAL
+	tristate "Support MAXIM DSM Calibration"
+	default y if SND_SOC_MAX98506=y
+	default m if SND_SOC_MAX98506=m
+	help
+	MAX9850x Calibration Driver
 
 config SND_SOC_MAX9850
 	tristate
