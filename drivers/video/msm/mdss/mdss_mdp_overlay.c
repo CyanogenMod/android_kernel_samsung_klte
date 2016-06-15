@@ -3611,7 +3611,7 @@ void mdss_mdp_underrun_dump_info(struct msm_fb_data_type *mfd)
 			pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h,
 			pipe->flags, pipe->src_fmt->format, pipe->src_fmt->bpp,
 			pipe->ndx);
-		pr_info("pipe addr : %p\n", pipe);
+		pr_info("pipe addr : %pK\n", pipe);
 		pcount--;
 		if(!pcount) break;
 	}

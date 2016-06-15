@@ -463,7 +463,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	printk("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	/* +ISL98611+ */
 	isl98611_backlight_initialize(); // ISL98611 Backlight IC init ( I2C )
@@ -542,7 +542,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 		cancel_work_sync(&err_fg_work);
 	}
 #endif
-	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	printk("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
