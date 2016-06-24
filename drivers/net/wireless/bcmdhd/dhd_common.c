@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), common DHD core.
  *
- * Copyright (C) 1999-2015, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c 605803 2015-12-11 14:44:32Z $
+ * $Id: dhd_common.c 479444 2014-05-21 04:19:36Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -113,9 +113,6 @@ const char dhd_version[] = "Dongle Host Driver, version " EPI_VERSION_STR
 #else
 const char dhd_version[] = "\nDongle Host Driver, version " EPI_VERSION_STR "\nCompiled from ";
 #endif 
-#ifdef DHD_LOG_DUMP
-char fw_version[FW_VER_STR_LEN] = "\0";
-#endif /* DHD_LOG_DUMP */
 
 void dhd_set_timer(void *bus, uint wdtick);
 
@@ -223,8 +220,6 @@ dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 
 	struct bcmstrbuf b;
 	struct bcmstrbuf *strbuf = &b;
-	if (!dhdp || !dhdp->prot || !buf)
-		return BCME_ERROR;
 
 	bcm_binit(strbuf, buf, buflen);
 
@@ -292,18 +287,7 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifindex, wl_ioctl_t *ioc, void *buf, int le
 
 	if (dhd_os_proto_block(dhd_pub))
 	{
-#ifdef DHD_LOG_DUMP
-		int slen, i, val, rem;
-		long int lval;
-		char *pval, *pos, *msg;
-		char tmp[64];
 
-		/* WLC_GET_VAR */
-		if (ioc->cmd == WLC_GET_VAR) {
-			memset(tmp, 0, sizeof(tmp));
-			bcopy(ioc->buf, tmp, strlen(ioc->buf) + 1);
-		}
-#endif /* DHD_LOG_DUMP */
 		ret = dhd_prot_ioctl(dhd_pub, ifindex, ioc, buf, len);
 #if defined(CUSTOMER_HW4)
 		if ((ret || ret == -ETIMEDOUT) && (dhd_pub->up))
@@ -321,44 +305,6 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifindex, wl_ioctl_t *ioc, void *buf, int le
 		}
 
 		dhd_os_proto_unblock(dhd_pub);
-
-#ifdef DHD_LOG_DUMP
-		if (ioc->cmd == WLC_GET_VAR || ioc->cmd == WLC_SET_VAR) {
-			lval = 0;
-			slen = strlen(ioc->buf) + 1;
-			msg = (char*)ioc->buf;
-			if (ioc->cmd == WLC_GET_VAR) {
-				bcopy(msg, &lval, sizeof(long int));
-				msg = tmp;
-			} else {
-				bcopy((msg + slen), &lval, sizeof(long int));
-			}
-			DHD_ERROR_EX(("%s: cmd: %d, msg: %s, val: 0x%lx, len: %d, set: %d\n",
-				ioc->cmd == WLC_GET_VAR ? "WLC_GET_VAR" : "WLC_SET_VAR",
-				ioc->cmd, msg, lval, ioc->len, ioc->set));
-		} else {
-			slen = ioc->len;
-			if (ioc->buf != NULL) {
-				val = *(int*)ioc->buf;
-				pval = (char*)ioc->buf;
-				pos = tmp;
-				rem = sizeof(tmp);
-				memset(tmp, 0, sizeof(tmp));
-				for (i = 0; i < slen; i++) {
-					pos += snprintf(pos, rem, "%02x ", pval[i]);
-					rem = sizeof(tmp) - (int)(pos - tmp);
-					if (rem <= 0) {
-						break;
-					}
-				}
-				DHD_ERROR_EX(("WLC_IOCTL: cmd: %d, val: %d (%s), len: %d, "
-					"set: %d\n", ioc->cmd, val, tmp, ioc->len, ioc->set));
-			} else {
-				DHD_ERROR_EX(("WLC_IOCTL: cmd: %d, buf is NULL\n", ioc->cmd));
-			}
-		}
-#endif /* DHD_LOG_DUMP */
-
 
 #if defined(CUSTOMER_HW4)
 		if (ret < 0) {
@@ -1266,18 +1212,16 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 	uint8 *event_data;
 	uint32 type, status, datalen;
 	uint16 flags;
-	uint evlen;
+	int evlen;
 
 	if (bcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) {
 		DHD_ERROR(("%s: mismatched OUI, bailing\n", __FUNCTION__));
 		return (BCME_ERROR);
 	}
 
-	if (ntoh16_ua((void *)&pvt_data->bcm_hdr.subtype) != BCMILCP_SUBTYPE_VENDOR_LONG ||
-		(bcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) ||
-		ntoh16_ua((void *)&pvt_data->bcm_hdr.usr_subtype) != BCMILCP_BCM_SUBTYPE_EVENT)
-	{
-		DHD_ERROR(("%s: mismatched bcm_event_t info, bailing out\n", __FUNCTION__));
+	/* BRCM event pkt may be unaligned - use xxx_ua to load user_subtype. */
+	if (ntoh16_ua((void *)&pvt_data->bcm_hdr.usr_subtype) != BCMILCP_BCM_SUBTYPE_EVENT) {
+		DHD_ERROR(("%s: mismatched subtype, bailing\n", __FUNCTION__));
 		return (BCME_ERROR);
 	}
 
@@ -1306,10 +1250,7 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 	switch (type) {
 #ifdef PROP_TXSTATUS
 	case WLC_E_FIFO_CREDIT_MAP:
-		if (dhd_wlfc_enable(dhd_pub) != BCME_OK) {
-			DHD_ERROR(("%s: dhd_wlfc_enable failed\n", __FUNCTION__));
-			return (BCME_ERROR);
-		}
+		dhd_wlfc_enable(dhd_pub);
 		dhd_wlfc_FIFOcreditmap_event(dhd_pub, event_data);
 		WLFC_DBGMESG(("WLC_E_FIFO_CREDIT_MAP:(AC0,AC1,AC2,AC3),(BC_MC),(OTHER): "
 			"(%d,%d,%d,%d),(%d),(%d)\n", event_data[0], event_data[1],
@@ -1320,7 +1261,7 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata, size_t pktlen,
 	case WLC_E_BCMC_CREDIT_SUPPORT:
 		dhd_wlfc_BCMCCredit_support_event(dhd_pub);
 		break;
-#endif /* PROP_TXSTATUS */
+#endif
 
 	case WLC_E_IF: {
 		struct wl_event_data_if *ifevent = (struct wl_event_data_if *)event_data;
@@ -1996,13 +1937,12 @@ dhd_ndo_remove_ip(dhd_pub_t *dhd, int idx)
 	}
 	retcode = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, iov_len, TRUE, idx);
 
-	if (retcode) {
-		DHD_ERROR(("%s: ndo ip addr remove returned (%d)\n",
+	if (retcode)
+		DHD_ERROR(("%s: ndo ip addr remove failed, retcode = %d\n",
 		__FUNCTION__, retcode));
-	} else {
+	else
 		DHD_TRACE(("%s: ndo ipaddr entry removed \n",
 		__FUNCTION__));
-	}
 
 	return retcode;
 }
@@ -2257,9 +2197,7 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 	int ret = -1;
 	int dtim_period = 0;
 	int ap_beacon = 0;
-#ifndef ENABLE_MAX_DTIM_IN_SUSPEND
 	int allowed_skip_dtim_cnt = 0;
-#endif /* !ENABLE_MAX_DTIM_IN_SUSPEND */
 	/* Check if associated */
 	if (dhd_is_associated(dhd, NULL, NULL) == FALSE) {
 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
@@ -2285,12 +2223,6 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 		goto exit;
 	}
 
-#ifdef ENABLE_MAX_DTIM_IN_SUSPEND
-	bcn_li_dtim = (int) (MAX_DTIM_ALLOWED_INTERVAL / (ap_beacon * dtim_period));
-	if (bcn_li_dtim == 0) {
-		bcn_li_dtim = 1;
-	}
-#else /* ENABLE_MAX_DTIM_IN_SUSPEND */
 	/* attemp to use platform defined dtim skip interval */
 	bcn_li_dtim = dhd->suspend_bcn_li_dtim;
 
@@ -2313,7 +2245,6 @@ dhd_get_suspend_bcn_li_dtim(dhd_pub_t *dhd)
 		bcn_li_dtim = (int)(CUSTOM_LISTEN_INTERVAL / dtim_period);
 		DHD_TRACE(("%s agjust dtim_skip as %d\n", __FUNCTION__, bcn_li_dtim));
 	}
-#endif /* ENABLE_MAX_DTIM_IN_SUSPEND */
 
 	DHD_ERROR(("%s beacon=%d bcn_li_dtim=%d DTIM=%d Listen=%d\n",
 		__FUNCTION__, ap_beacon, bcn_li_dtim, dtim_period, CUSTOM_LISTEN_INTERVAL));
@@ -2626,45 +2557,3 @@ wl_iw_parse_channel_list(char** list_str, uint16* channel_list, int channel_num)
 	*list_str = str;
 	return num;
 }
-#if defined(DHD_8021X_DUMP)
-/* Parse EAPOL 4 way handshake messages */
-void
-dhd_dump_eapol_4way_message(char *dump_data, bool direction)
-{
-	unsigned char type;
-	int pair, ack, mic, kerr, req, sec, install;
-	unsigned short us_tmp;
-	type = dump_data[18];
-	if (type == 2 || type == 254) {
-		us_tmp = (dump_data[19] << 8) | dump_data[20];
-		pair =  0 != (us_tmp & 0x08);
-		ack = 0  != (us_tmp & 0x80);
-		mic = 0  != (us_tmp & 0x100);
-		kerr =  0 != (us_tmp & 0x400);
-		req = 0  != (us_tmp & 0x800);
-		sec = 0  != (us_tmp & 0x200);
-		install  = 0 != (us_tmp & 0x40);
-		if (!sec && !mic && ack && !install && pair && !kerr && !req) {
-			DHD_ERROR(("ETHER_TYPE_802_1X [%s] : M1 of 4way\n",
-				direction ? "TX" : "RX"));
-		} else if (pair && !install && !ack && mic && !sec && !kerr && !req) {
-			DHD_ERROR(("ETHER_TYPE_802_1X [%s] : M2 of 4way\n",
-				direction ? "TX" : "RX"));
-		} else if (pair && ack && mic && sec && !kerr && !req) {
-			DHD_ERROR(("ETHER_TYPE_802_1X [%s] : M3 of 4way\n",
-				direction ? "TX" : "RX"));
-		} else if (pair && !install && !ack && mic && sec && !req && !kerr) {
-			DHD_ERROR(("ETHER_TYPE_802_1X [%s] : M4 of 4way\n",
-				direction ? "TX" : "RX"));
-		} else {
-			DHD_ERROR(("ETHER_TYPE_802_1X [%s]: ver %d, type %d, replay %d\n",
-				direction ? "TX" : "RX",
-				dump_data[14], dump_data[15], dump_data[30]));
-		}
-	} else {
-		DHD_ERROR(("ETHER_TYPE_802_1X [%s]: ver %d, type %d, replay %d\n",
-				direction ? "TX" : "RX",
-				dump_data[14], dump_data[15], dump_data[30]));
-	}
-}
-#endif /* DHD_8021X_DUMP */

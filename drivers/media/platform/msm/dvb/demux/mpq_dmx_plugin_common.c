@@ -88,9 +88,9 @@ static int mpq_sdmx_scramble_odd = 0x3;
 module_param(mpq_sdmx_scramble_odd, int, S_IRUGO | S_IWUSR);
 
 /* Whether to use secure demux or bypass it. Use for debugging */
-#if defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_SECURE_DEMUX_ENABLE)
+#if defined(CONFIG_MACH_KLTE_DCM)
 static int mpq_bypass_sdmx = 0;
-#else
+#else 
 static int mpq_bypass_sdmx = 1;
 #endif /* defined(CONFIG_MACH_KLTE_DCM) */
 module_param(mpq_bypass_sdmx, int, S_IRUGO | S_IWUSR);
@@ -912,11 +912,10 @@ static int mpq_map_buffer_to_kernel(
 	} else {
 		unsigned long tmp;
 		*kernel_mem = ion_map_kernel(client, ion_handle);
-		if (IS_ERR_OR_NULL(*kernel_mem)) {
-			ret = PTR_ERR(*kernel_mem);
-			MPQ_DVB_ERR_PRINT("%s: ion_map_kernel failed, ret=%d\n", __func__, ret);
-			if (!ret)
-				ret = -ENOMEM;
+		if (*kernel_mem == NULL) {
+			MPQ_DVB_ERR_PRINT("%s: ion_map_kernel failed\n",
+				__func__);
+			ret = -ENOMEM;
 			goto map_buffer_failed_free_buff;
 		}
 		ion_handle_get_size(client, ion_handle, &tmp);
@@ -999,12 +998,6 @@ EXPORT_SYMBOL(mpq_dmx_unmap_buffer);
 int mpq_dmx_reuse_decoder_buffer(struct dvb_demux_feed *feed, int cookie)
 {
 	struct mpq_demux *mpq_demux = feed->demux->priv;
-
-   if( cookie == 1 )
-   {
-      cookie = 0;
-      MPQ_DVB_DBG_PRINT("%s: adjuested cookie value\n", __func__ );
-   }
 
 	MPQ_DVB_DBG_PRINT("%s: cookie=%d\n", __func__, cookie);
 
@@ -1466,7 +1459,7 @@ static int mpq_dmx_init_video_feed(struct mpq_feed *mpq_feed)
 	feed_data->continuity_errs = 0;
 	feed_data->ts_packets_num = 0;
 	feed_data->ts_dropped_bytes = 0;
-	//feed_data->last_pkt_index = -1;
+	feed_data->last_pkt_index = -1;
 
 	mpq_demux->decoder_drop_count = 0;
 	mpq_demux->decoder_out_count = 0;
@@ -2229,10 +2222,9 @@ static inline void mpq_dmx_prepare_es_event_data(
 			struct mpq_adapter_video_meta_data *meta_data,
 			struct mpq_video_feed_info *feed_data,
 			struct mpq_streambuffer *stream_buffer,
-			struct dmx_data_ready *data,
-			int cookie )
+			struct dmx_data_ready *data)
 {
-	//size_t len = 0;
+	size_t len = 0;
 	struct dmx_pts_dts_info *pts_dts;
 
 	if (meta_data->packet_type == DMX_PES_PACKET) {
@@ -2250,7 +2242,14 @@ static inline void mpq_dmx_prepare_es_event_data(
 	data->data_length = 0;
 	data->buf.handle = packet->raw_data_handle;
 
-   data->buf.cookie = cookie;
+	/* this has to succeed when called here, after packet was written */
+	data->buf.cookie = mpq_streambuffer_pkt_next(stream_buffer,
+				feed_data->last_pkt_index, &len);
+	if (data->buf.cookie < 0)
+		MPQ_DVB_DBG_PRINT(
+			"%s: received invalid packet index %d\n",
+			__func__, data->buf.cookie);
+
 	data->buf.offset = packet->raw_data_offset;
 	data->buf.len = packet->raw_data_len;
 	data->buf.pts_exists = pts_dts->pts_exist;
@@ -2262,6 +2261,9 @@ static inline void mpq_dmx_prepare_es_event_data(
 	data->buf.ts_packets_num = feed_data->ts_packets_num;
 	data->buf.ts_dropped_bytes = feed_data->ts_dropped_bytes;
 	data->status = DMX_OK_DECODER_BUF;
+
+	/* save for next time: */
+	feed_data->last_pkt_index = data->buf.cookie;
 
 	MPQ_DVB_DBG_PRINT("%s: cookie=%d\n", __func__, data->buf.cookie);
 
@@ -2322,7 +2324,6 @@ static void mpq_dmx_decoder_frame_closure(struct mpq_demux *mpq_demux,
 	struct mpq_video_feed_info *feed_data;
 	struct dvb_demux_feed *feed = mpq_feed->dvb_demux_feed;
 	struct dmx_data_ready data;
-   int cookie;
 
 	feed_data = &mpq_feed->video_info;
 
@@ -2370,17 +2371,15 @@ static void mpq_dmx_decoder_frame_closure(struct mpq_demux *mpq_demux,
 
 		mpq_dmx_update_decoder_stat(mpq_demux);
 
-        cookie = mpq_streambuffer_pkt_write(stream_buffer, &packet,
-           (u8 *)&meta_data);
-        if (cookie >= 0) {
-           mpq_dmx_prepare_es_event_data(&packet, &meta_data,
-              feed_data, stream_buffer, &data, cookie);
-           feed->data_ready_cb.ts(&feed->feed.ts, &data);
-        } else {
-           MPQ_DVB_ERR_PRINT(
-              "%s: mpq_streambuffer_pkt_write failed, ret=%d\n",
-              __func__, cookie);
-        }
+		/* Writing meta-data that includes the framing information */
+		if (mpq_streambuffer_pkt_write(stream_buffer, &packet,
+			(u8 *)&meta_data) < 0)
+			MPQ_DVB_ERR_PRINT("%s: Couldn't write packet\n",
+				__func__);
+
+		mpq_dmx_prepare_es_event_data(&packet, &meta_data, feed_data,
+			stream_buffer, &data);
+		feed->data_ready_cb.ts(&feed->feed.ts, &data);
 	}
 
 	spin_unlock(&feed_data->video_buffer_lock);
@@ -2402,7 +2401,6 @@ static void mpq_dmx_decoder_pes_closure(struct mpq_demux *mpq_demux,
 	struct mpq_video_feed_info *feed_data;
 	struct dvb_demux_feed *feed = mpq_feed->dvb_demux_feed;
 	struct dmx_data_ready data;
-   int cookie;
 
 	feed_data = &mpq_feed->video_info;
 
@@ -2441,21 +2439,18 @@ static void mpq_dmx_decoder_pes_closure(struct mpq_demux *mpq_demux,
 
 		mpq_dmx_update_decoder_stat(mpq_demux);
 
-        cookie = mpq_streambuffer_pkt_write(stream_buffer, &packet,
-           (u8 *)&meta_data);
-        if (cookie >= 0) {
-           /* Save write offset where new PES will begin */
-           mpq_streambuffer_get_data_rw_offset(stream_buffer, NULL,
-              &feed_data->frame_offset);
-           mpq_dmx_prepare_es_event_data(&packet, &meta_data,
-              feed_data, stream_buffer, &data, cookie);
-           feed->data_ready_cb.ts(&feed->feed.ts, &data);
-        } else {
-           MPQ_DVB_ERR_PRINT(
-              "%s: mpq_streambuffer_pkt_write failed, ret=%d\n",
-              __func__, cookie);
-        }
+		if (mpq_streambuffer_pkt_write(stream_buffer, &packet,
+			(u8 *)&meta_data) < 0)
+			MPQ_DVB_ERR_PRINT("%s: Couldn't write packet\n",
+				__func__);
 
+		/* Save write offset where new PES will begin */
+		mpq_streambuffer_get_data_rw_offset(stream_buffer, NULL,
+			&feed_data->frame_offset);
+
+		mpq_dmx_prepare_es_event_data(&packet, &meta_data, feed_data,
+			stream_buffer, &data);
+		feed->data_ready_cb.ts(&feed->feed.ts, &data);
 	}
 	/* Reset PES info */
 	feed->peslen = 0;
@@ -2833,25 +2828,26 @@ static int mpq_dmx_process_video_packet_framing(
 			 * writing meta-data that includes
 			 * the framing information
 			 */
-			ret = mpq_streambuffer_pkt_write(stream_buffer, &packet,
-				(u8 *)&meta_data);
-			if (ret < 0) {
+			if (mpq_streambuffer_pkt_write(stream_buffer,
+				&packet,
+				(u8 *)&meta_data) < 0) {
 				MPQ_DVB_ERR_PRINT(
-               "%s: mpq_streambuffer_pkt_write failed, ret=%d\n",
-                             __func__, ret);
-                       } else {
-                          mpq_dmx_prepare_es_event_data(
-                             &packet, &meta_data, feed_data,
-                             stream_buffer, &data, ret);
+					"%s: "
+					"Couldn't write packet. "
+					"Should never happen\n",
+					__func__);
+			}
+
+			mpq_dmx_prepare_es_event_data(
+				&packet, &meta_data, feed_data,
+				stream_buffer, &data);
 
 			feed->data_ready_cb.ts(&feed->feed.ts, &data);
 
-         mpq_streambuffer_get_data_rw_offset(
-                       feed_data->video_buffer,
-                       NULL,
-                       &feed_data->frame_offset);
-                 }
-
+			mpq_streambuffer_get_data_rw_offset(
+				feed_data->video_buffer,
+				NULL,
+				&feed_data->frame_offset);
 
 			/*
 			 * In linear buffers, after writing the packet
@@ -2956,7 +2952,6 @@ static int mpq_dmx_process_video_packet_no_framing(
 	struct mpq_feed *mpq_feed;
 	int discontinuity_indicator = 0;
 	struct dmx_data_ready data;
-   int cookie;
 
 	mpq_demux = feed->demux->priv;
 	mpq_feed = feed->priv;
@@ -3027,34 +3022,37 @@ static int mpq_dmx_process_video_packet_no_framing(
 
 				mpq_dmx_update_decoder_stat(mpq_demux);
 
-            cookie = mpq_streambuffer_pkt_write(
-                          stream_buffer, &packet,
-                          (u8 *)&meta_data);
-                       if (cookie < 0) {
+				if (mpq_streambuffer_pkt_write(
+						stream_buffer,
+						&packet,
+						(u8 *)&meta_data) < 0)
+					MPQ_DVB_ERR_PRINT(
+						"%s: "
+						"Couldn't write packet. "
+						"Should never happen\n",
+						__func__);
+
+				/* Save write offset where new PES will begin */
+				mpq_streambuffer_get_data_rw_offset(
+					stream_buffer,
+					NULL,
+					&feed_data->frame_offset);
+
+				mpq_dmx_prepare_es_event_data(
+					&packet, &meta_data,
+					feed_data,
+					stream_buffer, &data);
+
+				feed->data_ready_cb.ts(
+					&feed->feed.ts, &data);
+			} else {
 				MPQ_DVB_ERR_PRINT(
-            "%s: mpq_streambuffer_pkt_write failed, ret=%d\n",
-                             __func__, cookie);
-                       } else {
-                          /*
-                           * Save write offset where new PES
-                           * will begin
-                           */
-                          mpq_streambuffer_get_data_rw_offset(
-                             stream_buffer,
-                             NULL,
-                             &feed_data->frame_offset);
-            mpq_dmx_prepare_es_event_data(
-                             &packet, &meta_data,
-                             feed_data,
-                             stream_buffer, &data, cookie);
-				feed->data_ready_cb.ts(&feed->feed.ts,
-						&data);
-            }}
-            else
-            {
-            MPQ_DVB_ERR_PRINT("%s: received PUSI while handling PES header of previous PES\n",
+					"%s: received PUSI"
+					"while handling PES header"
+					"of previous PES\n",
 					__func__);
-            }
+			}
+
 			/* Reset PES info */
 			feed->peslen = 0;
 			feed_data->pes_header_offset = 0;
@@ -3344,7 +3342,7 @@ static int mpq_dmx_decoder_eos_cmd(struct mpq_feed *mpq_feed)
 					(u8 *)&oob_meta_data);
 
 	spin_unlock(&feed_data->video_buffer_lock);
-	return (ret < 0) ? ret : 0;
+	return ret;
 }
 
 void mpq_dmx_convert_tts(struct dvb_demux_feed *feed,
@@ -4611,20 +4609,18 @@ static void mpq_sdmx_decoder_filter_results(struct mpq_demux *mpq_demux,
 				__func__, ret);
 		}
 		mpq_dmx_update_decoder_stat(mpq_demux);
-      ret = mpq_streambuffer_pkt_write(sbuf, &packet,
-              (u8 *)&meta_data);
-           if (ret < 0) {
-
+		if (mpq_streambuffer_pkt_write(sbuf,
+				&packet,
+				(u8 *)&meta_data) < 0)
 			MPQ_DVB_ERR_PRINT(
-				"%s: mpq_streambuffer_pkt_write failed, ret=%d\n",
-				__func__, ret);
-		} else {
-			mpq_dmx_prepare_es_event_data(
-				&packet, &meta_data, &mpq_feed->video_info,
-				sbuf, &data, ret);
-			MPQ_DVB_DBG_PRINT("%s: Notify ES Event\n", __func__);
-			feed->data_ready_cb.ts(&feed->feed.ts, &data);
-		}
+				"%s: Couldn't write packet. Should never happen\n",
+				__func__);
+
+		mpq_dmx_prepare_es_event_data(
+			&packet, &meta_data, &mpq_feed->video_info,
+			sbuf, &data);
+		MPQ_DVB_DBG_PRINT("%s: Notify ES Event\n", __func__);
+		feed->data_ready_cb.ts(&feed->feed.ts, &data);
 
 		spin_unlock(&mpq_feed->video_info.video_buffer_lock);
 	}

@@ -2000,7 +2000,7 @@ static int report_cc_based_soc(struct qpnp_bms_chip *chip)
 	last_change_sec = chip->last_soc_change_sec;
 	calculate_delta_time(&last_change_sec, &time_since_last_change_sec);
 
-	charging = is_battery_charging(chip);
+	charging = chip->battery_status == POWER_SUPPLY_STATUS_CHARGING;
 	charging_since_last_report = charging || (chip->last_soc_unbound
 			&& chip->was_charging_at_sleep);
 	/*
@@ -2369,6 +2369,7 @@ skip_limits:
 	rc_new_uah = (params->fcc_uah * pc_new) / 100;
 	soc_new = (rc_new_uah - params->cc_uah - params->uuc_uah)*100
 					/ (params->fcc_uah - params->uuc_uah);
+	soc_new = bound_soc(soc_new);
 
 	/*
 	 * if soc_new is ZERO force it higher so that phone doesnt report soc=0
@@ -2683,8 +2684,6 @@ static int calculate_state_of_charge(struct qpnp_bms_chip *chip,
     /* always clamp soc due to BMS hw/sw immaturities */
 	new_calculated_soc = clamp_soc_based_on_voltage(chip,
 					new_calculated_soc);
-
-	new_calculated_soc = bound_soc(new_calculated_soc);
 	/*
 	 * If the battery is full, configure the cc threshold so the system
 	 * wakes up after SoC changes
@@ -2791,7 +2790,7 @@ static int recalculate_raw_soc(struct qpnp_bms_chip *chip)
 			rc = read_soc_params_raw(chip, &raw, batt_temp);
 			if (rc) {
 				pr_err("Unable to read params, rc: %d\n", rc);
-				soc = chip->calculated_soc;
+				soc = 0;
 				goto done;
 			}
 			calculate_soc_params(chip, &raw, &params, batt_temp);
@@ -4386,18 +4385,11 @@ static inline int bms_read_properties(struct qpnp_bms_chip *chip)
 		pr_err("Missing required properties.\n");
 		return rc;
     }
-
-  #if defined(CONFIG_MACH_MATISSE3G_OPEN)
+  #if defined(CONFIG_SEC_MATISSE_PROJECT) || defined(CONFIG_SEC_T10_PROJECT)
       chip->use_ocv_thresholds = 1;
       chip->ocv_low_threshold_uv = 3600000;
-      chip->ocv_high_threshold_uv = 3850000;
+      chip->ocv_high_threshold_uv = 3750000;
       chip->adjust_soc_low_threshold = 3;
-      chip->shutdown_soc_valid_limit = 70;
-  #elif defined(CONFIG_SEC_MATISSE_PROJECT) || defined(CONFIG_SEC_T10_PROJECT)
-      chip->use_ocv_thresholds = 1;
-      chip->ocv_low_threshold_uv = 3400000;
-      chip->ocv_high_threshold_uv = 3850000;
-      chip->adjust_soc_low_threshold = 2;
       chip->shutdown_soc_valid_limit = 70;
   #elif defined(CONFIG_SEC_MILLET_PROJECT)
       chip->use_ocv_thresholds = 1;

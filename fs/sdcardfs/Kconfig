@@ -1,6 +1,7 @@
 config SDCARD_FS
 	tristate "sdcard file system"
-	default y
+	depends on EXPERIMENTAL
+	default n
 	help
 	  Sdcardfs is based on Wrapfs file system.
 
@@ -18,7 +19,7 @@ config SDCARD_FS_CI_SEARCH
 
 config SDCARD_FS_XATTR
 	bool "Sdcardfs extended attribute"
-	default y
+	default n
 	depends on SDCARD_FS
 	help
 	  Modification of sdcard file system for xattr

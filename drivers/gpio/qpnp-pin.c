@@ -518,33 +518,16 @@ static int _qpnp_pin_config(struct qpnp_pin_chip *q_chip,
 {
 	struct device *dev = &q_chip->spmi->dev;
 	int rc;
-#if defined(CONFIG_SEC_ATLANTIC_PROJECT) && defined(CONFIG_GPIO_PCAL6416A)
-	int pin = q_spec->pmic_pin;
-#endif
 
 	rc = qpnp_pin_check_constraints(q_spec, param);
 	if (rc)
 		goto gpio_cfg;
 
-#if defined(CONFIG_SEC_ATLANTIC_PROJECT) && defined(CONFIG_GPIO_PCAL6416A)
-/* Stop GPIO 6 set mode config for KMINI USA devices
- * Reason: Its a work arround for KMINI USA HWs only.
- * Because, LCD_ON PIN connected to Expander I/O.
- * EXPANDER-resets due to GPIO 6 going low due to mode config of GPIO 6 being set, LCD_ON PIN GO LOW and LCD turns-off.
- */
-	if ((pin == 6) && (q_spec->type == Q_GPIO_TYPE))
-	{
-		dev_info(dev, "%s: Skip Set mode config for PMIC GPIO 6\n", __func__);
-	}
-	else
-#endif
-	{
-		/* set mode */
-		if (Q_HAVE_HW_SP(Q_PIN_CFG_MODE, q_spec, param->mode))
-			q_reg_clr_set(&q_spec->regs[Q_REG_I_MODE_CTL],
+	/* set mode */
+	if (Q_HAVE_HW_SP(Q_PIN_CFG_MODE, q_spec, param->mode))
+		q_reg_clr_set(&q_spec->regs[Q_REG_I_MODE_CTL],
 			  Q_REG_MODE_SEL_SHIFT, Q_REG_MODE_SEL_MASK,
 			  param->mode);
-	}
 
 	/* output specific configuration */
 	if (Q_HAVE_HW_SP(Q_PIN_CFG_INVERT, q_spec, param->invert))

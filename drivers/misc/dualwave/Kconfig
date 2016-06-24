@@ -1,5 +1,0 @@
-comment "Altera FPGA firmware download module"
-
-config DUALWAVE
-    bool "DUALWAVE enable"
-	default y

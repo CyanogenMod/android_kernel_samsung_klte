@@ -787,7 +787,7 @@ cancel_readonly:
 	return retval;
 }
 
-void do_emergency_remount(struct work_struct *work)
+static void do_emergency_remount(struct work_struct *work)
 {
 	struct super_block *sb, *p = NULL;
 

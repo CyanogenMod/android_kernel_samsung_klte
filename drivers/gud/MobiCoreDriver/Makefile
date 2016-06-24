@@ -8,18 +8,13 @@ else
     ccflags-y = -DDEBUG
 endif # DEBUG/RELEASE
 
-# CFLAG for testable mode
-ifeq ($(IS_TESTABLE),yes)
-	ccflags-y = -DTEST
-endif
-
 # CFLAGS from the build script
 ifdef MOBICORE_CFLAGS
 	ccflags-y += $(MOBICORE_CFLAGS)
 endif
 #EXTRA_CFLAGS+=-DDEBUG_VERBOSE
 
-ccflags-y += -Wall -D__$(PLATFORM)__
+ccflags-y += -include $(M)/build_tag.h -Wall -D__$(PLATFORM)__
 # add our module to kernel.
 obj-m += mcDrvModule.o
 

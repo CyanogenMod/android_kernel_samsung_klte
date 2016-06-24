@@ -169,8 +169,6 @@ struct k2hh_p {
 	u8 negate_x;
 	u8 negate_y;
 	u8 negate_z;
-
-	u64 old_timestamp;
 };
 
 #define ACC_ODR10		0x10	/*   10Hz output data rate */
@@ -510,9 +508,6 @@ static void k2hh_work_func(struct work_struct *work)
 	int ret;
 	struct k2hh_v acc;
 	struct k2hh_p *data = container_of(work, struct k2hh_p, work);
-	struct timespec ts = ktime_to_timespec(alarm_get_elapsed_realtime());
-	u64 timestamp_new = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	int time_hi, time_lo;
 
 	ret = k2hh_read_accel_xyz(data, &acc);
 	if (ret < 0)
@@ -521,32 +516,12 @@ static void k2hh_work_func(struct work_struct *work)
 	data->accdata.x = acc.x - data->caldata.x;
 	data->accdata.y = acc.y - data->caldata.y;
 	data->accdata.z = acc.z - data->caldata.z;
-	if (data->old_timestamp != 0 && 
-		((timestamp_new - data->old_timestamp) > ktime_to_ms(data->poll_delay) * 1800000LL)) {
-		u64 delay = ktime_to_ns(data->poll_delay);
-		u64 shift_timestamp = delay >> 1;
-		u64 timestamp = 0ULL;
-		for (timestamp = data->old_timestamp + delay; timestamp < timestamp_new - shift_timestamp; timestamp+=delay) {
-			time_hi = (int)((timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
-			time_lo = (int)(timestamp & TIME_LO_MASK);
-			input_report_rel(data->input, REL_X, data->accdata.x);
-			input_report_rel(data->input, REL_Y, data->accdata.y);
-			input_report_rel(data->input, REL_Z, data->accdata.z);
-			input_report_rel(data->input, REL_DIAL, time_hi);
-			input_report_rel(data->input, REL_MISC, time_lo);
-			input_sync(data->input);
-		}
-	}
 
-	time_hi = (int)((timestamp_new & TIME_HI_MASK) >> TIME_HI_SHIFT);
-	time_lo = (int)(timestamp_new & TIME_LO_MASK);
 	input_report_rel(data->input, REL_X, data->accdata.x);
 	input_report_rel(data->input, REL_Y, data->accdata.y);
 	input_report_rel(data->input, REL_Z, data->accdata.z);
-	input_report_rel(data->input, REL_DIAL, time_hi);
-	input_report_rel(data->input, REL_MISC, time_lo);
 	input_sync(data->input);
-	data->old_timestamp = timestamp_new;
+
 exit:
 	if ((ktime_to_ns(data->poll_delay) * (int64_t)data->time_count)
 		>= ((int64_t)ACCEL_LOG_TIME * NSEC_PER_SEC)) {
@@ -595,7 +570,6 @@ static ssize_t k2hh_enable_store(struct device *dev,
 
 	if (enable) {
 		if (pre_enable == OFF) {
-			data->old_timestamp = 0LL;
 			sensor_regulator_onoff(data, true);
 
 			k2hh_open_calibration(data);
@@ -639,9 +613,6 @@ static ssize_t k2hh_delay_store(struct device *dev,
 		pr_err("[SENSOR]: %s - Invalid Argument\n", __func__);
 		return ret;
 	}
-
-	if (delay > K2HH_DEFAULT_DELAY)
-		delay = K2HH_DEFAULT_DELAY;
 
 	data->poll_delay = ns_to_ktime(delay);
 	k2hh_set_odr(data);
@@ -1154,8 +1125,6 @@ static int k2hh_input_init(struct k2hh_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
-	input_set_capability(dev, EV_REL, REL_DIAL);
-	input_set_capability(dev, EV_REL, REL_MISC);
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);

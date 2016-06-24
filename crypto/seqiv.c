@@ -21,18 +21,11 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/string.h>
-#ifndef CONFIG_CRYPTO_DRBG
 #include <linux/spinlock.h>
-#endif
+#include <linux/string.h>
 
 struct seqiv_ctx {
-
-#ifdef CONFIG_CRYPTO_DRBG
-	int reserved;
-#else
 	spinlock_t lock;
-#endif
 	u8 salt[] __attribute__ ((aligned(__alignof__(u32))));
 };
 
@@ -193,7 +186,6 @@ static int seqiv_aead_givencrypt(struct aead_givcrypt_request *req)
 	return err;
 }
 
-#ifndef CONFIG_CRYPTO_DRBG
 static int seqiv_givencrypt_first(struct skcipher_givcrypt_request *req)
 {
 	struct crypto_ablkcipher *geniv = skcipher_givcrypt_reqtfm(req);
@@ -239,23 +231,15 @@ unlock:
 
 	return seqiv_aead_givencrypt(req);
 }
-#endif /* CONFIG_CRYPTO_DRBG */
 
 static int seqiv_init(struct crypto_tfm *tfm)
 {
 	struct crypto_ablkcipher *geniv = __crypto_ablkcipher_cast(tfm);
 	struct seqiv_ctx *ctx = crypto_ablkcipher_ctx(geniv);
 
-#ifndef CONFIG_CRYPTO_DRBG
 	spin_lock_init(&ctx->lock);
-#endif
 
 	tfm->crt_ablkcipher.reqsize = sizeof(struct ablkcipher_request);
-
-#ifdef CONFIG_CRYPTO_DRBG
-	crypto_rng_get_bytes(crypto_default_rng, ctx->salt,
-						crypto_ablkcipher_ivsize(geniv));
-#endif
 
 	return skcipher_geniv_init(tfm);
 }
@@ -265,16 +249,9 @@ static int seqiv_aead_init(struct crypto_tfm *tfm)
 	struct crypto_aead *geniv = __crypto_aead_cast(tfm);
 	struct seqiv_ctx *ctx = crypto_aead_ctx(geniv);
 
-#ifndef CONFIG_CRYPTO_DRBG
 	spin_lock_init(&ctx->lock);
-#endif
 
 	tfm->crt_aead.reqsize = sizeof(struct aead_request);
-
-#ifdef CONFIG_CRYPTO_DRBG
-	crypto_rng_get_bytes(crypto_default_rng, ctx->salt,
-						crypto_aead_ivsize(geniv));
-#endif
 
 	return aead_geniv_init(tfm);
 }
@@ -290,11 +267,7 @@ static struct crypto_instance *seqiv_ablkcipher_alloc(struct rtattr **tb)
 	if (IS_ERR(inst))
 		goto out;
 
-#ifdef CONFIG_CRYPTO_DRBG
-	inst->alg.cra_ablkcipher.givencrypt = seqiv_givencrypt;
-#else
 	inst->alg.cra_ablkcipher.givencrypt = seqiv_givencrypt_first;
-#endif
 
 	inst->alg.cra_init = seqiv_init;
 	inst->alg.cra_exit = skcipher_geniv_exit;
@@ -314,11 +287,7 @@ static struct crypto_instance *seqiv_aead_alloc(struct rtattr **tb)
 	if (IS_ERR(inst))
 		goto out;
 
-#ifdef CONFIG_CRYPTO_DRBG
-	inst->alg.cra_aead.givencrypt = seqiv_aead_givencrypt;
-#else
 	inst->alg.cra_aead.givencrypt = seqiv_aead_givencrypt_first;
-#endif
 
 	inst->alg.cra_init = seqiv_aead_init;
 	inst->alg.cra_exit = aead_geniv_exit;

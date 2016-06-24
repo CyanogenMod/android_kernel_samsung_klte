@@ -25,8 +25,6 @@ void convert_acc_data(s16 *iValue)
 
 void report_acc_data(struct ssp_data *data, struct sensor_value *accdata)
 {
-	int time_hi, time_lo;
-
 	convert_acc_data(&accdata->x);
 	convert_acc_data(&accdata->y);
 	convert_acc_data(&accdata->z);
@@ -53,8 +51,6 @@ void report_acc_data(struct ssp_data *data, struct sensor_value *accdata)
 		data->buf[ACCELEROMETER_SENSOR].z =
 			(data->buf[ACCELEROMETER_SENSOR].z > 0 ? MIN_ACCEL_2G : MAX_ACCEL_2G);
 	}
-	time_lo = (int)(accdata->timestamp & TIME_LO_MASK);
-	time_hi = (int)((accdata->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 
 	input_report_rel(data->acc_input_dev, REL_X,
 		data->buf[ACCELEROMETER_SENSOR].x);
@@ -62,15 +58,12 @@ void report_acc_data(struct ssp_data *data, struct sensor_value *accdata)
 		data->buf[ACCELEROMETER_SENSOR].y);
 	input_report_rel(data->acc_input_dev, REL_Z,
 		data->buf[ACCELEROMETER_SENSOR].z);
-	input_report_rel(data->acc_input_dev, REL_DIAL, time_hi);
-	input_report_rel(data->acc_input_dev, REL_MISC, time_lo);
 	input_sync(data->acc_input_dev);
 }
 
 void report_gyro_data(struct ssp_data *data, struct sensor_value *gyrodata)
 {
-	long lTemp[6] = {0,};
-	int time_hi, time_lo;
+	long lTemp[3] = {0,};
 	data->buf[GYROSCOPE_SENSOR].x = gyrodata->x - data->gyrocal.x;
 	data->buf[GYROSCOPE_SENSOR].y = gyrodata->y - data->gyrocal.y;
 	data->buf[GYROSCOPE_SENSOR].z = gyrodata->z - data->gyrocal.z;
@@ -95,57 +88,34 @@ void report_gyro_data(struct ssp_data *data, struct sensor_value *gyrodata)
 	}
 
 	if (data->uGyroDps == GYROSCOPE_DPS500) {
-		lTemp[0] = (long)gyrodata->x;
-		lTemp[1] = (long)gyrodata->y;
-		lTemp[2] = (long)gyrodata->z;
-		lTemp[3] = (long)data->gyrocal.x;
-		lTemp[4] = (long)data->gyrocal.y;
-		lTemp[5] = (long)data->gyrocal.z;
+		lTemp[0] = (long)data->buf[GYROSCOPE_SENSOR].x;
+		lTemp[1] = (long)data->buf[GYROSCOPE_SENSOR].y;
+		lTemp[2] = (long)data->buf[GYROSCOPE_SENSOR].z;
 	} else if (data->uGyroDps == GYROSCOPE_DPS250)	{
-		lTemp[0] = (long)gyrodata->x >> 1;
-		lTemp[1] = (long)gyrodata->y >> 1;
-		lTemp[2] = (long)gyrodata->z >> 1;
-		lTemp[3] = (long)data->gyrocal.x >> 1;
-		lTemp[4] = (long)data->gyrocal.y >> 1;
-		lTemp[5] = (long)data->gyrocal.z >> 1;
+		lTemp[0] = (long)data->buf[GYROSCOPE_SENSOR].x >> 1;
+		lTemp[1] = (long)data->buf[GYROSCOPE_SENSOR].y >> 1;
+		lTemp[2] = (long)data->buf[GYROSCOPE_SENSOR].z >> 1;
 	} else if (data->uGyroDps == GYROSCOPE_DPS2000)	{
-		lTemp[0] = (long)gyrodata->x << 2;
-		lTemp[1] = (long)gyrodata->y << 2;
-		lTemp[2] = (long)gyrodata->z << 2;
-		lTemp[3] = (long)data->gyrocal.x << 2;
-		lTemp[4] = (long)data->gyrocal.y << 2;
-		lTemp[5] = (long)data->gyrocal.z << 2;
+		lTemp[0] = (long)data->buf[GYROSCOPE_SENSOR].x << 2;
+		lTemp[1] = (long)data->buf[GYROSCOPE_SENSOR].y << 2;
+		lTemp[2] = (long)data->buf[GYROSCOPE_SENSOR].z << 2;
 	} else {
-		lTemp[0] = (long)gyrodata->x;
-		lTemp[1] = (long)gyrodata->y;
-		lTemp[2] = (long)gyrodata->z;
-		lTemp[3] = (long)data->gyrocal.x;
-		lTemp[4] = (long)data->gyrocal.y;
-		lTemp[5] = (long)data->gyrocal.z;
+		lTemp[0] = (long)data->buf[GYROSCOPE_SENSOR].x;
+		lTemp[1] = (long)data->buf[GYROSCOPE_SENSOR].y;
+		lTemp[2] = (long)data->buf[GYROSCOPE_SENSOR].z;
 	}
 
-	time_lo = (int)(gyrodata->timestamp & TIME_LO_MASK);
-	time_hi = (int)((gyrodata->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
-
-	input_report_rel(data->gyro_input_dev, REL_RX, lTemp[0] + 1);
-	input_report_rel(data->gyro_input_dev, REL_RY, lTemp[1] + 1);
-	input_report_rel(data->gyro_input_dev, REL_RZ, lTemp[2] + 1);
-	input_report_rel(data->gyro_input_dev, REL_HWHEEL, lTemp[3] + 1);
-	input_report_rel(data->gyro_input_dev, REL_DIAL, lTemp[4] + 1);
-	input_report_rel(data->gyro_input_dev, REL_WHEEL, lTemp[5] + 1);
-	input_report_rel(data->gyro_input_dev, REL_X, time_hi);
-	input_report_rel(data->gyro_input_dev, REL_Y, time_lo);
+	input_report_rel(data->gyro_input_dev, REL_RX, lTemp[0]);
+	input_report_rel(data->gyro_input_dev, REL_RY, lTemp[1]);
+	input_report_rel(data->gyro_input_dev, REL_RZ, lTemp[2]);
 	input_sync(data->gyro_input_dev);
 }
 
 void report_mag_data(struct ssp_data *data, struct sensor_value *magdata)
 {
-	int time_hi, time_lo;
 	data->buf[GEOMAGNETIC_SENSOR].x = magdata->x;
 	data->buf[GEOMAGNETIC_SENSOR].y = magdata->y;
 	data->buf[GEOMAGNETIC_SENSOR].z = magdata->z;
-	time_lo = (int)(magdata->timestamp & TIME_LO_MASK);
-	time_hi = (int)((magdata->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 
 	input_report_rel(data->mag_input_dev, REL_RX,
 		data->buf[GEOMAGNETIC_SENSOR].x);
@@ -153,8 +123,6 @@ void report_mag_data(struct ssp_data *data, struct sensor_value *magdata)
 		data->buf[GEOMAGNETIC_SENSOR].y);
 	input_report_rel(data->mag_input_dev, REL_RZ,
 		data->buf[GEOMAGNETIC_SENSOR].z);
-	input_report_rel(data->mag_input_dev, REL_X, time_hi);
-	input_report_rel(data->mag_input_dev, REL_Y, time_lo);
 	input_sync(data->mag_input_dev);
 }
 
@@ -402,18 +370,8 @@ int initialize_event_symlink(struct ssp_data *data)
 	if (iRet < 0)
 		goto iRet_step_cnt_sysfs_create_link;
 
-	iRet = sysfs_create_link(&data->sen_dev->kobj,
-		&data->meta_input_dev->dev.kobj,
-		data->meta_input_dev->name);
-	if (iRet < 0)
-		goto iRet_meta_sysfs_create_link;
-
 	return SUCCESS;
 
-iRet_meta_sysfs_create_link:
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->step_cnt_input_dev->dev.kobj,
-		data->step_cnt_input_dev->name);
 iRet_step_cnt_sysfs_create_link:
 	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->step_det_input_dev->dev.kobj,
@@ -495,9 +453,6 @@ void remove_event_symlink(struct ssp_data *data)
 	sysfs_delete_link(&data->sen_dev->kobj,
 		&data->step_cnt_input_dev->dev.kobj,
 		data->step_cnt_input_dev->name);
-	sysfs_delete_link(&data->sen_dev->kobj,
-		&data->meta_input_dev->dev.kobj,
-		data->meta_input_dev->name);
 }
 
 int initialize_input_dev(struct ssp_data *data)
@@ -506,7 +461,7 @@ int initialize_input_dev(struct ssp_data *data)
 	struct input_dev *acc_input_dev, *gyro_input_dev, *pressure_input_dev,
 		*light_input_dev, *prox_input_dev, *temp_humi_input_dev,
 		*mag_input_dev, *gesture_input_dev, *sig_motion_input_dev,
-		*step_det_input_dev, *step_cnt_input_dev, *meta_input_dev;
+		*step_det_input_dev, *step_cnt_input_dev;
 
 	/* allocate input_device */
 	acc_input_dev = input_allocate_device();
@@ -553,10 +508,6 @@ int initialize_input_dev(struct ssp_data *data)
 	if (step_cnt_input_dev == NULL)
 		goto iRet_step_cnt_input_free_device;
 
-	meta_input_dev = input_allocate_device();
-	if (meta_input_dev == NULL)
-		goto iRet_meta_input_free_device;
-
 	input_set_drvdata(acc_input_dev, data);
 	input_set_drvdata(gyro_input_dev, data);
 	input_set_drvdata(pressure_input_dev, data);
@@ -568,7 +519,6 @@ int initialize_input_dev(struct ssp_data *data)
 	input_set_drvdata(sig_motion_input_dev, data);
 	input_set_drvdata(step_det_input_dev, data);
 	input_set_drvdata(step_cnt_input_dev, data);
-	input_set_drvdata(meta_input_dev, data);
 
 	acc_input_dev->name = "accelerometer_sensor";
 	gyro_input_dev->name = "gyro_sensor";
@@ -581,22 +531,14 @@ int initialize_input_dev(struct ssp_data *data)
 	sig_motion_input_dev->name = "sig_motion_sensor";
 	step_det_input_dev->name = "step_det_sensor";
 	step_cnt_input_dev->name = "step_cnt_sensor";
-	meta_input_dev->name = "meta_event";
 
 	input_set_capability(acc_input_dev, EV_REL, REL_X);
 	input_set_capability(acc_input_dev, EV_REL, REL_Y);
 	input_set_capability(acc_input_dev, EV_REL, REL_Z);
-	input_set_capability(acc_input_dev, EV_REL, REL_DIAL); /* time_hi */
-	input_set_capability(acc_input_dev, EV_REL, REL_MISC); /* time_lo */
 
 	input_set_capability(gyro_input_dev, EV_REL, REL_RX);
 	input_set_capability(gyro_input_dev, EV_REL, REL_RY);
 	input_set_capability(gyro_input_dev, EV_REL, REL_RZ);
-	input_set_capability(gyro_input_dev, EV_REL, REL_HWHEEL);
-	input_set_capability(gyro_input_dev, EV_REL, REL_DIAL);
-	input_set_capability(gyro_input_dev, EV_REL, REL_WHEEL);
-	input_set_capability(gyro_input_dev, EV_REL, REL_X); /* time_hi */
-	input_set_capability(gyro_input_dev, EV_REL, REL_Y); /* time_lo */
 
 	input_set_capability(pressure_input_dev, EV_REL, REL_HWHEEL);
 	input_set_capability(pressure_input_dev, EV_REL, REL_DIAL);
@@ -636,17 +578,12 @@ int initialize_input_dev(struct ssp_data *data)
 	input_set_capability(mag_input_dev, EV_REL, REL_RX);
 	input_set_capability(mag_input_dev, EV_REL, REL_RY);
 	input_set_capability(mag_input_dev, EV_REL, REL_RZ);
-	input_set_capability(mag_input_dev, EV_REL, REL_X); /* time_hi */
-	input_set_capability(mag_input_dev, EV_REL, REL_Y); /* time_lo */
 
 	input_set_capability(sig_motion_input_dev, EV_REL, REL_MISC);
 
 	input_set_capability(step_det_input_dev, EV_REL, REL_MISC);
 
 	input_set_capability(step_cnt_input_dev, EV_REL, REL_MISC);
-
-	input_set_capability(meta_input_dev, EV_REL, REL_HWHEEL);
-	input_set_capability(meta_input_dev, EV_REL, REL_DIAL);
 
 	/* register input_device */
 	iRet = input_register_device(acc_input_dev);
@@ -665,7 +602,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_gyro_input_unreg_device;
 	}
 
@@ -680,7 +616,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_pressure_input_unreg_device;
 	}
 
@@ -694,7 +629,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_gesture_input_unreg_device;
 	}
 
@@ -707,7 +641,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_light_input_unreg_device;
 	}
 
@@ -719,7 +652,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_proximity_input_unreg_device;
 	}
 
@@ -730,7 +662,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_tmep_humi_input_unreg_device;
 	}
 
@@ -740,7 +671,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_mag_input_unreg_device;
 	}
 
@@ -749,7 +679,6 @@ int initialize_input_dev(struct ssp_data *data)
 		input_free_device(sig_motion_input_dev);
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_sig_motion_input_unreg_device;
 	}
 
@@ -757,21 +686,13 @@ int initialize_input_dev(struct ssp_data *data)
 	if (iRet < 0) {
 		input_free_device(step_det_input_dev);
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_step_det_motion_input_unreg_device;
 	}
 
 	iRet = input_register_device(step_cnt_input_dev);
 	if (iRet < 0) {
 		input_free_device(step_cnt_input_dev);
-		input_free_device(meta_input_dev);
 		goto iRet_step_cnt_motion_input_unreg_device;
-	}
-
-	iRet = input_register_device(meta_input_dev);
-	if (iRet < 0) {
-		input_free_device(meta_input_dev);
-		goto iRet_meta_input_unreg_device;
 	}
 
 	data->acc_input_dev = acc_input_dev;
@@ -785,12 +706,8 @@ int initialize_input_dev(struct ssp_data *data)
 	data->sig_motion_input_dev = sig_motion_input_dev;
 	data->step_det_input_dev = step_det_input_dev;
 	data->step_cnt_input_dev = step_cnt_input_dev;
-	data->meta_input_dev = meta_input_dev;
 
 	return SUCCESS;
-
-iRet_meta_input_unreg_device:
-	input_unregister_device(step_cnt_input_dev);
 iRet_step_cnt_motion_input_unreg_device:
 	input_unregister_device(step_det_input_dev);
 iRet_step_det_motion_input_unreg_device:
@@ -814,9 +731,8 @@ iRet_gyro_input_unreg_device:
 	return ERROR;
 iRet_acc_input_unreg_device:
 	pr_err("[SSP]: %s - could not register input device\n", __func__);
-	input_free_device(meta_input_dev);
-iRet_meta_input_free_device:
 	input_free_device(step_cnt_input_dev);
+
 iRet_step_cnt_input_free_device:
 	input_free_device(step_det_input_dev);
 iRet_step_det_input_free_device:
@@ -855,5 +771,4 @@ void remove_input_dev(struct ssp_data *data)
 	input_unregister_device(data->sig_motion_input_dev);
 	input_unregister_device(data->step_det_input_dev);
 	input_unregister_device(data->step_cnt_input_dev);
-	input_unregister_device(data->meta_input_dev);
 }

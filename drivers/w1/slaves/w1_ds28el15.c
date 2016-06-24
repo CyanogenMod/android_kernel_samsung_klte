@@ -2142,14 +2142,11 @@ static int w1_ds28el15_add_slave(struct w1_slave *sl)
 
 		pr_info("%s:COVER CLASS(%d)\n", __func__, cf_node);
 #endif
-#if defined(CONFIG_SEC_H_PROJECT)
-		w1_ds28el15_update_slave_info(sl);
-#else
-		w1_ds28el15_update_slave_info(sl);
+
 		pr_info("%s:uevent send 1\n", __func__);
 		input_report_switch(sl->master->bus_master->input, SW_W1, 1);
 		input_sync(sl->master->bus_master->input);
-#endif
+		w1_ds28el15_update_slave_info(sl);
 	}
 
 	printk(KERN_ERR "w1_ds28el15_add_slave end, skip_setup=%d, err=%d\n", skip_setup, err);

@@ -35,54 +35,34 @@ enum boot_events_type {
 	SYSTEM_LK_LOGO_DISPLAY,
 	SYSTEM_END_LK,
 	SYSTEM_START_INIT_PROCESS,
-    PLATFORM_START_PRELOAD,
-    PLATFORM_END_PRELOAD,
+	PLATFORM_START_PRELOAD_RESOURCES,
+	PLATFORM_START_PRELOAD_CLASSES,
+	PLATFORM_END_PRELOAD_RESOURCES,
+	PLATFORM_END_PRELOAD_CLASSES,
 	PLATFORM_START_INIT_AND_LOOP,
 	PLATFORM_START_PACKAGEMANAGERSERVICE,
 	PLATFORM_END_PACKAGEMANAGERSERVICE,
 	PLATFORM_END_INIT_AND_LOOP,
-	PLATFORM_PERFORMENABLESCREEN,
-	PLATFORM_ENABLE_SCREEN,
 	PLATFORM_BOOT_COMPLETE,
-	PLATFORM_VOICE_SVC,
-	PLATFORM_DATA_SVC,
-    PLATFORM_START_NETWORK,
-    PLATFORM_END_NETWORK,
-	PLATFORM_PHONEAPP_ONCREATE,
-	RIL_UNSOL_RIL_CONNECTED,
-	RIL_SETRADIOPOWER_ON,
-	RIL_SETUICCSUBSCRIPTION,
-    RIL_SIM_RECORDSLOADED,
-    RIL_RUIM_RECORDSLOADED,
-	RIL_SETUPDATACALL,
+	PLATFORM_ENABLE_SCREEN,
 };
 
 static struct boot_event boot_events[] = {
 	{SYSTEM_START_LK, "lk start", 0},
 	{SYSTEM_LK_LOGO_DISPLAY, "lk logo display", 0},
 	{SYSTEM_END_LK, "lk end", 0},
-	{SYSTEM_START_INIT_PROCESS,"!@Boot: start init process",0},
-	{PLATFORM_START_PRELOAD,"!@Boot: Begin of preload()",0},
-	{PLATFORM_END_PRELOAD,"!@Boot: End of preload()",0},
-	{PLATFORM_START_INIT_AND_LOOP,"!@Boot: Entered the Android system server!",0},
-	{PLATFORM_START_PACKAGEMANAGERSERVICE,"!@Boot: Start PackageManagerService",0},
-	{PLATFORM_END_PACKAGEMANAGERSERVICE,"!@Boot: End PackageManagerService",0},
-	{PLATFORM_END_INIT_AND_LOOP,"!@Boot: Loop forever",0},
-	{PLATFORM_PERFORMENABLESCREEN,"!@Boot: performEnableScreen",0},
-	{PLATFORM_ENABLE_SCREEN,"!@Boot: Enabling Screen!",0},
-	{PLATFORM_BOOT_COMPLETE,"!@Boot: bootcomplete",0},
-	{PLATFORM_VOICE_SVC,"!@Boot: Voice SVC is acquired",0},
-	{PLATFORM_DATA_SVC,"!@Boot: Data SVC is acquired",0},
-    {PLATFORM_START_NETWORK,"!@Boot_DEBUG: start networkManagement",0},
-    {PLATFORM_END_NETWORK,"!@Boot_DEBUG: end networkManagement",0},
-	{PLATFORM_PHONEAPP_ONCREATE,"!@Boot_SVC : PhoneApp OnCrate",0},
-	{RIL_UNSOL_RIL_CONNECTED,"!@Boot_SVC : RIL_UNSOL_RIL_CONNECTED",0},
-	{RIL_SETRADIOPOWER_ON,"!@Boot_SVC : setRadioPower on",0},
-	{RIL_SETUICCSUBSCRIPTION,"!@Boot_SVC : setUiccSubscription",0},
-    {RIL_SIM_RECORDSLOADED,"!@Boot_SVC : SIM onAllRecordsLoaded",0},
-    {RIL_RUIM_RECORDSLOADED,"!@Boot_SVC : RUIM onAllRecordsLoaded",0},
-	{RIL_SETUPDATACALL,"!@Boot_SVC : setupDataCall",0},
-	{0,NULL,0},
+	{SYSTEM_START_INIT_PROCESS, "!@Boot: start init process", 0},
+	{PLATFORM_START_PRELOAD_RESOURCES, "!@Boot: beginofpreloadResources()", 0},
+	{PLATFORM_START_PRELOAD_CLASSES, "!@Boot: beginofpreloadClasses()", 0},
+	{PLATFORM_END_PRELOAD_RESOURCES, "!@Boot: End of preloadResources()", 0},
+	{PLATFORM_END_PRELOAD_CLASSES, "!@Boot: EndofpreloadClasses()", 0},
+	{PLATFORM_START_INIT_AND_LOOP, "!@Boot: Entered the Android system server!", 0},
+	{PLATFORM_START_PACKAGEMANAGERSERVICE, "!@Boot: Start PackageManagerService", 0},
+	{PLATFORM_END_PACKAGEMANAGERSERVICE, "!@Boot: End PackageManagerService", 0},
+	{PLATFORM_END_INIT_AND_LOOP, "!@Boot: Loop forever", 0},
+	{PLATFORM_BOOT_COMPLETE, "!@Boot: bootcomplete", 0},
+	{PLATFORM_ENABLE_SCREEN, "!@Boot: Enabling Screen!", 0},
+	{0, NULL, 0},
 };
 
 static int sec_boot_stat_proc_show(struct seq_file *m, void *v)
@@ -98,7 +78,7 @@ static int sec_boot_stat_proc_show(struct seq_file *m, void *v)
 				"------------\n");
 
 	while (boot_events[i].string != NULL) {
-		seq_printf(m, "%-50s : %5d    %5d\n", boot_events[i].string,
+		seq_printf(m, "%-43s : %5d    %5d\n", boot_events[i].string,
 				boot_events[i].time*1000/32768,	delta);
 		delta = boot_events[i+1].time*1000/32768 - boot_events[i].time*1000/32768;
 		i = i + 1;
@@ -126,8 +106,7 @@ void sec_boot_stat_add(const char *c)
 	i = 0;
 	while (boot_events[i].string != NULL) {
 		if (strcmp(c, boot_events[i].string) == 0) {
-			if (boot_events[i].time == 0)
-				boot_events[i].time = get_boot_stat_time();
+			boot_events[i].time = get_boot_stat_time();
 			break;
 		}
 		i = i + 1;

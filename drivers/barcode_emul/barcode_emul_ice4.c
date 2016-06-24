@@ -49,8 +49,6 @@
 #include "barcode_emul_ice4.h"
 #include <linux/err.h>
 
-#define US_TO_PATTERN		1000000
-
 #if defined(TEST_DEBUG)
 #define pr_barcode	pr_emerg
 #else
@@ -870,8 +868,8 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t size)
 {
 	struct barcode_emul_data *data = dev_get_drvdata(dev);
-	unsigned int _data, _tdata;
-	int count, i, converting_factor = 1;
+	unsigned int _data;
+	int count, i;
 
 	pr_barcode("ir_send called\n");
 
@@ -881,7 +879,6 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 				break;
 			if (data->count == 2) {
 				data->ir_freq = _data;
-				converting_factor = US_TO_PATTERN / data->ir_freq;
 				if (data->on_off) {
 					irda_wake_en(0);
 					usleep_range(200, 300);
@@ -900,13 +897,12 @@ static ssize_t remocon_store(struct device *dev, struct device_attribute *attr,
 								= _data & 0xFF;
 				data->count += 3;
 			} else {
-				_tdata = _data / converting_factor;
-				data->ir_sum += _tdata;
+				data->ir_sum += _data;
 				count = data->count;
 				data->i2c_block_transfer.data[count]
-								= _tdata >> 8;
+								= _data >> 8;
 				data->i2c_block_transfer.data[count+1]
-								= _tdata & 0xFF;
+								= _data & 0xFF;
 				data->count += 2;
 			}
 

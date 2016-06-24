@@ -22,11 +22,7 @@
 #define	CHIP_ID		"MAX88920"
 #endif
 
-#ifdef CONFIG_MACH_KACTIVELTE_KOR
-#define CANCELATION_FILE_PATH	"/efs/FactoryApp/prox_cal"
-#else
 #define CANCELATION_FILE_PATH	"/efs/prox_cal"
-#endif
 #define LCD_LDI_FILE_PATH	"/sys/class/lcd/panel/window_type"
 
 #define LINE_1		'4'

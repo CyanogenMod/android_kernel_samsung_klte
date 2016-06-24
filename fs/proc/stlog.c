@@ -18,24 +18,8 @@
 
 extern wait_queue_head_t ringbuf_wait;
 
-/*
- * Compatibility Issue :
- * dumpstate process of Android M tries to open stlog node with O_NONBLOCK.
- * But on Android L, it tries to open stlog node without O_NONBLOCK.
- * In order to resolve this issue, stlog_open() always works as NONBLOCK mode.
- * If you want runtime debugging, please use stlog_open_pipe().
- */
 static int stlog_open(struct inode * inode, struct file * file)
 {
-	//Open as non-blocking mode for printing once.
-	file->f_flags |= O_NONBLOCK;
-	return do_stlog(STLOG_ACTION_OPEN, NULL, 0, STLOG_FROM_PROC);
-}
-
-static int stlog_open_pipe(struct inode * inode, struct file * file)
-{
-	//Open as blocking mode for runtime debugging
-	file->f_flags &= ~(O_NONBLOCK);
 	return do_stlog(STLOG_ACTION_OPEN, NULL, 0, STLOG_FROM_PROC);
 }
 
@@ -48,12 +32,10 @@ static int stlog_release(struct inode * inode, struct file * file)
 static ssize_t stlog_read(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
-	//Blocking mode for runtime debugging
-	if (!(file->f_flags & O_NONBLOCK))
-		return do_stlog(STLOG_ACTION_READ, buf, count, STLOG_FROM_PROC);
+	if (file->f_flags & O_NONBLOCK) //For runtime debugging
+	    return do_stlog(STLOG_ACTION_READ, buf, count, STLOG_FROM_PROC);
 
-	//Non-blocking mode, print once, consume all the buffers
-	return do_stlog(STLOG_ACTION_READ_ALL, buf, count, STLOG_FROM_PROC);
+	return do_stlog(STLOG_ACTION_READ_ALL, buf, count, STLOG_FROM_PROC); //Print once, consume all the buffers
 }
 
 static ssize_t stlog_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
@@ -67,6 +49,8 @@ loff_t stlog_llseek(struct file *file, loff_t offset, int whence)
 	return (loff_t)do_stlog(STLOG_ACTION_SIZE_BUFFER, 0, 0, STLOG_FROM_READER);
 }
 
+
+
 static const struct file_operations stlog_operations = {
 	.read		= stlog_read,
 	.write		= stlog_write,
@@ -75,48 +59,9 @@ static const struct file_operations stlog_operations = {
 	.llseek		= stlog_llseek,
 };
 
-static const struct file_operations stlog_pipe_operations = {
-	.read		= stlog_read,
-	.open		= stlog_open_pipe,
-	.release	= stlog_release,
-	.llseek		= stlog_llseek,
-};
-
-static const char DEF_STLOG_VER_STR[] = "1.0.2\n";
-
-static ssize_t stlog_ver_read(struct file *file, char __user *buf,
-			 size_t count, loff_t *ppos)
-{
-	ssize_t ret = 0;
-	loff_t off = *ppos;
-	ssize_t len = strlen(DEF_STLOG_VER_STR);
-
-	if (off >= len)
-		return 0;
-
-	len -= off;
-	if (count < len)
-		return -ENOMEM;
-
-	ret = copy_to_user(buf, &DEF_STLOG_VER_STR[off], len);
-	if (ret < 0)
-		return ret;
-
-	len -= ret;
-	*ppos += len;
-
-	return len;
-}
-
-static const struct file_operations stlog_ver_operations = {
-	.read		= stlog_ver_read,
-};
-
 static int __init stlog_init(void)
 {
 	proc_create("stlog", S_IRUGO, NULL, &stlog_operations);
-	proc_create("stlog_pipe", S_IRUGO, NULL, &stlog_pipe_operations);
-	proc_create("stlog_version", S_IRUGO, NULL, &stlog_ver_operations);
 	return 0;
 }
 module_init(stlog_init);
@@ -571,6 +516,7 @@ static int stlog_print_all(char __user *buf, int size, bool clear)
 int do_stlog(int type, char __user *buf, int len, bool from_file)
 {
 	int error=0;
+	char *kern_buf=0;
 
 	switch (type) {
 	case STLOG_ACTION_CLOSE:	/* Close log */
@@ -622,7 +568,7 @@ int do_stlog(int type, char __user *buf, int len, bool from_file)
 			stlog_clear_idx=ringbuf_first_idx;
 			error=0;
 			goto out;
-		}
+			}
 		error = stlog_print_all(buf, len, true);
 		break;
 	/* Size of the log buffer */
@@ -637,6 +583,7 @@ int do_stlog(int type, char __user *buf, int len, bool from_file)
 		break;
 	}
 out:
+	kfree(kern_buf);
 	return error;
 }
 
@@ -660,14 +607,12 @@ int do_stlog_write(int type, const char __user *buf, int len, bool from_file)
 
 	line = kern_buf;
 	if (copy_from_user(line, buf, len)) {
-		error = -EFAULT;
-		goto out;
-	}
+			error = -EFAULT;
+			goto out;
+		}
 
-	line[len] = '\0';
-	error = stlog("%s", line);
-	if ((line[len-1] == '\n') && (error == (len-1)))
-		error++;
+	stlog("%s", line);
+
 out:
 	kfree(kern_buf);
 	return error;

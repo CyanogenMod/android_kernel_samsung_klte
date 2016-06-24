@@ -1033,7 +1033,7 @@ static ssize_t sysfs_hall_debounce_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(hall_irq_ctrl, 0660,
+static DEVICE_ATTR(hall_irq_ctrl, S_IRUGO | S_IWUGO,
 			sysfs_hall_debounce_show,
 			sysfs_hall_debounce_store);
 #endif
@@ -1721,10 +1721,7 @@ static int gpio_keys_resume(struct device *dev)
 			disable_irq_wake(bdata->irq);
 
 		if (gpio_is_valid(bdata->button->gpio))
-		{
-			if(!(bdata->button->code == 172))
-				gpio_keys_gpio_report_event(bdata);
-		}
+			gpio_keys_gpio_report_event(bdata);
 	}
 #ifdef CONFIG_SENSORS_HALL
 	if (device_may_wakeup(dev) && ddata->gpio_flip_cover != 0) {

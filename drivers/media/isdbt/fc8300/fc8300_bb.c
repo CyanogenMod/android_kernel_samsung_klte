@@ -4034,9 +4034,6 @@ s32 fc8300_init(HANDLE handle, DEVICEID devid)
 	bbm_byte_write(handle, DIV_MASTER, BBM_FEC_CTRL, 0x03);
 #endif
 
-	bbm_byte_write(handle, DIV_BROADCAST, BBM_FAIP_MTD_SR_SHIFT_VALUE, 0x10);
-	bbm_byte_write(handle, DIV_BROADCAST, BBM_CIR_THR_23, 0x02);
-
 #ifdef BBM_INT_LOW_ACTIVE
 	bbm_byte_write(handle, DIV_BROADCAST, BBM_INT_POLAR_SEL, 0x00);
 #endif
@@ -4051,8 +4048,6 @@ s32 fc8300_init(HANDLE handle, DEVICEID devid)
 	bbm_byte_write(handle, DIV_BROADCAST, BBM_BCAS_ENABLE, 0x00);
 #endif
 
-	bbm_word_write(handle, DIV_BROADCAST, 0x30b6, 0x0500);
-	bbm_byte_write(handle, DIV_BROADCAST, 0x30b8, 0x0f);
 	bbm_byte_write(handle, DIV_MASTER, BBM_INT_AUTO_CLEAR, 0x01);
 	bbm_byte_write(handle, DIV_MASTER, BBM_BUF_ENABLE, 0x01);
 	bbm_byte_write(handle, DIV_MASTER, BBM_BUF_INT_ENABLE, 0x01);

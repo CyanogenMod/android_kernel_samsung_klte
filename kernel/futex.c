@@ -2381,9 +2381,6 @@ static int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 	struct futex_q q = futex_q_init;
 	int res, ret;
 
-	if (uaddr == uaddr2)
-		return -EINVAL;
-
 	if (!bitset)
 		return -EINVAL;
 

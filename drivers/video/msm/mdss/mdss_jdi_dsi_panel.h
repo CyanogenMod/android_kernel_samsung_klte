@@ -132,5 +132,4 @@ struct panel_hrev {
 
 #endif
 void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *cmds, int cnt, int flag);
-static struct mipi_samsung_driver_data msd;
-extern int mipi_samsung_cabc_onoff ( int cabc_set );
+

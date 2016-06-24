@@ -34,6 +34,7 @@
 #include <media/msm_media_info.h>
 
 #include "vidc_hfi_api.h"
+#include "vidc_hfi_api.h"
 
 #define MSM_VIDC_DRV_NAME "msm_vidc_driver"
 #define MSM_VIDC_VERSION KERNEL_VERSION(0, 0, 1);
@@ -100,17 +101,6 @@ struct buf_info {
 	struct list_head list;
 	struct vb2_buffer *buf;
 };
-
-struct msm_vidc_list {
-	struct list_head list;
-	struct mutex lock;
-};
-
-static inline void INIT_MSM_VIDC_LIST(struct msm_vidc_list *mlist)
-{
-	mutex_init(&mlist->lock);
-	INIT_LIST_HEAD(&mlist->list);
-}
 
 enum buffer_owner {
 	DRIVER,
@@ -238,7 +228,7 @@ struct msm_vidc_inst {
 	int state;
 	struct msm_vidc_format *fmts[MAX_PORT_NUM];
 	struct buf_queue bufq[MAX_PORT_NUM];
-	struct msm_vidc_list pendingq;
+	struct list_head pendingq;
 	struct list_head internalbufs;
 	struct list_head persistbufs;
 	struct list_head outputbufs;

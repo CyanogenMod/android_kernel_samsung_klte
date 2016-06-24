@@ -522,8 +522,8 @@
 		   SEC_BATTERY_FULL_CONDITION_NOTIMEFULL |
 		   SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
-		battery,full_condition_soc = <93>;
-		battery,full_condition_vcell = <4300>;
+		battery,full_condition_soc = <97>;
+		battery,full_condition_vcell = <4350>;
 
 		battery,recharge_check_count = <1>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
@@ -556,10 +556,10 @@
 			battery,full_check_type = <7>; /* SEC_BATTERY_FULLCHARGED_CHGPSY */
 			battery,full_check_type_2nd = <3>; /*SEC_BATTERY_FULLCHARGED_TIME */
 
-			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1400 400 700 1300 1500 300 80 900 1500 1000 1000 1800 1800 1800 1400 1800 460>;
-			battery,fast_charging_current = <1800 0 460 2300 460 1200 1000 460 0 1200 750 2100 2100 0 1400 400 700 1300 1500 300 80 900 1500 0 1000 2800 2800 2800 1400 2800 0>;
-			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 200 0 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 200 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0>;
+			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1300 400 700 1300 300 1000 1800 460 1800 1800 460>;
+			battery,fast_charging_current = <1800 0 460 2300 460 1200 1000 460 0 1200 750 2100 2100 0 1300 400 700 1300 300 1000 2100 0 3000 3000 0>;
+			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 200 200 200 0>;
+			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 2400 2400 0>;
 		};
 	};
 };

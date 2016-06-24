@@ -140,10 +140,6 @@ static void determine_jack_type(struct sec_jack_info *hi);
 static int detect_count = 0;
 #endif
 
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-static int ear_adc_value = 0;
-#endif
-
 #if defined(CONFIG_MACH_VIENNA) || defined(CONFIG_MACH_PICASSO) || defined(CONFIG_MACH_MONDRIAN) || defined(CONFIG_MACH_LT03) || defined(CONFIG_SEC_H_PROJECT) || defined(CONFIG_SEC_FRESCO_PROJECT)
 static void mpp_control(bool onoff)
 {
@@ -521,20 +517,6 @@ static ssize_t earjack_state_onoff_show(struct device *dev,
 static DEVICE_ATTR(state, 0664 , earjack_state_onoff_show,
 	NULL);
 
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-static ssize_t mic_adc_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	int value = 0;
-
-	value = ear_adc_value;
-	return snprintf(buf, 10, "%d\n", value);
-}
-
-static DEVICE_ATTR(mic_adc, 0444 , mic_adc_show, NULL);
-
-#endif
-
 #if defined (CONFIG_EARJACK_ADC_SYSFS)
 static ssize_t jack_adc_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -779,10 +761,6 @@ void sec_jack_buttons_work(struct work_struct *work)
 	int adc;
 	int i;
 
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-	ear_adc_value = 0;
-#endif
-
 	if (!hi->buttons_enable) {
 		pr_info("%s: BTN %d is skipped\n", __func__,
 			hi->pressed_code);
@@ -807,9 +785,6 @@ void sec_jack_buttons_work(struct work_struct *work)
 
 	/* when button is pressed */
 	adc = sec_jack_get_adc_value(hi);
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-	ear_adc_value = adc;
-#endif
 
 #if defined(CONFIG_MACH_VIENNA) || defined(CONFIG_MACH_PICASSO) || defined(CONFIG_MACH_MONDRIAN) || defined(CONFIG_MACH_LT03) || defined(CONFIG_SEC_H_PROJECT) || defined(CONFIG_SEC_FRESCO_PROJECT)
 	mpp_control(0);
@@ -906,18 +881,10 @@ static struct sec_jack_platform_data *sec_jack_populate_dt_pdata(struct device *
 				__func__, args.args_count, args.args[0],
 				args.args[1], args.args[2],args.args[3]);		
 	}
-#if defined(CONFIG_SAMSUNG_JACK_VOICE_BTN)
-	for( i=0; i<4; i++)
-#else
 	for( i=0; i<3; i++)
-#endif
 	{
 		of_parse_phandle_with_args(dev->of_node, "but-zones-list","#list-but-cells", i, &args);
-#if defined(CONFIG_SAMSUNG_JACK_VOICE_BTN)
-		pdata->jack_buttons_zones[i].code = args.args[0]==0?KEY_MEDIA:args.args[0]==1?KEY_VOLUMEUP:args.args[0]==2?KEY_VOLUMEDOWN:KEY_VOICECOMMAND;
-#else
 		pdata->jack_buttons_zones[i].code = args.args[0]==0?KEY_MEDIA:args.args[0]==1?KEY_VOLUMEUP:KEY_VOLUMEDOWN;
-#endif
 		pdata->jack_buttons_zones[i].adc_low = args.args[1];
 		pdata->jack_buttons_zones[i].adc_high = args.args[2];
 		pr_info("%s : %d, %d, %d, %d\n",
@@ -1064,14 +1031,6 @@ static int sec_jack_probe(struct platform_device *pdev)
 	if (ret)
 		pr_err("Failed to create device file in sysfs entries(%s)!\n",
 			dev_attr_state.attr.name);
-
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-	ret = device_create_file(earjack, &dev_attr_mic_adc);
-	if (ret)
-		pr_err("Failed to create device file in sysfs entries(%s)!\n",
-			dev_attr_key_state.attr.name);
-#endif
-
 #if defined (CONFIG_EARJACK_ADC_SYSFS)
 	ret = device_create_file(earjack, &dev_attr_jack_adc);
 	if (ret)
@@ -1166,9 +1125,6 @@ err_create_buttons_wq_failed:
 err_create_wq_failed:
 	device_remove_file(earjack, &dev_attr_state);
 	device_remove_file(earjack, &dev_attr_key_state);
-#if defined(CONFIG_SAMSUNG_JACK_READ_BTN_ADC)
-	device_remove_file(earjack, &dev_attr_mic_adc);
-#endif
 #if defined (CONFIG_EARJACK_ADC_SYSFS)
 	device_remove_file(earjack, &dev_attr_jack_adc);
 	device_remove_file(earjack, &dev_attr_send_end_btn_adc);

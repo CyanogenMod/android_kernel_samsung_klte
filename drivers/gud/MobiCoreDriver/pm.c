@@ -1,17 +1,4 @@
 /*
- * Copyright (c) 2013 TRUSTONIC LIMITED
- * All Rights Reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- */
-/*
  * MobiCore Driver Kernel Module.
  * This module is written as a Linux device driver.
  * This driver represents the command proxy on the lowest layer, from the
@@ -21,6 +8,13 @@
  * the interface from the secure world to the normal world.
  * The access to the driver is possible with a file descriptor,
  * which has to be created by the fd = open(/dev/mobicore) command.
+ *
+ * <-- Copyright Giesecke & Devrient GmbH 2009-2012 -->
+ * <-- Copyright Trustonic Limited 2013 -->
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <linux/module.h>
 #include <linux/timer.h>
@@ -41,14 +35,7 @@
 	struct clk *mc_ce_iface_clk = NULL;
 	struct clk *mc_ce_core_clk = NULL;
 	struct clk *mc_ce_bus_clk = NULL;
-
 #endif /* MC_CRYPTO_CLOCK_MANAGEMENT */
-
-#if defined(MC_CRYPTO_CLOCK_MANAGEMENT) && defined(MC_USE_DEVICE_TREE)
-	#include <linux/of.h>
-	#define QSEE_CE_CLK_100MHZ 100000000
-	struct clk *mc_ce_core_src_clk = NULL;
-#endif /* MC_CRYPTO_CLOCK_MANAGEMENT && MC_USE_DEVICE_TREE */
 
 #ifdef MC_PM_RUNTIME
 
@@ -94,7 +81,7 @@ static int mc_suspend_notifier(struct notifier_block *nb,
 
 #ifdef MC_MEM_TRACES
 	mobicore_log_read();
-#endif  /* MC_MEM_TRACES */
+#endif
 
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
@@ -169,37 +156,6 @@ int mc_pm_clock_initialize(void)
 {
 	int ret = 0;
 
-#ifdef MC_USE_DEVICE_TREE
-	/* Get core clk src */
-	mc_ce_core_src_clk = clk_get(mcd, "core_clk_src");
-	if (IS_ERR(mc_ce_core_src_clk)) {
-		ret = PTR_ERR(mc_ce_core_src_clk);
-		MCDRV_DBG_ERROR(mcd,
-				"cannot get core clock src with error: %d",
-				ret);
-		goto error;
-	} else {
-		int ce_opp_freq_hz = QSEE_CE_CLK_100MHZ;
-
-		if (of_property_read_u32(mcd->of_node,
-					 "qcom,ce-opp-freq",
-					 &ce_opp_freq_hz)) {
-			ce_opp_freq_hz = QSEE_CE_CLK_100MHZ;
-			MCDRV_DBG_ERROR(mcd,
-					"cannot get ce clock frequency. Using %d",
-					ce_opp_freq_hz);
-		}
-		ret = clk_set_rate(mc_ce_core_src_clk, ce_opp_freq_hz);
-		if (ret) {
-			clk_put(mc_ce_core_src_clk);
-			mc_ce_core_src_clk = NULL;
-			MCDRV_DBG_ERROR(mcd, "cannot set core clock src rate");
-			ret = -EIO;
-			goto error;
-		}
-	}
-#endif  /* MC_CRYPTO_CLOCK_MANAGEMENT && MC_USE_DEVICE_TREE */
-
 	/* Get core clk */
 	mc_ce_core_clk = clk_get(mcd, "core_clk");
 	if (IS_ERR(mc_ce_core_clk)) {
@@ -224,8 +180,6 @@ int mc_pm_clock_initialize(void)
 		MCDRV_DBG_ERROR(mcd, "cannot get AXI bus clock");
 		goto error;
 	}
-
-	MCDRV_DBG(mcd, "obtained crypto clocks");
 	return ret;
 
 error:
@@ -238,19 +192,14 @@ error:
 
 void mc_pm_clock_finalize(void)
 {
-	if (mc_ce_bus_clk != NULL)
-		clk_put(mc_ce_bus_clk);
-
 	if (mc_ce_iface_clk != NULL)
 		clk_put(mc_ce_iface_clk);
 
 	if (mc_ce_core_clk != NULL)
 		clk_put(mc_ce_core_clk);
 
-#ifdef MC_USE_DEVICE_TREE
-	if (mc_ce_core_src_clk != NULL)
-		clk_put(mc_ce_core_src_clk);
-#endif  /* MC_CRYPTO_CLOCK_MANAGEMENT && MC_USE_DEVICE_TREE */
+	if (mc_ce_bus_clk != NULL)
+		clk_put(mc_ce_bus_clk);
 }
 
 int mc_pm_clock_enable(void)

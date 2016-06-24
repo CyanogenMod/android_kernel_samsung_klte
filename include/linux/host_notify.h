@@ -15,7 +15,6 @@ enum host_uevent_state {
 	NOTIFY_HOST_REMOVE,
 	NOTIFY_HOST_OVERCURRENT,
 	NOTIFY_HOST_LOWBATT,
-	NOTIFY_HOST_BLOCK,
 	NOTIFY_HOST_UNKNOWN,
 };
 
@@ -83,7 +82,6 @@ enum host_notify_data {
 	HNOTIFY_BOOSTER,
 };
 
-extern int check_usb_block_type(void);
 extern int sec_otg_notify(int event);
 extern int sec_otg_register_booster(struct booster_data *);
 extern int sec_get_notification(int ndata);

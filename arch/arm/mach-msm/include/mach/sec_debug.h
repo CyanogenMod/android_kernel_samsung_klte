@@ -327,9 +327,8 @@ static inline void sec_debug_fuelgauge_log(unsigned int voltage,
 extern bool kernel_sec_set_normal_pwroff(int value);
 extern int kernel_sec_get_normal_pwroff(void);
 #endif
-#ifdef CONFIG_RESTART_REASON_SEC_PARAM
-extern void sec_param_restart_reason(const char *cmd);
-#endif
+
+
 extern bool kernel_sec_set_debug_level(int level);
 extern int kernel_sec_get_debug_level(void);
 extern int ssr_panic_handler_for_sec_dbg(void);

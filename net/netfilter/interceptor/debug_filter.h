@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2011 - 2015, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2011 - 2013, INSIDE Secure Oy. All rights reserved.
 */
 
 
@@ -15,7 +15,7 @@
 
 void
 debug_filter_reset(
-          void);
+        void);
 
 void
 debug_filter_add(

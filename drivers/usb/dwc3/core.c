@@ -528,16 +528,10 @@ void dwc3_set_notifier(void (*notify)(struct dwc3 *, unsigned))
 }
 EXPORT_SYMBOL(dwc3_set_notifier);
 
-int dwc3_notify_event(struct dwc3 *dwc, unsigned event)
+void dwc3_notify_event(struct dwc3 *dwc, unsigned event)
 {
-	int ret = 0;
-
 	if (dwc->notify_event)
 		dwc->notify_event(dwc, event);
-	else
-		ret = -ENODEV;
-
-	return ret;
 }
 EXPORT_SYMBOL(dwc3_notify_event);
 

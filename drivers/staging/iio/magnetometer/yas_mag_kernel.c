@@ -189,8 +189,6 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 	int len = 0, i, j;
 	size_t datasize = buffer->access->get_bytes_per_datum(buffer);
 	int32_t *mag;
-	struct timespec ts;
-	s64 timestamp;
 
 	mag = (int32_t *) kmalloc(datasize, GFP_KERNEL);
 	if (mag == NULL)
@@ -207,14 +205,8 @@ static irqreturn_t yas_trigger_handler(int irq, void *p)
 	}
 
 	/* Guaranteed to be aligned with 8 byte boundary */
-	//if (indio_dev->scan_timestamp)
-	// *(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = pf->timestamp;
-
-	ts = ktime_to_timespec(ktime_get_boottime());
-	timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	*(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = timestamp;
-	if (timestamp <= 0)
-		pr_err("[%s] invalid time = %lld\n", __func__, timestamp);
+	if (buffer->scan_timestamp)
+		*(s64 *)((u8 *)mag + ALIGN(len, sizeof(s64))) = pf->timestamp;
 	iio_push_to_buffer(indio_dev->buffer, (u8 *)mag, 0);
 	kfree(mag);
 done:

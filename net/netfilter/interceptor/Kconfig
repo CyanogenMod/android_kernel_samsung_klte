@@ -1,6 +1,6 @@
 config VPNCLIENT_SECURITY
    tristate "VpnClient Security module"
-   default y
+   default n
    help
      If you say Y here, VpnClient security module will be built in kernel.
 

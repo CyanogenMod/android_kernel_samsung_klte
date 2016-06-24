@@ -28,26 +28,6 @@
 /* mismatch 8974 */
 #if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01KTT) || defined(CONFIG_MACH_KS01LGT) || defined(CONFIG_MACH_JACTIVESKT)
 static struct sec_therm_adc_table temper_table_ap[] = {
-	{25794,		900},
-	{25864,		890},
-	{26000,		880},
-	{26155,		870},
-	{26203,		860},
-	{26237,		850},
-	{26288,		840},
-	{26354,		830},
-	{26393,		820},
-	{26472,		810},
-	{26494,		800},
-	{26578,		790},
-	{26636,		780},
-	{26695,		770},
-	{26779,		760},
-	{26817,		750},
-	{26870,		740},
-	{27000,		730},
-	{27031,		720},
-	{27107,		710},
 	{27229,		700},
 	{27271,		690},
 	{27309,		680},
@@ -1021,9 +1001,7 @@ static struct sec_therm_platform_data sec_therm_pdata = {
 	.adc_table	= temper_table_ap,
 	.polling_interval = 30 * 1000, /* msecs */
 	.get_siop_level = get_msm8974_siop_level,
-#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
-	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN) || \
-	defined(CONFIG_MACH_KACTIVELTE_DCM) || defined(CONFIG_MACH_KLIMT_LTE_DCM)
+#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_KLTE_JPN)
 	#if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI)
 	.adc_flash_arr_size = ARRAY_SIZE(temper_table_flash),
 	.adc_table_flash = temper_table_flash,

@@ -114,8 +114,6 @@ struct sec_battery_info {
 	unsigned int check_adc_count;
 	unsigned int check_adc_value;
 
-	/* health change check*/
-	bool health_change;
 	/* time check */
 	unsigned long charging_start_time;
 	unsigned long charging_passed_time;
@@ -185,7 +183,9 @@ struct sec_battery_info {
 	int eng_not_full_status;
 #if defined(CONFIG_BATTERY_SWELLING)
 	bool swelling_mode;
-	bool charging_block;
+	bool swelling_block;
+	unsigned long swelling_block_start;
+	unsigned long swelling_block_passed;
 	int swelling_full_check_cnt;
 #endif
 };
@@ -289,7 +289,6 @@ enum {
 #endif
 	BATT_STABILITY_TEST,
 	BATT_INBAT_VOLTAGE,
-	BATT_CAPACITY_MAX,
 };
 
 enum {

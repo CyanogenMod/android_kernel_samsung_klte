@@ -2056,9 +2056,6 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 
 	msleep(150);
 
-#ifdef CRC_CHECK_DELAY
-	msleep(70);
-#endif
 	tkey_check_ic(info);
 
 	if (info->touchkeyid == CORERIVER_TOUCHKEY)
@@ -2247,9 +2244,6 @@ static int cypress_touchkey_resume(struct device *dev)
 	msleep(150);
 
 	if (info->touchkeyid == CYPRESS_TOUCHKEY) {
-#ifdef CRC_CHECK_DELAY
-	msleep(70);
-#endif
 #ifdef CYPRESS_SUPPORT_DUAL_INT_MODE
 	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
 		cypress_touchkey_interrupt_set_dual(info->client);

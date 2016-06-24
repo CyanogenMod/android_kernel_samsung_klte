@@ -114,11 +114,10 @@ static void traverse_receive_queue(struct sock *sk)
 static void recv_queue_timer_callback(unsigned long data)
 {
   struct sock *sk = (struct sock *)data;
-  unsigned long flags;
 
-  spin_lock_irqsave(&pppox_sk(sk)->recv_queue_lock, flags);
+  spin_lock(&pppox_sk(sk)->recv_queue_lock);
   traverse_receive_queue(sk);
-  spin_unlock_irqrestore(&pppox_sk(sk)->recv_queue_lock, flags);
+  spin_unlock(&pppox_sk(sk)->recv_queue_lock);
 }
 
 /******************************************************************************/
@@ -130,7 +129,6 @@ static int pppopns_recv_core(struct sock *sk_raw, struct sk_buff *skb)
 	struct meta *meta = skb_meta(skb);
 	__u32 now = jiffies;
 	struct header *hdr;
-    unsigned long flags;
 
 	/* Skip transport header */
 	skb_pull(skb, skb_transport_header(skb) - skb->data);
@@ -178,12 +176,7 @@ static int pppopns_recv_core(struct sock *sk_raw, struct sk_buff *skb)
 	/* Perform reordering if sequencing is enabled. */
 	if (hdr->bits & PPTP_GRE_SEQ_BIT) {
 		struct sk_buff *skb1;
-
-		if (timer_pending(&pppox_sk(sk)->recv_queue_timer)) {
-			del_timer_sync(&pppox_sk(sk)->recv_queue_timer);
-		}
-
-		spin_lock_irqsave(&pppox_sk(sk)->recv_queue_lock, flags);
+		spin_lock(&pppox_sk(sk)->recv_queue_lock);
 
 		/* Insert the packet into receive queue in order. */
 		skb_set_owner_r(skb, sk);
@@ -191,7 +184,7 @@ static int pppopns_recv_core(struct sock *sk_raw, struct sk_buff *skb)
 			struct meta *meta1 = skb_meta(skb1);
 			__s32 order = meta->sequence - meta1->sequence;
 			if (order == 0) {
-				spin_unlock_irqrestore(&pppox_sk(sk)->recv_queue_lock, flags);
+				spin_unlock(&pppox_sk(sk)->recv_queue_lock);
 				goto drop;
 			}
 			if (order < 0) {
@@ -206,8 +199,11 @@ static int pppopns_recv_core(struct sock *sk_raw, struct sk_buff *skb)
 			skb_queue_tail(&sk->sk_receive_queue, skb);
 		}
 		
+		if (timer_pending(&pppox_sk(sk)->recv_queue_timer)) {
+			del_timer_sync(&pppox_sk(sk)->recv_queue_timer);
+		}
 		traverse_receive_queue(sk);
-		spin_unlock_irqrestore(&pppox_sk(sk)->recv_queue_lock, flags);
+		spin_unlock(&pppox_sk(sk)->recv_queue_lock);
 		return NET_RX_SUCCESS;
 	}
 
@@ -371,7 +367,6 @@ static int pppopns_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct pppox_sock *po = pppox_sk(sk);
-    unsigned long flags;
 
 	if (!sk)
 		return 0;
@@ -383,11 +378,11 @@ static int pppopns_release(struct socket *sock)
 	}
 
 	if (po) {
-		spin_lock_irqsave(&po->recv_queue_lock, flags);
+		spin_lock(&po->recv_queue_lock);
 		if (po && timer_pending( &po->recv_queue_timer )) {	    
 			del_timer_sync( &po->recv_queue_timer );
 		}
-		spin_unlock_irqrestore(&po->recv_queue_lock, flags);
+		spin_unlock(&po->recv_queue_lock);
 	}
 
 	if (sk->sk_state != PPPOX_NONE) {

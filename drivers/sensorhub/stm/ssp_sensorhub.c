@@ -151,58 +151,39 @@ static ssize_t ssp_sensorhub_write(struct file *file, const char __user *buf,
 		= container_of(file->private_data,
 			struct ssp_sensorhub_data, sensorhub_device);
 	int ret = 0;
-	char *buffer;
 
 	if (unlikely(count < 2)) {
-		sensorhub_err("library data length err(%d)", (int)count);
+		sensorhub_err("library data length err(%d)", count);
 		return -EINVAL;
 	}
 
-	buffer = kzalloc(count * sizeof(char), GFP_KERNEL);
-	if (unlikely(!buffer)) {
-		sensorhub_err("allocate memory for kernel buffer err");
-		return -ENOMEM;
-	}
-
-	ret = copy_from_user(buffer, buf, count);
-	if (unlikely(ret)) {
-		sensorhub_err("memcpy for kernel buffer err");
-		ret = -EFAULT;
-		goto exit;
-	}
-
-	ssp_sensorhub_log(__func__, buffer, count);
+	ssp_sensorhub_log(__func__, buf, count);
 
 	if (unlikely(hub_data->ssp_data->bSspShutdown)) {
 		sensorhub_err("stop sending library data(shutdown)");
-		ret = -EBUSY;
-		goto exit;
+		return -EBUSY;
 	}
 
-	if (buffer[0] == MSG2SSP_INST_LIB_DATA && count >= BIG_DATA_SIZE)
-		ret = ssp_sensorhub_send_big_data(hub_data, buffer, count);
-	else if (buffer[0] == MSG2SSP_INST_LIB_NOTI)
-		ret = ssp_sensorhub_send_cmd(hub_data, buffer, count);
+	if (buf[0] == MSG2SSP_INST_LIB_DATA && count >= BIG_DATA_SIZE)
+		ret = ssp_sensorhub_send_big_data(hub_data, buf, count);
+	else if (buf[0] == MSG2SSP_INST_LIB_NOTI)
+		ret = ssp_sensorhub_send_cmd(hub_data, buf, count);
 	else
-		ret = ssp_sensorhub_send_instruction(hub_data, buffer, count);
+		ret = ssp_sensorhub_send_instruction(hub_data, buf, count);
 
 	if (unlikely(ret <= 0)) {
 		sensorhub_err("send library data err(%d)", ret);
 		/* i2c transfer fail */
 		if (ret == ERROR)
-			ret = -EIO;
+			return -EIO;
 		/* i2c transfer done but no ack from MCU */
 		else if (ret == FAIL)
-			ret = -EAGAIN;
-
-		goto exit;
+			return -EAGAIN;
+		else
+			return ret;
 	}
 
-	ret = count;
-
-exit:
-	kfree(buffer);
-	return ret;
+	return count;
 }
 
 static ssize_t ssp_sensorhub_read(struct file *file, char __user *buf,

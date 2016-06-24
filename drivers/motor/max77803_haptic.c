@@ -57,7 +57,7 @@ static void max77803_haptic_i2c(struct max77803_haptic_data *hap_data, bool en)
 		pr_err("[VIB] i2c write error %d\n", ret);
 }
 
-#ifdef CONFIG_SS_VIBRATOR
+#ifdef CONFIG_VIBETONZ
 void max77803_vibtonz_en(bool en)
 {
 	if (g_hap_data == NULL) {
@@ -90,7 +90,7 @@ static int max77803_haptic_probe(struct platform_device *pdev)
 	struct max77803_dev *max77803 = dev_get_drvdata(pdev->dev.parent);
 	struct max77803_platform_data *max77803_pdata
 		= dev_get_platdata(max77803->dev);
-#ifdef CONFIG_SS_VIBRATOR
+#ifdef CONFIG_VIBETONZ
 	struct max77803_haptic_platform_data *pdata
 		= max77803_pdata->haptic_data;
 #endif

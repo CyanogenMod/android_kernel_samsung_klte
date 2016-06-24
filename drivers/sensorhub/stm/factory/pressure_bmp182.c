@@ -182,18 +182,6 @@ static ssize_t pressure_name_show(struct device *dev,
 #endif
 }
 
-static ssize_t pressure_temperature_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	struct ssp_data *data = dev_get_drvdata(dev);
-	s32 temperature = 0;
-	s32 temp = 0;
-	temp = (s32) (data->buf[PRESSURE_SENSOR].pressure[1]);
-	temperature = (42500) + ((temp / (120 * 4))*1000); //(42.5f) + (temperature/(120 * 4));
-
-	return sprintf(buf, "%d.%02d\n", (temperature/1000), (s32)abs(temperature%1000));
-}
-
 static DEVICE_ATTR(vendor,  S_IRUGO, pressure_vendor_show, NULL);
 static DEVICE_ATTR(name,  S_IRUGO, pressure_name_show, NULL);
 static DEVICE_ATTR(eeprom_check, S_IRUGO, eeprom_check_show, NULL);
@@ -201,7 +189,6 @@ static DEVICE_ATTR(calibration,  S_IRUGO | S_IWUSR | S_IWGRP,
 	pressure_cabratioin_show, pressure_cabratioin_store);
 static DEVICE_ATTR(sea_level_pressure, S_IRUGO | S_IWUSR | S_IWGRP,
 	NULL, sea_level_pressure_store);
-static DEVICE_ATTR(temperature, S_IRUGO, pressure_temperature_show, NULL);
 
 static struct device_attribute *pressure_attrs[] = {
 	&dev_attr_vendor,
@@ -218,7 +205,6 @@ static struct device_attribute *pressure_attrs_lps25h[] = {
 	&dev_attr_name,
 	&dev_attr_calibration,
 	&dev_attr_sea_level_pressure,
-	&dev_attr_temperature,
 	NULL,
 };
 #endif

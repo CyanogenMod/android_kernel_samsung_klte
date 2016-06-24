@@ -150,7 +150,7 @@ static s32 spi_bulkwrite(HANDLE handle, u16 addr, u8 command, u8 *data,
 	return BBM_OK;
 }
 
-static s32 spi_dataread(HANDLE handle, u16 addr, u8 command, u8 *data,
+static s32 spi_dataread(HANDLE handle, u8 addr, u8 command, u8 *data,
 			u32 length)
 {
 	s32 res = BBM_OK;

@@ -3316,15 +3316,6 @@ static int sii8240_mhl_onoff(unsigned long event)
 	struct sii8240_data *sii8240 = dev_get_drvdata(sii8240_mhldev);
 	int handled = MHL_CON_UNHANDLED;
 
-#ifdef CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK
-	pr_info("sii8240_mhl_onoff mmdock debug_log event =  %lu\n", event);
-	if (event == 2)	{
-		pr_info("sii8240: mmdock connection\n");
-		sii8240->pdata->is_multimediadock = true;
-		event = 1;
-	}
-#endif
-
 	if (event == sii8240->muic_state) {
 		pr_info("sii8240 : Same muic event, Ignored!\n");
 		return MHL_CON_UNHANDLED;
@@ -3348,9 +3339,7 @@ static int sii8240_mhl_onoff(unsigned long event)
 		sii8240->muic_state = MHL_DETACHED;
 		wake_unlock(&sii8240->mhl_wake_lock);
 		mutex_lock(&sii8240->lock);
-#ifdef CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK
-		sii8240->pdata->is_multimediadock = false;
-#endif
+
 		if (sii8240->pdata->hdmi_mhl_ops) {
 			struct msm_hdmi_mhl_ops *hdmi_mhl_ops =	sii8240->pdata->hdmi_mhl_ops;
 			hdmi_mhl_ops->set_upstream_hpd(sii8240->pdata->hdmi_pdev, 0);

@@ -20,7 +20,7 @@
 
 #if defined(CONFIG_USB_SWITCH_TSU6721) || defined(CONFIG_USB_SWITCH_RT8973) || defined(CONFIG_SM5502_MUIC)
 #include <linux/i2c/tsu6721.h>
-#define DEBUG_STATUS		1
+#define DEBUG_STATUS   			1
 #endif
 
 #ifdef CONFIG_USB_HOST_NOTIFY
@@ -516,12 +516,7 @@ int max77803_muic_charger_cb(enum cable_type_muic cable_type)
 		current_cable_type = POWER_SUPPLY_TYPE_MAINS;
 		break;
 	case CABLE_TYPE_OTG_MUIC:
-#ifdef CONFIG_CONTROL_OTG_POPUP
-		current_cable_type = POWER_SUPPLY_TYPE_OTG;
-		break;
-#else
 		goto skip;
-#endif
 	case CABLE_TYPE_JIG_UART_OFF_MUIC:
 		current_cable_type = POWER_SUPPLY_TYPE_BATTERY;
 		break;
@@ -1692,7 +1687,6 @@ int max77888_muic_charger_cb(enum cable_type_muic cable_type)
 	case CABLE_TYPE_SMARTDOCK_MUIC:
 	case CABLE_TYPE_SMARTDOCK_TA_MUIC:
 	case CABLE_TYPE_JIG_UART_OFF_VB_MUIC:
-	case CABLE_TYPE_MMDOCK_MUIC:
 	case CABLE_TYPE_INCOMPATIBLE_MUIC:
 		is_cable_attached = true;
 		break;
@@ -1767,8 +1761,6 @@ int max77888_muic_charger_cb(enum cable_type_muic cable_type)
 	case CABLE_TYPE_CHARGING_CABLE_MUIC:
 		current_cable_type = POWER_SUPPLY_TYPE_POWER_SHARING;
 		break;
-	case CABLE_TYPE_MMDOCK_MUIC:
-		return 0;
 	default:
 		pr_err("%s: invalid type for charger:%d\n",
 				__func__, cable_type);
@@ -2084,7 +2076,7 @@ int msm8930_get_cable_status(void) {return (int)set_cable_status; }
 #if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_QPNP_SEC_CHARGER)
 bool sec_bat_is_lpm(void)
 {
-	return (bool)poweroff_charging;
+	return (bool)poweroff_charging; 
 }
 #endif
 
@@ -2222,7 +2214,7 @@ void tsu6721_callback(enum cable_type_t cable_type, int attached)
                if (attached)
                {
                        status_count = status_count+1;
-                       pr_err("%s UART Status attached (%d), VBUS: %s\n",__func__,
+                       pr_err("%s UART Status attached (%d), VBUS: %s\n",__func__, 
 					status_count,((cable_type == CABLE_TYPE_UARTOFF ? "No": "Yes")));
                } else {
                        status_count = status_count-1;
@@ -2641,7 +2633,7 @@ extern int poweroff_charging;
 /* support for LPM charging */
 bool sec_bat_is_lpm(void)
 {
-	return (bool)poweroff_charging;
+	return (bool)poweroff_charging; 
 }
 
 int sec_bat_get_cable_status(void)
@@ -2717,7 +2709,7 @@ static int acc_notify(int event)
 	return ret;
 }
 
-static void fsa9485_muic_mhl_cb(int attached)
+static void fsa9485_muic_mhl_cb(bool attached)
 {
 	pr_info("%s : attached_status (%d)\n", __func__, attached);
 	acc_notify(attached);
@@ -3359,52 +3351,6 @@ static void fsa9485_smartdock_cb(bool attached)
 //	msm_otg_set_smartdock_state(attached);
 }
 
-static void fsa9485_mmdock_cb(bool attached)
-{
-	union power_supply_propval value;
-	int i, ret = 0;
-	struct power_supply *psy;
-
-	pr_info("fsa9485_mmdock_cb attached %d\n", attached);
-
-	switch_set_state(&switch_dock, attached);
-	set_cable_status =
-		attached ? CABLE_TYPE_MM_DOCK : CABLE_TYPE_NONE;
-
-	for (i = 0; i < 10; i++) {
-		psy = power_supply_get_by_name("battery");
-		if (psy)
-			break;
-	}
-	if (i == 10) {
-		pr_err("%s: fail to get battery ps\n", __func__);
-		return;
-	}
-
-	switch (set_cable_status) {
-	case CABLE_TYPE_MM_DOCK:
-		value.intval = POWER_SUPPLY_TYPE_USB_CDP;
-		break;
-	case CABLE_TYPE_NONE:
-		value.intval = POWER_SUPPLY_TYPE_BATTERY;
-		break;
-	default:
-		pr_err("invalid status:%d\n", attached);
-		return;
-	}
-
-	current_cable_type = value.intval;
-
-	value.intval = current_cable_type;
-	ret = psy->set_property(psy, POWER_SUPPLY_PROP_ONLINE, &value);
-
-	if (ret) {
-		pr_err("%s: fail to set power_suppy ONLINE property(%d)\n",
-			__func__, ret);
-	}
-
-}
-
 static void fsa9485_audio_dock_cb(bool attached)
 {
 	pr_info("fsa9485_audio_dock_cb attached %d\n", attached);
@@ -3497,7 +3443,6 @@ struct fsa9485_platform_data fsa9485_pdata = {
 #endif
 	.smartdock_cb	= fsa9485_smartdock_cb,
 	.audio_dock_cb	= fsa9485_audio_dock_cb,
-	.mmdock_cb		= fsa9485_mmdock_cb,
 #else
 #ifdef CONFIG_MUIC_FSA9485_SUPPORT_LANHUB
 	.lanhub_cb	= NULL,

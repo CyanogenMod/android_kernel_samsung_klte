@@ -284,8 +284,6 @@ extern "C" {
 	/* CE */
 #define BBM_WSCN_MSQ                0x4063
 #define BBM_AD_GAIN_PERIOD          0x4070
-#define BBM_FAIP_MTD_SR_SHIFT_VALUE 0x417f
-#define BBM_CIR_THR_23              0x41c7
 #define BBM_MAN_PARTIAL_EN          0x41f1
 #define BBM_MAN_LAYER_A_SEG_NUM     0x41f2
 #define BBM_MAN_LAYER_B_SEG_NUM     0x41f3

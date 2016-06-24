@@ -80,6 +80,9 @@ static void enable_sensor(struct ssp_data *data,
 			proximity_open_lcd_ldi(data);
 			proximity_open_calibration(data);
 			set_proximity_threshold(data, data->uProxHiThresh, data->uProxLoThresh);
+
+			input_report_abs(data->prox_input_dev, ABS_DISTANCE, 1);
+			input_sync(data->prox_input_dev);
 		}
 #ifdef CONFIG_DUAL_LCD
 		else if ((iSensorType == GEOMAGNETIC_SENSOR)\

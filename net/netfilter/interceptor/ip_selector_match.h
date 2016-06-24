@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2013 - 2015, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2013, INSIDE Secure Oy. All rights reserved.
 */
 
 #ifndef IP_SELECTOR_MATCH_H
@@ -11,14 +11,14 @@
 
 struct IPSelectorFields
 {
-    uint8_t source_address[16];
-    uint8_t destination_address[16];
+  uint8_t source_address[16];
+  uint8_t destination_address[16];
 
-    int32_t source_port;
-    int32_t destination_port;
+  int32_t source_port;
+  int32_t destination_port;
 
-    int32_t ip_version;
-    int32_t ip_protocol;
+  int32_t ip_version;
+  int32_t ip_protocol;
 };
 
 

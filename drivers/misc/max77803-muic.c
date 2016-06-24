@@ -2096,9 +2096,7 @@ static int max77803_muic_handle_attach(struct max77803_muic_info *info,
 			}
 
 			info->cable_type = CABLE_TYPE_OTG_MUIC;
-#ifdef CONFIG_CONTROL_OTG_POPUP
-			max77803_muic_set_charging_type(info, false);
-#endif
+
 			max77803_muic_set_usb_path(info, AP_USB_MODE);
 			msleep(40);
 			if (mdata->usb_cb && info->is_usb_ready)
@@ -2326,9 +2324,6 @@ static int max77803_muic_handle_detach(struct max77803_muic_info *info, int irq)
 
 		if (mdata->usb_cb && info->is_usb_ready)
 			mdata->usb_cb(USB_OTGHOST_DETACHED);
-#ifdef CONFIG_CONTROL_OTG_POPUP
-		max77803_muic_set_charging_type(info, true);
-#endif
 		break;
 	case CABLE_TYPE_USB_MUIC:
 	case CABLE_TYPE_CDP_MUIC:

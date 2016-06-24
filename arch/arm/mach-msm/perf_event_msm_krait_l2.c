@@ -494,7 +494,6 @@ static int msm_l2_clear_ev_constraint(struct perf_event *event)
 		err = -EINVAL;
 		goto out;
 	}
-
 	bitmap_t = 1 << shift_idx;
 
 	/* Clear constraint bit. */

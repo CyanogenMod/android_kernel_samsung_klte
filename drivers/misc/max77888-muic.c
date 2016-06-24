@@ -71,8 +71,8 @@ enum {
 	CHGTYP_500MA		= 0x04,
 	/* Special 1A charger, max current 1A */
 	CHGTYP_1A		= 0x05,
-	/* Special Charger */
-	CHGTYP_SPECIAL_CHGR		= 0x06,
+	/* Reserved for Future Use */
+	CHGTYP_RFU		= 0x06,
 	/* Dead Battery Charging, max current 100mA */
 	CHGTYP_DB_100MA		= 0x07,
 	CHGTYP_MAX,
@@ -91,11 +91,10 @@ enum {
 	ADC_DOCK_PLAY_PAUSE_KEY = 0x0d,
 	ADC_INCOMPATIBLE	= 0x0f, /* 0x01111 34K ohm */
 	ADC_SMARTDOCK		= 0x10, /* 0x10000 40.2K ohm */
-	ADC_HMT			= 0x11, /* 0x10001 49.9K ohm */
 	ADC_AUDIODOCK		= 0x12, /* 0x10010 64.9K ohm */
 	ADC_CHARGING_CABLE	= 0x14, /* 0x10100 102K ohm */
 	ADC_LANHUB		= 0x13, /* 0x10011 80.07K ohm */
-	ADC_MMDOCK		= 0x15,	/* 0x10101 121K ohm */
+	ADC_HMT			= 0x15, /* 0x10100 102K ohm */
 	ADC_CEA936ATYPE1_CHG	= 0x17,	/* 0x10111 200K ohm */
 	ADC_JIG_USB_OFF		= 0x18, /* 0x11000 255K ohm */
 	ADC_JIG_USB_ON		= 0x19, /* 0x11001 301K ohm */
@@ -1379,27 +1378,6 @@ static int max77888_muic_attach_dock_type(struct max77888_muic_info *info,
 		return 0;
 
 	switch (adc) {
-	case ADC_MMDOCK:
-		if (info->cable_type == CABLE_TYPE_MMDOCK_MUIC) {
-			dev_info(info->dev, "%s: duplicated(MMDOCK)\n",
-					__func__);
-			return 0;
-		}
-		dev_info(info->dev, "%s: mm dock attached\n", __func__);
-		info->cable_type = CABLE_TYPE_MMDOCK_MUIC;
-		path = AP_USB_MODE;
-
-		if (mdata->mhl_cb)
-			mdata->mhl_cb(MAX77888_MUIC_ATTACHED);
-
-		if (mdata->usb_cb)
-			mdata->usb_cb(USB_POWERED_HOST_ATTACHED);
-
-		max77888_muic_set_charging_type(info, false);
-
-		if (mdata->dock_cb)
-			mdata->dock_cb(MAX77888_MUIC_DOCK_SMARTDOCK);
-		break;
 	case ADC_LANHUB:
 		/* Lanhub */
 		if (info->cable_type == CABLE_TYPE_LANHUB_MUIC) {
@@ -1407,7 +1385,7 @@ static int max77888_muic_attach_dock_type(struct max77888_muic_info *info,
 				__func__);
 			return 0;
 		}
-		dev_info(info->dev, "%s:Lanhub attached\n", __func__);
+		dev_info(info->dev, "%s:Lanhub\n", __func__);
 		info->cable_type = CABLE_TYPE_LANHUB_MUIC;
 		info->is_otg_enable = false;
 		path = AP_USB_MODE;
@@ -2103,27 +2081,6 @@ static int max77888_muic_handle_attach(struct max77888_muic_info *info,
 		}
 		break;
 #endif /* CONFIG_MUIC_MAX77888_SUPPORT_OTG_AUDIO_DOCK */
-	case CABLE_TYPE_MMDOCK_MUIC:
-		if (adc != ADC_MMDOCK) {
-			dev_warn(info->dev, "%s: assume mm dock detach\n",
-					__func__);
-
-			info->cable_type = CABLE_TYPE_NONE_MUIC;
-			ret = max77888_muic_set_charging_type(info, true);
-			if (ret)
-				pr_err("%s fail to set chg type\n", __func__);
-
-			if (mdata->usb_cb)
-				mdata->usb_cb(USB_POWERED_HOST_DETACHED);
-
-			if (mdata->mhl_cb)
-				mdata->mhl_cb(MAX77888_MUIC_DETACHED);
-
-			if (mdata->dock_cb)
-				mdata->dock_cb(MAX77888_MUIC_DOCK_DETACHED);
-
-		}
-		break;
 	default:
 		break;
 	}
@@ -2200,14 +2157,11 @@ static int max77888_muic_handle_attach(struct max77888_muic_info *info,
 			max77888_muic_attach_dock_type(info, adc, chgtyp);
 		break;
 #endif /* CONFIG_MUIC_MAX77888_SUPPORT_OTG_AUDIO_DOCK */
-	case ADC_MMDOCK:
-		if (!!vbvolt)
-			max77888_muic_attach_dock_type(info, adc, chgtyp);
-		break;
 	case ADC_JIG_UART_OFF:
 		max77888_muic_handle_jig_uart(info, vbvolt);
 		mdata->jig_state(true);
 		break;
+	case ADC_JIG_USB_OFF:
 	case ADC_JIG_USB_ON:
 		if (vbvolt & STATUS2_VBVOLT_MASK) {
 			dev_info(info->dev, "%s: SKIP_JIG_USB\n", __func__);
@@ -2611,23 +2565,6 @@ static int max77888_muic_handle_detach(struct max77888_muic_info *info, int irq)
 			mdata->mhl_cb(MAX77888_MUIC_DETACHED);
 #endif
 		break;
-	case CABLE_TYPE_MMDOCK_MUIC:
-		dev_info(info->dev, "%s: MM Dock\n", __func__);
-		info->cable_type = CABLE_TYPE_NONE_MUIC;
-
-		ret = max77888_muic_set_charging_type(info, true);
-		if (ret)
-			pr_err("%s fail to set chg type\n", __func__);
-
-		if (mdata->usb_cb)
-			mdata->usb_cb(USB_POWERED_HOST_DETACHED);
-
-		if (mdata->mhl_cb)
-			mdata->mhl_cb(MAX77888_MUIC_DETACHED);
-
-		if (mdata->dock_cb)
-			mdata->dock_cb(MAX77888_MUIC_DOCK_DETACHED);
-		break;
 	case CABLE_TYPE_UNKNOWN_MUIC:
 		dev_info(info->dev, "%s: UNKNOWN\n", __func__);
 		info->cable_type = CABLE_TYPE_NONE_MUIC;
@@ -2678,6 +2615,9 @@ static int max77888_muic_filter_dev(struct max77888_muic_info *info,
 		if (vbvolt == 0)
 			intr = INT_DETACH;
 		break;
+	case ADC_HMT:
+		intr = INT_DETACH;
+		break;
 	case ADC_INCOMPATIBLE:
 	case ADC_OPEN:
 		if (!adcerr) {
@@ -2690,8 +2630,7 @@ static int max77888_muic_filter_dev(struct max77888_muic_info *info,
 				 chgtyp == CHGTYP_DOWNSTREAM_PORT ||
 				 chgtyp == CHGTYP_DEDICATED_CHGR ||
 				 chgtyp == CHGTYP_500MA ||
-				 chgtyp == CHGTYP_1A ||
-				 chgtyp == CHGTYP_SPECIAL_CHGR) {
+				 chgtyp == CHGTYP_1A) {
 				switch (info->cable_type) {
 				case CABLE_TYPE_OTG_MUIC:
 				case CABLE_TYPE_CHARGING_CABLE_MUIC:
@@ -2702,7 +2641,6 @@ static int max77888_muic_filter_dev(struct max77888_muic_info *info,
 				case CABLE_TYPE_SMARTDOCK_TA_MUIC:
 				case CABLE_TYPE_SMARTDOCK_USB_MUIC:
 				case CABLE_TYPE_AUDIODOCK_MUIC:
-				case CABLE_TYPE_MMDOCK_MUIC:
 					intr = INT_DETACH;
 					break;
 				default:
@@ -3078,7 +3016,6 @@ static void max77888_muic_mhl_detect(struct work_struct *work)
 		info->cable_type == CABLE_TYPE_MHL_VB_MUIC ||
 		info->cable_type == CABLE_TYPE_SMARTDOCK_MUIC ||
 		info->cable_type == CABLE_TYPE_SMARTDOCK_TA_MUIC ||
-		info->cable_type == CABLE_TYPE_MMDOCK_MUIC ||
 		info->cable_type == CABLE_TYPE_SMARTDOCK_USB_MUIC) {
 		if (mdata->mhl_cb)
 			mdata->mhl_cb(MAX77888_MUIC_ATTACHED);

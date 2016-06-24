@@ -1427,7 +1427,7 @@ static int __devexit krait_power_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct of_device_id krait_power_match_table[] __initdata = {
+static struct of_device_id krait_power_match_table[] = {
 	{ .compatible = "qcom,krait-regulator", },
 	{}
 };
@@ -1442,7 +1442,7 @@ static struct platform_driver krait_power_driver = {
 	},
 };
 
-static struct of_device_id krait_pdn_match_table[] __initdata = {
+static struct of_device_id krait_pdn_match_table[] = {
 	{ .compatible = "qcom,krait-pdn", },
 	{}
 };

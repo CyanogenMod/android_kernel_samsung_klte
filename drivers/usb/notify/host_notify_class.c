@@ -151,7 +151,6 @@ char *host_state_string(int type)
 	case NOTIFY_HOST_REMOVE:		return "remove";
 	case NOTIFY_HOST_OVERCURRENT:	return "overcurrent";
 	case NOTIFY_HOST_LOWBATT:		return "lowbatt";
-	case NOTIFY_HOST_BLOCK:			return "block";
 	case NOTIFY_HOST_UNKNOWN:
 	default:	return "unknown";
 	}
@@ -196,9 +195,6 @@ host_notify_uevent(struct device *dev, struct kobj_uevent_env *env)
 		break;
 	case NOTIFY_HOST_LOWBATT:
 		state = "LOWBATT";
-		break;
-	case NOTIFY_HOST_BLOCK:
-		state = "BLOCK";
 		break;
 	case NOTIFY_HOST_UNKNOWN:
 		state = "UNKNOWN";

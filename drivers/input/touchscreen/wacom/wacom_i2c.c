@@ -1646,12 +1646,7 @@ static int wacom_i2c_probe(struct i2c_client *client,
 				__func__);
 		goto err_sysfs_create_group;
 	}
-	ret = sysfs_create_link(&wac_i2c->dev->kobj, &wac_i2c->input_dev->dev.kobj, "input");
-	if (ret < 0) {
-		dev_err(&client->dev,
-				"%s: Failed to create input symbolic link\n",
-				__func__);
-	}
+
 	ret = wacom_firmware_update(wac_i2c);
 	if (ret) {
 		dev_err(&wac_i2c->client->dev,

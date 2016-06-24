@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2011 - 2015, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2011 - 2013, INSIDE Secure Oy. All rights reserved.
 */
 
 #include "implementation_defs.h"
@@ -8,6 +8,7 @@
 
 #include <linux/module.h>
 
+int vprintk(const char *fmt, va_list args);
 extern void
 assert_outputf(
         const char *condition,
@@ -17,24 +18,24 @@ assert_outputf(
         const char *func,
         const char *description)
 {
-    panic(description);
+  panic(description);
 }
 
 
 static const char *
 last_slash(const char *str)
 {
-    const char *last = str;
+  const char *last = str;
 
-    while (*str != 0)
+  while (*str != 0)
     {
-        if (*str == '/')
-          last = str;
+      if (*str == '/')
+        last = str;
 
-        str++;
+      str++;
     }
 
-    return last + 1;
+  return last + 1;
 }
 
 
@@ -48,14 +49,14 @@ debug_outputf(
         const char *func,
         const char *format, ...)
 {
-    if (debug_filter(level, flow, module, file, func))
+  if (debug_filter(level, flow, module, file, func))
     {
-        va_list args;
+      va_list args;
 
-        printk("%s %s %s:%d ", level, module, last_slash(file), line);
-        va_start(args, format);
-        vprintk(format, args);
-        va_end(args);
-        printk("\n");
+      printk("%s %s %s:%d ", level, module, last_slash(file), line);
+      va_start(args, format);
+      vprintk(format, args);
+      va_end(args);
+      printk("\n");
     }
 }

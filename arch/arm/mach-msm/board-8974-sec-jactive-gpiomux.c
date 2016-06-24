@@ -941,13 +941,19 @@ static struct gpiomux_setting sdc3_clk_actv_cfg = {
 static struct gpiomux_setting sdc3_cmd_data_0_3_actv_cfg = {
 	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_NONE,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting sdc3_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+
+static struct gpiomux_setting sdc3_data_1_suspend_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting sdc3_clk_suspend_cfg = {
@@ -979,7 +985,7 @@ static struct msm_gpiomux_config msm8974_sdc3_configs[] __initdata = {
 		.gpio      = 37,
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &sdc3_cmd_data_0_3_actv_cfg,
-			[GPIOMUX_SUSPENDED] = &sdc3_suspend_cfg,
+			[GPIOMUX_SUSPENDED] = &sdc3_data_1_suspend_cfg,
 		},
 	},
 	{
@@ -1383,37 +1389,6 @@ static struct msm_gpiomux_config fuel_i2c_config[] __initdata = {
 		},
 	},
 };
-#if defined(CONFIG_SEC_FPGA)
-static struct gpiomux_setting gpio_ir_led_reset_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-static struct msm_gpiomux_config ir_led_reset_config[] __initdata = {
-	{
-		.gpio = 57,	/* CRESET_B */
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &gpio_ir_led_reset_config,
-			[GPIOMUX_ACTIVE] = &gpio_ir_led_reset_config,
-		},
-	},
-};
-
-static struct gpiomux_setting gpio_ir_led_irq_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-};
-static struct msm_gpiomux_config ir_led_irq_config[] __initdata = {
-	{
-		.gpio = 64,	/* IRDA_IRQ */
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &gpio_ir_led_irq_config,
-			[GPIOMUX_ACTIVE] = &gpio_ir_led_irq_config,
-		},
-	},
-};
-#endif
 
 extern unsigned int system_rev;
 void __init msm_8974_init_gpiomux(void)
@@ -1526,11 +1501,4 @@ void __init msm_8974_init_gpiomux(void)
 
 	msm_gpiomux_install(nc_configs,
 			ARRAY_SIZE(nc_configs));
-#if defined(CONFIG_SEC_FPGA)
-	msm_gpiomux_install(ir_led_reset_config,
-			ARRAY_SIZE(ir_led_reset_config));
-
-	msm_gpiomux_install(ir_led_irq_config,
-			ARRAY_SIZE(ir_led_irq_config));
-#endif
 }

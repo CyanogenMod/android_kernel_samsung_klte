@@ -215,14 +215,6 @@ static void mxt_treat_dbg_data(struct mxt_data *data,
 	}
 #endif
 
-#if (USE_DUAL_X_MODE && TSP_INFORM_CHARGER)
-	if(data->charging_mode==1){
-		if(x_num == (data->fdata->num_xnode - 1)){
-			dev_dbg(&client->dev, "ignored x=%d/%d node, because TA mode,%d\n",x_num,data->fdata->num_xnode,data->charging_mode);
-			return;
-		}
-	}
-#endif
 	if (dbg_mode == MXT_DIAG_DELTA_MODE) {
 		/* read delta data */
 		mxt_read_mem(data, dbg_object->start_address + read_point,
@@ -2605,11 +2597,6 @@ static int mxt_init_factory(struct mxt_data *data)
 	if (error) {
 		dev_err(dev, "Failed to create touchscreen sysfs group\n");
 		goto err_create_group;
-	}
-	error = sysfs_create_link(&data->fdata->fac_dev_ts->kobj,
-		&data->input_dev->dev.kobj, "input");
-	if (error < 0) {
-		dev_err(dev, "Failed to create input symbolic link\n");
 	}
 
 	return 0;

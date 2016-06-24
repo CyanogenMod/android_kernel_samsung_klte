@@ -272,6 +272,35 @@ static int sm5504_read_reg(struct i2c_client *client, int reg)
         return ret;
 }
 
+
+static void sm5504_disable_interrupt(void)
+{
+	struct i2c_client *client = local_usbsw->client;
+	int value, ret;
+
+	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
+	value |= CON_INT_MASK;
+
+	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
+	if (ret < 0)
+		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+
+}
+
+static void sm5504_enable_interrupt(void)
+{
+	struct i2c_client *client = local_usbsw->client;
+	int value, ret;
+
+	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
+	value &= (~CON_INT_MASK);
+
+	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
+	if (ret < 0)
+		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+
+}
+
 #if defined(CONFIG_SEC_FACTORY) || defined(CONFIG_USB_HOST_NOTIFY)
 static void sm5504_dock_control(struct sm5504_usbsw *usbsw,
 	int dock_type, int state, int path)
@@ -1009,10 +1038,12 @@ static int sm5504_attach_dev(struct sm5504_usbsw *usbsw)
 			/* MHL */
 		} else if (val3 & DEV_MHL) {
 			pr_info("[MUIC] MHL Connected\n");
+			sm5504_disable_interrupt();
 			if (!poweroff_charging)
 				/*mhl_ret = mhl_onoff_ex(1); support from sii8240*/
 			else
 				pr_info("LPM mode, skip MHL sequence\n");
+			sm5504_enable_interrupt();
 #endif
 			/* Car Dock */
 		} else if (val2 & DEV_JIG_UART_ON) {
@@ -1251,8 +1282,10 @@ static irqreturn_t sm5504_irq_thread(int irq, void *data)
 	pr_info("sm5504_irq_thread is called\n");
 
 	mutex_lock(&usbsw->mutex);
+	sm5504_disable_interrupt();
 	intr1 = i2c_smbus_read_byte_data(client, REG_INT1);
 	intr2 = i2c_smbus_read_byte_data(client, REG_INT2);
+	sm5504_enable_interrupt();
 
 	adc = i2c_smbus_read_byte_data(client, REG_ADC);
 	dev_info(&client->dev, "%s: intr1 : 0x%x,intr2 : 0x%x, adc : 0x%x\n",

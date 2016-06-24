@@ -219,7 +219,7 @@ static irqreturn_t z180_irq_handler(struct kgsl_device *device)
 			count &= 255;
 			z180_dev->timestamp += count;
 
-			queue_work(device->work_queue, &device->event_work);
+			queue_work(device->work_queue, &device->ts_expired_ws);
 			wake_up_interruptible(&device->wait_queue);
 		}
 	}
@@ -401,8 +401,8 @@ z180_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 	struct kgsl_pagetable *pagetable = dev_priv->process_priv->pagetable;
 	struct z180_device *z180_dev = Z180_DEVICE(device);
 	unsigned int sizedwords;
-	unsigned int numibs = 0;
-	struct kgsl_memobj_node *ib;
+	unsigned int numibs;
+	struct kgsl_ibdesc *ibdesc;
 
 	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
@@ -415,9 +415,8 @@ z180_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 		goto error;
 	}
 
-	/* Get the total IBs in the list */
-	list_for_each_entry(ib, &cmdbatch->cmdlist, node)
-		numibs++;
+	ibdesc = cmdbatch->ibdesc;
+	numibs = cmdbatch->ibcount;
 
 	if (device->state & KGSL_STATE_HUNG) {
 		result = -EINVAL;
@@ -428,8 +427,8 @@ z180_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 		result = -EINVAL;
 		goto error;
 	}
-	cmd = ib->gpuaddr;
-	sizedwords = ib->sizedwords;
+	cmd = ibdesc[0].gpuaddr;
+	sizedwords = ibdesc[0].sizedwords;
 	/*
 	 * Get a kernel mapping to the IB for monkey patching.
 	 * See the end of this function.
@@ -514,7 +513,7 @@ z180_cmdstream_issueibcmds(struct kgsl_device_private *dev_priv,
 	z180_cmdwindow_write(device, ADDR_VGV3_CONTROL, cmd);
 	z180_cmdwindow_write(device, ADDR_VGV3_CONTROL, 0);
 error:
-	kgsl_trace_issueibcmds(device, context->id, cmdbatch, numibs,
+	kgsl_trace_issueibcmds(device, context->id, cmdbatch,
 		*timestamp, cmdbatch ? cmdbatch->flags : 0, result, 0);
 
 	kgsl_active_count_put(device);

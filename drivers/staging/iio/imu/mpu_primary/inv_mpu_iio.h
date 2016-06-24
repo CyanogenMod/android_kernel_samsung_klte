@@ -218,7 +218,6 @@
 #define PEDQUAT_HDR              0x0200
 #define STEP_DETECTOR_HDR        0x0100
 #define STEP_INDICATOR_MASK      0xf
-#define STEP_COUNTER_HDR         0xfff0
 
 #define MAX_BYTES_PER_SAMPLE     80
 #define MAX_HW_FIFO_BYTES        (BYTES_PER_SENSOR * 2)
@@ -298,6 +297,7 @@
 
 #define MPU_INIT_SMD_DELAY_THLD  3
 #define MPU_INIT_SMD_DELAY2_THLD 1
+#define MPU_INIT_SMD_THLD        1500
 #define MPU_DEFAULT_DMP_FREQ     200
 #define MPL_PROD_KEY(ver, rev)  (ver * 100 + rev)
 #define NUM_OF_PROD_REVS (ARRAY_SIZE(prod_rev_map))
@@ -817,7 +817,6 @@ struct inv_mpu_state {
 	enum   inv_devices chip_type;
 	spinlock_t time_stamp_lock;
 	struct mutex suspend_resume_lock;
-	struct mutex iio_buf_write_lock;
 	struct i2c_client *client;
 	struct mpu_platform_data plat_data;
 	struct inv_mpu_slave *slave_accel;

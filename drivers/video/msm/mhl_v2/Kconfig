@@ -26,9 +26,3 @@ config MHL_VERSION
 	For example, those device compliant
 	with MHL Specification version 2.0
 	shell set this MHL_VERSION to 0x20
-
-config MUIC_SUPPORT_MULTIMEDIA_DOCK
-	bool "support multimedia dock"
-	default n
-	---help---
-	Support for multimedia dock

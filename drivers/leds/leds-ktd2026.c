@@ -645,10 +645,16 @@ static ssize_t store_led_r(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct ktd2026_data *data = dev_get_drvdata(dev);
-	int ret;
+	char buff[10] = {0,};
+	int cnt, ret;
 	u8 brightness;
 
-	ret = kstrtou8(buf, 0, &brightness);
+	cnt = count;
+	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
+	memcpy(buff, buf, cnt);
+	buff[cnt] = '\0';
+
+	ret = kstrtou8(buff, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;
@@ -668,10 +674,16 @@ static ssize_t store_led_g(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct ktd2026_data *data = dev_get_drvdata(dev);
-	int ret;
+	char buff[10] = {0,};
+	int cnt, ret;
 	u8 brightness;
 
-	ret = kstrtou8(buf, 0, &brightness);
+	cnt = count;
+	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
+	memcpy(buff, buf, cnt);
+	buff[cnt] = '\0';
+
+	ret = kstrtou8(buff, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;
@@ -691,10 +703,16 @@ static ssize_t store_led_b(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct ktd2026_data *data = dev_get_drvdata(dev);
-	int ret;
+	char buff[10] = {0,};
+	int cnt, ret;
 	u8 brightness;
 
-	ret = kstrtou8(buf, 0, &brightness);
+	cnt = count;
+	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
+	memcpy(buff, buf, cnt);
+	buff[cnt] = '\0';
+
+	ret = kstrtou8(buff, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;

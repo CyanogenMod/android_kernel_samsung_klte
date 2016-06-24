@@ -1,7 +1,6 @@
 #ifndef _ARM_LIBFDT_ENV_H
 #define _ARM_LIBFDT_ENV_H
 
-#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <asm/byteorder.h>

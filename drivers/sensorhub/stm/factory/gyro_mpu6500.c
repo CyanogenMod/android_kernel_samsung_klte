@@ -22,11 +22,7 @@
 #define VENDOR		"INVENSENSE"
 #define CHIP_ID		"MPU6500"
 
-#ifdef CONFIG_MACH_KACTIVELTE_KOR
-#define CALIBRATION_FILE_PATH	"/efs/FactoryApp/gyro_cal_data"
-#else
 #define CALIBRATION_FILE_PATH	"/efs/gyro_cal_data"
-#endif
 #define VERBOSE_OUT 1
 #define CALIBRATION_DATA_AMOUNT	20
 #define DEF_GYRO_FULLSCALE	2000
@@ -60,7 +56,7 @@ int gyro_open_calibration(struct ssp_data *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0660);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0666);
 	if (IS_ERR(cal_filp)) {
 		set_fs(old_fs);
 		iRet = PTR_ERR(cal_filp);
@@ -102,7 +98,7 @@ static int save_gyro_caldata(struct ssp_data *data, s16 *iCalData)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY | O_NOFOLLOW | O_NONBLOCK, 0660);		
+			O_CREAT | O_TRUNC | O_WRONLY, 0666);
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SSP]: %s - Can't open calibration file\n", __func__);
 		set_fs(old_fs);

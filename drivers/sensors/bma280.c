@@ -105,8 +105,6 @@ struct bma280_p {
 	int sda_gpio;
 	int scl_gpio;
 	int time_count;
-
-	u64 old_timestamp;
 };
 
 static int bma280_open_calibration(struct bma280_p *);
@@ -441,12 +439,6 @@ static void bma280_work_func(struct work_struct *work)
 	struct bma280_v acc;
 	struct bma280_p *data = container_of(work, struct bma280_p, work);
 
-	struct timespec ts = ktime_to_timespec(alarm_get_elapsed_realtime());
-	u64 timestamp_new = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	int time_hi, time_lo;
-	//u64 diff = 0ULL;
-	u64 delay = ktime_to_ns(data->poll_delay);
-
 	ret = bma280_read_accel_xyz(data, &acc);
 	if (ret < 0)
 		goto exit;
@@ -455,34 +447,10 @@ static void bma280_work_func(struct work_struct *work)
 	data->accdata.y = acc.y - data->caldata.y;
 	data->accdata.z = acc.z - data->caldata.z;
 
-	if (data->old_timestamp != 0 &&
-	   ((timestamp_new - data->old_timestamp) > ktime_to_ms(data->poll_delay) * 1800000LL)) {
-
-		u64 shift_timestamp = delay >> 1;
-		u64 timestamp = 0ULL;
-
-		for (timestamp = data->old_timestamp + delay; timestamp < timestamp_new - shift_timestamp; timestamp+=delay) {
-				time_hi = (int)((timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
-				time_lo = (int)(timestamp & TIME_LO_MASK);
-				input_report_rel(data->input, REL_X, data->accdata.x);
-				input_report_rel(data->input, REL_Y, data->accdata.y);
-				input_report_rel(data->input, REL_Z, data->accdata.z);
-				input_report_rel(data->input, REL_DIAL, time_hi);
-				input_report_rel(data->input, REL_MISC, time_lo);
-				input_sync(data->input);
-		}
-	}
-
-	time_hi = (int)((timestamp_new & TIME_HI_MASK) >> TIME_HI_SHIFT);
-	time_lo = (int)(timestamp_new & TIME_LO_MASK);
-
 	input_report_rel(data->input, REL_X, data->accdata.x);
 	input_report_rel(data->input, REL_Y, data->accdata.y);
 	input_report_rel(data->input, REL_Z, data->accdata.z);
-	input_report_rel(data->input, REL_DIAL, time_hi);
-	input_report_rel(data->input, REL_MISC, time_lo);
 	input_sync(data->input);
-	data->old_timestamp = timestamp_new;
 
 exit:
 	if ((ktime_to_ns(data->poll_delay) * (int64_t)data->time_count)
@@ -532,7 +500,6 @@ static ssize_t bma280_enable_store(struct device *dev,
 
 	if (enable) {
 		if (pre_enable == OFF) {
-			data->old_timestamp = 0LL;
 			bma280_open_calibration(data);
 			bma280_set_mode(data, BMA280_MODE_NORMAL);
 			atomic_set(&data->enable, ON);
@@ -1022,8 +989,6 @@ static int bma280_input_init(struct bma280_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
-	input_set_capability(dev, EV_REL, REL_DIAL);
-	input_set_capability(dev, EV_REL, REL_MISC);
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);

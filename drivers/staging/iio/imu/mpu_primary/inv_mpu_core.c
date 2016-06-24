@@ -57,13 +57,8 @@ extern unsigned int system_rev;
 s64 get_time_ns(void)
 {
 	struct timespec ts;
-	s64 timestamp;
-	ts = ktime_to_timespec(ktime_get_boottime());
-	timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-	if (timestamp < 0)
-		pr_err("[INV] %s invalid time = %lld\n", __func__, timestamp);
-
-	return timestamp;
+	ktime_get_ts(&ts);
+	return timespec_to_ns(&ts);
 }
 
 s64 get_time_timeofday(void)
@@ -517,8 +512,7 @@ static int inv_init_config(struct iio_dev *indio_dev)
 		st->tap.thresh = INIT_TAP_THRESHOLD;
 		st->tap.min_count = INIT_TAP_MIN_COUNT;
 		st->sample_divider = INIT_SAMPLE_DIVIDER;
-
-		st->smd.threshold = 0;
+		st->smd.threshold = MPU_INIT_SMD_THLD;
 		st->smd.delay     = MPU_INIT_SMD_DELAY_THLD;
 		st->smd.delay2    = MPU_INIT_SMD_DELAY2_THLD;
 		st->ped.int_thresh = INIT_PED_INT_THRESH;
@@ -1023,8 +1017,6 @@ static ssize_t _dmp_mem_store(struct device *dev,
 	struct inv_mpu_state *st = iio_priv(indio_dev);
 	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
 	int result, data;
-	u8 sc_buf[IIO_BUFFER_BYTES];
-	u16 hdr;
 
 	if (st->chip_config.enable)
 		return -EBUSY;
@@ -1050,16 +1042,9 @@ static ssize_t _dmp_mem_store(struct device *dev,
 		result = inv_enable_pedometer(st, !!data);
 
 		/*reset internal pedometer step buffer*/
-		if(!!data) {
+		if (!!data)
 			result = inv_reset_pedometer_internal_timer(st);
-			// Sending dummy data to begin polling at HAL
-			hdr = STEP_COUNTER_HDR;
-			memcpy(sc_buf, &hdr, sizeof(hdr));
-			mutex_lock(&st->iio_buf_write_lock);
-			iio_push_to_buffer(indio_dev->buffer, sc_buf, 0);
-			mutex_unlock(&st->iio_buf_write_lock);
-			pr_info("step counter dummy data sent\n");
-		} else
+		else
 			st->shealth.interrupt_mask = 0;
 		if (result)
 			goto dmp_mem_store_fail;
@@ -1101,12 +1086,8 @@ static ssize_t _dmp_mem_store(struct device *dev,
 	case ATTR_DMP_SMD_THLD:
 		if (data < 0 || data > SHRT_MAX)
 			goto dmp_mem_store_fail;
-		data = data << 16;
-		result = write_be32_key_to_mem(st, data,
+		result = write_be32_key_to_mem(st, data << 16,
 						KEY_SMD_ACCEL_THLD);
-		if (result)
-			goto dmp_mem_store_fail;
-		cpu_to_be32s(&data);
 		if (result)
 			goto dmp_mem_store_fail;
 		st->smd.threshold = data;
@@ -4051,7 +4032,6 @@ static int inv_mpu_probe(struct i2c_client *client,
 		pr_err("%s : inv_check_chip_type\n", __func__);
 		goto out_free;
 	}
-	pr_info("[SENSOR] %s - chip_type=%d\n", __func__, st->chip_type);
 
 	result = st->init_config(indio_dev);
 	if (result) {
@@ -4115,7 +4095,6 @@ static int inv_mpu_probe(struct i2c_client *client,
 	INIT_KFIFO(st->timestamps);
 	spin_lock_init(&st->time_stamp_lock);
 	mutex_init(&st->suspend_resume_lock);
-	mutex_init(&st->iio_buf_write_lock);
 	wake_lock_init(&st->shealth.wake_lock, WAKE_LOCK_SUSPEND, "inv_iio");
 
 	result = st->set_power_state(st, false);
@@ -4163,7 +4142,6 @@ err_gyro_sensor_register_failed:
 #endif
 
 out_remove_dmp_sysfs:
-	mutex_destroy(&st->iio_buf_write_lock);
 	mutex_destroy(&st->suspend_resume_lock);
 	kfifo_free(&st->timestamps);
 out_unreg_iio:

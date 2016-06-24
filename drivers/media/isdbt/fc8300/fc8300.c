@@ -36,7 +36,6 @@
 #include <linux/io.h>
 #include <mach/isdbt_tuner_pdata.h>
 #include <mach/sec_debug.h>
-#include <linux/regulator/machine.h>
 
 #include <mach/gpio.h>
 #include <linux/platform_device.h>
@@ -60,9 +59,7 @@ struct ISDBT_INIT_INFO_T *hInit;
 int bbm_xtal_freq;
 unsigned int fc8300_xtal_freq;
 
-#ifndef BBM_I2C_TSIF
 #define RING_BUFFER_SIZE	(188 * 320 * 17)
-#endif
 
 /* GPIO(RESET & INTRRUPT) Setting */
 #define FC8300_NAME		"isdbt"
@@ -71,9 +68,7 @@ static struct isdbt_platform_data *isdbt_pdata;
 #define TS0_5PKT_LENGTH	(188 * 5)
 #define TS0_32PKT_LENGTH (188 * 32)
 
-#ifndef BBM_I2C_TSIF
 u8 static_ringbuffer[RING_BUFFER_SIZE];
-#endif
 
 enum ISDBT_MODE driver_mode = ISDBT_POWEROFF;
 static DEFINE_MUTEX(ringbuffer_lock);
@@ -245,15 +240,6 @@ int isdbt_hw_setting(void)
 	int err;
 	pr_info("isdbt_hw_setting \n");
 
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-	err = gpio_request(isdbt_pdata->gpio_tmm_sw, "isdbt_tmm_sw");
-	if (err) {
-		pr_info("isdbt_hw_setting: Couldn't request isdbt_tmm_sw\n");
-		goto ISDBT_TMM_SW_ERR;
-	}
-	gpio_direction_output(isdbt_pdata->gpio_tmm_sw, 0);
-#endif
-
 	err = gpio_request(isdbt_pdata->gpio_en, "isdbt_en");
 	if (err) {
 		pr_info("isdbt_hw_setting: Couldn't request isdbt_en\n");
@@ -286,24 +272,20 @@ int isdbt_hw_setting(void)
 			, gpio_to_irq(isdbt_pdata->gpio_int), err);
 	goto request_isdbt_irq;
 	}
-#endif
+#endif	
 
-
+	
 
 	return 0;
-#ifndef BBM_I2C_TSIF
+#ifndef BBM_I2C_TSIF	
 request_isdbt_irq:
 	gpio_free(isdbt_pdata->gpio_int);
 ISDBT_INT_ERR:
 	gpio_free(isdbt_pdata->gpio_rst);
-#endif
+#endif	
 ISDBT_RST_ERR:
 	gpio_free(isdbt_pdata->gpio_en);
 ISBT_EN_ERR:
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-ISDBT_TMM_SW_ERR:
-	gpio_free(isdbt_pdata->gpio_tmm_sw);
-#endif
 	return err;
 }
 
@@ -312,91 +294,21 @@ static void isdbt_gpio_init(void)
 {
 	pr_info("%s\n",__func__);
 
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_tmm_sw, GPIOMUX_FUNC_GPIO,
-						GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-						GPIO_CFG_ENABLE);
-#endif
-
-#ifdef CONFIG_MACH_KLIMT_LTE_DCM
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_en, GPIOMUX_FUNC_GPIO,
-						GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-						GPIO_CFG_ENABLE);
-#else
+					 
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_en, GPIOMUX_FUNC_GPIO,
 						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 						GPIO_CFG_ENABLE);
-#endif
 
-#ifdef CONFIG_MACH_CHAGALL_KDI
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_rst, GPIOMUX_FUNC_GPIO,
-						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-						GPIO_CFG_ENABLE);
-#else
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_rst, GPIOMUX_FUNC_GPIO,
 						GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 						GPIO_CFG_ENABLE);
-#endif
 
-#ifdef BBM_I2C_TSIF
-	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_int, GPIOMUX_FUNC_GPIO,
-		GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
-		GPIO_CFG_ENABLE);
-#else
 	gpio_tlmm_config(GPIO_CFG(isdbt_pdata->gpio_int, GPIOMUX_FUNC_GPIO,
 		GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 		GPIO_CFG_ENABLE);
-#endif
+
 	isdbt_hw_setting();
 }
-
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-void isdbt_sw_ldo_on(void)
-{
-	int ret=0;
-	struct regulator *max77826_ldo9;
-
-	pr_info("%s set ldo ON\n", __func__);
-	max77826_ldo9 = regulator_get(NULL, "max77826_ldo9");
-	if(max77826_ldo9)
-	{
-		if (regulator_is_enabled(max77826_ldo9) > 0)
-		{
-			pr_info("%s LDO already ON\n", __func__);
-			return;
-		}
-		ret = regulator_set_voltage(max77826_ldo9,2100000, 2100000);
-		if (unlikely(ret < 0)){
-				pr_err("ISDBT ERROR max77826_ldo9 set voltage failed.\n");
-		}
-
-		regulator_enable(max77826_ldo9);
-		regulator_put(max77826_ldo9);
-	}
-	else
-	{
-		pr_err("%s ERROR !! LDO not found!!\n", __func__);
-	}
-
-
-}
-
-void isdbt_sw_ldo_off(void)
-{
-	struct regulator *max77826_ldo9;
-	pr_info("%s set ldo OFF\n", __func__);
-	max77826_ldo9 = regulator_get(NULL, "max77826_ldo9");
-	if(max77826_ldo9)
-	{
-		if (regulator_is_enabled(max77826_ldo9) > 0)
-		{
-			regulator_disable(max77826_ldo9);
-			regulator_put(max77826_ldo9);
-		}
-	}
-}
-#endif
-
 
 /*POWER_ON & HW_RESET & INTERRUPT_CLEAR */
 void isdbt_hw_init(void)
@@ -462,7 +374,6 @@ void isdbt_hw_deinit(void)
 	gpio_set_value(isdbt_pdata->gpio_rst, 0);
 }
 
-#ifndef BBM_I2C_TSIF
 int data_callback(u32 hDevice, u8 bufid, u8 *data, int len)
 {
 	struct ISDBT_INIT_INFO_T *hInit;
@@ -494,6 +405,8 @@ int data_callback(u32 hDevice, u8 bufid, u8 *data, int len)
 	return 0;
 }
 
+
+#ifndef BBM_I2C_TSIF
 static int isdbt_thread(void *hDevice)
 {
 	struct ISDBT_INIT_INFO_T *hInit = (struct ISDBT_INIT_INFO_T *)hDevice;
@@ -532,9 +445,7 @@ const struct file_operations isdbt_fops = {
 	.owner		= THIS_MODULE,
 	.unlocked_ioctl		= isdbt_ioctl,
 	.open		= isdbt_open,
-#ifndef BBM_I2C_TSIF
 	.read		= isdbt_read,
-#endif
 	.release	= isdbt_release,
 };
 
@@ -556,31 +467,26 @@ int isdbt_open(struct inode *inode, struct file *filp)
 		pr_err("hOpen malloc failed ENOMEM\n");
 		return -ENOMEM;
 	}
-#ifndef BBM_I2C_TSIF
 	hOpen->buf = &static_ringbuffer[0];
 	/*kmalloc(RING_BUFFER_SIZE, GFP_KERNEL);*/
-#endif
 	hOpen->isdbttype = 0;
 
 	list_add(&(hOpen->hList), &(hInit->hHead));
 
 	hOpen->hInit = (HANDLE *)hInit;
 
-#ifndef BBM_I2C_TSIF
 	if (hOpen->buf == NULL) {
 		pr_info("ring buffer malloc error\n");
 		return -ENOMEM;
 	}
 
 	fci_ringbuffer_init(&hOpen->RingBuffer, hOpen->buf, RING_BUFFER_SIZE);
-#endif
 
 	filp->private_data = hOpen;
 
 	return 0;
 }
 
-#ifndef BBM_I2C_TSIF
 ssize_t isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 {
 	s32 avail;
@@ -621,7 +527,6 @@ ssize_t isdbt_read(struct file *filp, char *buf, size_t count, loff_t *f_pos)
 
 	return read_len;
 }
-#endif
 
 int isdbt_release(struct inode *inode, struct file *filp)
 {
@@ -865,15 +770,10 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		} else {
 			pr_info("FC8300 IOCTL_ISDBT_POWER_ON SUCCESS\n");
 		}
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-		isdbt_sw_ldo_on();
-#endif
+
 		break;
 	case IOCTL_ISDBT_POWER_OFF:
 	pr_info("[FC8300] IOCTL_ISDBT_POWER_OFF \n");
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-		isdbt_sw_ldo_off();
-#endif
 		isdbt_hw_deinit();
 
 		break;
@@ -905,7 +805,6 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE \n");
 		err = copy_from_user((void *)&info, (void *)arg, size);
 		if (!err) {
-			bbm_byte_write(hInit, DIV_MASTER, BBM_BUF_ENABLE, 0x00); // buffer disable
 
 			if ((u32)info.buff[0] == ISDBT_INTERRUPT_32_PKT) {
 				pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE ISDBT_INTERRUPT_32_PKT\n");
@@ -922,21 +821,19 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				pr_info("[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE ISDBT_INTERRUPT_5_PKT\n");
 				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_START, 0);
 				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_END
-					, TS0_5PKT_LENGTH - 1);
+					, TS0_32PKT_LENGTH - 1);
 				bbm_com_word_write(hInit, DIV_BROADCAST, BBM_BUF_TS0_THR
 					, TS0_5PKT_LENGTH / 2 - 1);
 				print_log(hInit, "[FC8300] TUNER THRESHOLD: %d \n"
 				, TS0_5PKT_LENGTH / 2 - 1);
 			}
-
-			bbm_byte_write(hInit, DIV_MASTER, BBM_BUF_ENABLE, 0x01); // buffer enable
-
+			
 			print_log(hInit, "[FC8300] IOCTL_ISDBT_TUNER_PKT_MODE %lu \n"
 			, info.buff[0]);
 		}
 		res = err;
-		break;
-
+		break;	
+		
 	default:
 		pr_info("isdbt ioctl error!\n");
 		res = BBM_NOK;
@@ -950,62 +847,7 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return res;
 }
 
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
 
-static struct device isdbt_sysfs_dev = {
-	.init_name = "isdbt",
-};
-
-static ssize_t isdbt_signal_source_store(struct device *dev,
-			     struct device_attribute *attr, const char *buf, size_t size)
-{
-	unsigned int state;
-	if (sscanf(buf, "%u", &state) != 1) {
-		pr_info("%s: invalid state:%u\n", __func__, state);
-		return -EINVAL;
-	}
-
-	pr_info("%s: state:%u system_rev:%u\n", __func__, state, system_rev);
-
-	/*0: F-type cable, 1: Antenna */
-	if(system_rev <= 2) /*Rev 0.2 gpio: F-type cable:0, Antenna:1 */
-	{
-		if (state == 0) {
-			pr_info("%s: state:%u Enabling F type cable by setting TMM_SW to LOW\n", __func__, state);
-			gpio_set_value_cansleep(isdbt_pdata->gpio_tmm_sw, 0);
-		} else if (state == 1) {
-			pr_info("%s: state:%u Enabling antenna by setting TMM_SW to HIGH\n", __func__, state);
-			gpio_set_value_cansleep(isdbt_pdata->gpio_tmm_sw, 1);
-		} else {
-			return -EINVAL;
-		}
-	}
-	else	/*Rev 0.3 gpio: F-type cable:1, Antenna:0 */
-	{
-		if (state == 0) {
-			pr_info("%s: state:%u Enabling F type cable by setting TMM_SW to HIGH\n", __func__, state);
-			gpio_set_value_cansleep(isdbt_pdata->gpio_tmm_sw, 1);
-		} else if (state == 1) {
-			pr_info("%s: state:%u Enabling antenna by setting TMM_SW to LOW\n", __func__, state);
-			gpio_set_value_cansleep(isdbt_pdata->gpio_tmm_sw, 0);
-		} else {
-			return -EINVAL;
-		}
-	}
-	return size;
-}
-/*
-static ssize_t isdbt_signal_source_show(struct device *dev,
-		struct device_attribute *devattr, char *buf)
-{
-	int ret;
-	ret = gpio_get_value_cansleep(isdbt_pdata->gpio_tmm_sw);
-	pr_info("%s: gpio_tmm_sw state:%d\n", __func__, ret);
-	return snprintf(buf, PAGE_SIZE, "%d\n", ret);
-}
-*/
-static DEVICE_ATTR(isdbt_signal_source, (S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP), NULL, isdbt_signal_source_store);
-#endif
 
 static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 {
@@ -1076,18 +918,6 @@ static struct isdbt_platform_data *isdbt_populate_dt_pdata(struct device *dev)
 		pr_info("%s : isdbt-detect-gpio gpio_i2c_scl=%d\n", __func__, pdata->gpio_i2c_scl);
 	}
 
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-	pdata->gpio_tmm_sw = of_get_named_gpio(dev->of_node, "qcom,isdb-gpio-tmm_sw", 0);
-	if (pdata->gpio_tmm_sw < 0)
-		of_property_read_u32(dev->of_node, "qcom,isdb-gpio-tmm_sw", &pdata->gpio_tmm_sw);
-	if (pdata->gpio_tmm_sw < 0) {
-		pr_err("%s : can not find the isdbt-detect-gpio gpio_tmm_sw in the dt\n", __func__);
-		goto alloc_err;
-	} else {
-		pr_info("%s : isdbt-detect-gpio gpio_tmm_sw=%d\n", __func__, pdata->gpio_tmm_sw);
-	}
-#endif
-
 	return pdata;
 alloc_err:
 	devm_kfree(dev, pdata);
@@ -1139,19 +969,6 @@ static int isdbt_probe(struct platform_device *pdev)
 		pr_info("kthread run\n");
 		isdbt_kthread = kthread_run(isdbt_thread
 			, (void *)hInit, "isdbt_thread");
-	}
-#endif
-
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-	res = device_register(&isdbt_sysfs_dev);
-	if(res){
-		pr_err("[W1] error register isdbt_sysfs_dev device\n");
-	} else {
-		res = sysfs_create_file(&isdbt_sysfs_dev.kobj, &dev_attr_isdbt_signal_source.attr);
-		if(res < 0)
-			pr_info("couldn't create sysfs for F-type cable\n");
-		else
-			pr_info("created sysfs for F-type cable\n");
 	}
 #endif
 
@@ -1256,15 +1073,10 @@ void isdbt_exit(void)
 	gpio_free(isdbt_pdata->gpio_en);
 //	gpio_free(isdbt_pdata->gpio_i2c_sda);
 //	gpio_free(isdbt_pdata->gpio_i2c_scl);
-#ifndef BBM_I2C_TSIF
+#ifndef BBM_I2C_TSIF	
 	if (isdbt_kthread)
 	kthread_stop(isdbt_kthread);
 	isdbt_kthread = NULL;
-#endif
-#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
-	gpio_free(isdbt_pdata->gpio_tmm_sw);
-	sysfs_remove_file(&isdbt_sysfs_dev.kobj, &dev_attr_isdbt_signal_source.attr);
-	device_unregister(&isdbt_sysfs_dev);
 #endif
 
 	bbm_com_hostif_deselect(hInit);

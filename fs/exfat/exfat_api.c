@@ -72,10 +72,7 @@ INT32 FsMountVol(struct super_block *sb)
 		if (!fs_struct[drv].mounted) break;
 	}
 
-	if (drv >= MAX_DRIVE) {
-		err = FFS_ERROR;
-		goto ret_unlock;
-	}
+	if (drv >= MAX_DRIVE) return(FFS_ERROR);
 
 	sm_P(&(fs_struct[drv].v_sem));
 
@@ -92,7 +89,7 @@ INT32 FsMountVol(struct super_block *sb)
 	} else {
 		buf_shutdown(sb);
 	}
-ret_unlock:
+
 	sm_V(&z_sem);
 
 	return(err);
@@ -203,7 +200,7 @@ INT32 FsReadFile(struct inode *inode, FILE_ID_T *fid, void *buffer, UINT64 count
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
 
 	return(err);
-}
+} 
 
 INT32 FsWriteFile(struct inode *inode, FILE_ID_T *fid, void *buffer, UINT64 count, UINT64 *wcount)
 {
@@ -233,9 +230,9 @@ INT32 FsTruncateFile(struct inode *inode, UINT64 old_size, UINT64 new_size)
 	sm_P(&(fs_struct[p_fs->drv].v_sem));
 
 	PRINTK("FsTruncateFile entered (inode %p size %llu)\n", inode, new_size);
-
+	
 	err = ffsTruncateFile(inode, old_size, new_size);
-
+ 
 	PRINTK("FsTruncateFile exitted (%d)\n", err);
 
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
@@ -324,7 +321,7 @@ INT32 FsWriteStat(struct inode *inode, DIR_ENTRY_T *info)
 	PRINTK("FsWriteStat exited (%d)\n", err);
 
 	return(err);
-}
+} 
 
 INT32 FsMapCluster(struct inode *inode, INT32 clu_offset, UINT32 *clu)
 {
@@ -359,7 +356,7 @@ INT32 FsCreateDir(struct inode *inode, UINT8 *path, FILE_ID_T *fid)
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
 
 	return(err);
-}
+} 
 
 INT32 FsReadDir(struct inode *inode, DIR_ENTRY_T *dir_entry)
 {
@@ -376,7 +373,7 @@ INT32 FsReadDir(struct inode *inode, DIR_ENTRY_T *dir_entry)
 	sm_V(&(fs_struct[p_fs->drv].v_sem));
 
 	return(err);
-}
+} 
 
 INT32 FsRemoveDir(struct inode *inode, FILE_ID_T *fid)
 {
@@ -457,7 +454,7 @@ static int __init init_exfat_core(void)
 	int err;
 
 	printk(KERN_INFO "exFAT: Core Version %s\n", EXFAT_VERSION);
-
+	
 	err = FsInit();
 	if (err) {
 		if (err == FFS_MEMORYERR)

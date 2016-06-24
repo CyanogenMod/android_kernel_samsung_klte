@@ -907,7 +907,7 @@ static int ieee80211_fragment(struct ieee80211_tx_data *tx,
 	}
 
 	/* adjust first fragment's length */
-	skb_trim(skb, hdrlen + per_fragm);
+	skb->len = hdrlen + per_fragm;
 	return 0;
 }
 
