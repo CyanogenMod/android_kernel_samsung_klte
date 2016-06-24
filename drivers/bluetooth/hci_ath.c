@@ -41,8 +41,6 @@
 #include <linux/of_gpio.h>
 #include <linux/proc_fs.h>
 
-#include <linux/jiffies.h>
-
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
@@ -136,7 +134,7 @@ static void hsuart_serial_clock_off(struct uart_port *port)
 static void modify_timer_task(void)
 {
 	spin_lock(&rw_lock);
-	mod_timer(&tx_timer, jiffies + msecs_to_jiffies(TX_TIMER_INTERVAL * 1000));
+	mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 	clear_bit(BT_TXEXPIRED, &flags);
 	spin_unlock(&rw_lock);
 
