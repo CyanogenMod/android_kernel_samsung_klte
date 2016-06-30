@@ -176,18 +176,6 @@ char scenario_name[MAX_mDNIe_MODE][16] = {
 #endif
 };
 
-const char background_name[MAX_BACKGROUND_MODE][10] = {
-	"DYNAMIC",
-#ifndef	MDNIE_LITE_MODE
-	"STANDARD",
-#if !defined(CONFIG_SUPPORT_DISPLAY_OCTA_TFT)
-	"NATURAL",
-#endif
-	"MOVIE",
-	"AUTO",
-#endif /* MDNIE_LITE_MODE */
-};
-
 const char outdoor_name[MAX_OUTDOOR_MODE][20] = {
 	"OUTDOOR_OFF_MODE",
 #ifndef MDNIE_LITE_MODE
@@ -572,12 +560,8 @@ void mDNIe_Set_Mode(void)
 	sending_tuning_cmd();
 	free_tun_cmd();
 
-	DPRINT("mDNIe_Set_Mode end , %s(%d), %s(%d), %s(%d), %s(%d)\n",
-		scenario_name[mdnie_tun_state.scenario], mdnie_tun_state.scenario,
-		background_name[mdnie_tun_state.background], mdnie_tun_state.background,
-		outdoor_name[mdnie_tun_state.outdoor], mdnie_tun_state.outdoor,
-		accessibility_name[mdnie_tun_state.accessibility], mdnie_tun_state.accessibility);
-
+	DPRINT("mDNIe_Set_Mode end , background(%d)\n",
+		mdnie_tun_state.background);
 }
 
 void is_play_speed_1_5(int enable)
@@ -595,43 +579,40 @@ void is_play_speed_1_5(int enable)
  * #
  * #	0. Dynamic
  * #	1. Standard
- * #	2. Video
- * #	3. Natural
+ * #	2. Natural
+ * #	3. Movie
+ * #	4. Auto
  * #
  * ##########################################################*/
 
 static ssize_t mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	DPRINT("Current Background Mode : %s\n",
-		background_name[mdnie_tun_state.background]);
-
-	return snprintf(buf, 256, "Current Background Mode : %s\n",
-		background_name[mdnie_tun_state.background]);
+	return snprintf(buf, 256, "%d\n", mdnie_tun_state.background);
 }
 
 static ssize_t mode_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	int value;
-	int backup;
 
 	sscanf(buf, "%d", &value);
+	DPRINT("set background mode : %d\n", value);
 
 	if (value < DYNAMIC_MODE || value >= MAX_BACKGROUND_MODE) {
 		DPRINT("[ERROR] wrong backgound mode value : %d\n",
 			value);
 		return size;
 	}
-	backup = mdnie_tun_state.background;
+
 	mdnie_tun_state.background = value;
 
 	if (mdnie_tun_state.accessibility == NEGATIVE) {
 		DPRINT("already negative mode(%d), do not set background(%d)\n",
 			mdnie_tun_state.accessibility, mdnie_tun_state.background);
 	} else {
-		DPRINT(" %s : (%s) -> (%s)\n",
-			__func__, background_name[backup], background_name[mdnie_tun_state.background]);
+		DPRINT(" %s, input background(%d)\n",
+				__func__, value);
 
 		mDNIe_Set_Mode();
 	}
@@ -766,8 +747,7 @@ static ssize_t outdoor_show(struct device *dev,
 	DPRINT("Current outdoor Mode : %s\n",
 		outdoor_name[mdnie_tun_state.outdoor]);
 
-	return snprintf(buf, 256, "Current outdoor Mode : %s\n",
-		outdoor_name[mdnie_tun_state.outdoor]);
+	return snprintf(buf, 256, "%d\n", mdnie_tun_state.outdoor);
 }
 
 static ssize_t outdoor_store(struct device *dev,
