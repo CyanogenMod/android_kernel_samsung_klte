@@ -119,6 +119,11 @@ static int vibrator_work;
 
 #define TEST_MODE_TIME 10000
 
+#define PWM_MIN 0
+#define PWM_DEFAULT 50
+#define PWM_THRESH 75
+#define PWM_MAX 100
+
 struct vibrator_platform_data vibrator_drvdata;
 
 /*
@@ -133,7 +138,7 @@ struct vibrator_platform_data vibrator_drvdata;
  */
 
 #define BASE_STRENGTH 126
-static unsigned int pwm_val = 100;
+static unsigned int pwm_val = PWM_DEFAULT;
 
 static int set_vibetonz(int timeout)
 {
@@ -148,7 +153,7 @@ static int set_vibetonz(int timeout)
 	} else {
 		DbgOut((KERN_INFO "tspdrv: ENABLE\n"));
 		if (vibrator_drvdata.vib_model == HAPTIC_PWM) {
-			strength = (int8_t) (BASE_STRENGTH * pwm_val / 100);
+			strength = (int8_t) (BASE_STRENGTH * pwm_val / PWM_MAX);
 			/* 90% duty cycle */
 			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, &strength);
 		} else { /* HAPTIC_MOTOR */
@@ -166,15 +171,17 @@ static ssize_t pwm_value_show(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%u\n", pwm_val);
 }
 
-ssize_t pwm_value_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t pwm_value_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
 {
 	unsigned int new_pwm_val;
 
 	if (!sscanf(buf, "%u", &new_pwm_val))
 		return -EINVAL;
 
-	if (new_pwm_val < 0 || new_pwm_val > 100) {
-		pr_info("[VIB] %s: new pwm_val %d is out of [0, 100] range\n", __func__, pwm_val);
+	if (new_pwm_val < PWM_MIN || new_pwm_val > PWM_MAX) {
+		pr_info("[VIB] %s: new pwm_val %d is out of [%d, %d] range\n",
+		        __func__, pwm_val, PWM_MIN, PWM_MAX);
 		return -EINVAL;
 	} else {
 		pr_info("[VIB] %s: pwm_val=%d\n", __func__, pwm_val);
@@ -188,6 +195,38 @@ ssize_t pwm_value_store(struct device *dev, struct device_attribute *attr, const
 
 static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
 		pwm_value_show, pwm_value_store);
+
+static ssize_t pwm_default_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+   return sprintf(buf, "%u\n", PWM_DEFAULT);
+}
+
+static DEVICE_ATTR(pwm_default, S_IRUGO, pwm_default_show, NULL);
+
+static ssize_t pwm_max_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+   return sprintf(buf, "%u\n", PWM_MAX);
+}
+
+static DEVICE_ATTR(pwm_max, S_IRUGO, pwm_max_show, NULL);
+
+static ssize_t pwm_min_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+   return sprintf(buf, "%u\n", PWM_MIN);
+}
+
+static DEVICE_ATTR(pwm_min, S_IRUGO, pwm_min_show, NULL);
+
+static ssize_t pwm_threshold_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+   return sprintf(buf, "%u\n", PWM_THRESH);
+}
+
+static DEVICE_ATTR(pwm_threshold, S_IRUGO, pwm_threshold_show, NULL);
 
 static void _set_vibetonz_work(struct work_struct *unused)
 {
@@ -268,10 +307,29 @@ static void vibetonz_start(void)
 	}
 
 	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_value);
+	if (ret) {
+		DbgOut((KERN_ERR "tspdrv: create sysfs fail: pwm_value\n"));
+	}
 
-	if (ret)
-		DbgOut((KERN_ERR
-		"tspdrv: create sysfs fail: pwm_value\n"));
+	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_max);
+	if (ret) {
+		DbgOut((KERN_ERR "tspdrv: create sysfs fail: pwm_max\n"));
+	}
+
+	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_min);
+	if (ret) {
+		DbgOut((KERN_ERR "tspdrv: create sysfs fail: pwm_min\n"));
+	}
+
+	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_default);
+	if (ret) {
+		DbgOut((KERN_ERR "tspdrv: create sysfs fail: pwm_default\n"));
+	}
+
+	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_threshold);
+	if (ret) {
+		DbgOut((KERN_ERR "tspdrv: create sysfs fail: pwm_threshold\n"));
+	}
 }
 
 /* File IO */
@@ -595,7 +653,7 @@ static __devinit int tspdrv_probe(struct platform_device *pdev)
 	int ret, i, rc;   /* initialized below */
 
 	DbgOut((KERN_INFO "tspdrv: tspdrv_probe.\n"));
-	motor_min_strength = g_nlra_gp_clk_n*MOTOR_MIN_STRENGTH/100;
+	motor_min_strength = g_nlra_gp_clk_n*MOTOR_MIN_STRENGTH/PWM_MAX;
 	if(!pdev->dev.of_node){
 		DbgOut(KERN_ERR "tspdrv: tspdrv probe failed, DT is NULL");
 		return -ENODEV;
