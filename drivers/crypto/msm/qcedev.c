@@ -2016,7 +2016,11 @@ static int qcedev_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, podev);
 
 	rc = misc_register(&podev->miscdevice);
-	qce_hw_support(podev->qce, &podev->ce_support);
+	if(rc < 0)
+		return rc;
+	rc = qce_hw_support(podev->qce, &podev->ce_support);
+	if(rc < 0)
+		return rc;
 	if (podev->ce_support.bam) {
 		podev->platform_support.ce_shared = 0;
 		podev->platform_support.shared_ce_resource = 0;

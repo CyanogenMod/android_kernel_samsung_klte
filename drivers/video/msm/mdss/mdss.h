@@ -84,6 +84,11 @@ struct mdss_fudge_factor {
 	u32 denom;
 };
 
+struct mdss_perf_tune {
+	unsigned long min_mdp_clk;
+	u64 min_bus_vote;
+};
+
 struct mdss_prefill_data {
 	u32 ot_bytes;
 	u32 y_buf_bytes;
@@ -129,7 +134,8 @@ struct mdss_data_type {
 	u32 has_no_lut_read;
 	atomic_t sd_client_count;
 	u8 has_wb_ad;
-
+	bool idle_pc_enabled;
+	
 	u32 rotator_ot_limit;
 	u32 mdp_irq_mask;
 	u32 mdp_hist_irq_mask;
@@ -138,7 +144,6 @@ struct mdss_data_type {
 	u8 clk_ena;
 	u8 fs_ena;
 	u8 vsync_ena;
-	unsigned long min_mdp_clk;
 
 	u32 res_init;
 
@@ -164,6 +169,9 @@ struct mdss_data_type {
 
 	u32 *clock_levels;
 	u32 nclk_lvl;
+
+	u32 enable_bw_release;
+	u32 enable_rotator_bw_release;
 
 	struct mdss_hw_settings *hw_settings;
 
@@ -207,7 +215,8 @@ struct mdss_data_type {
 
 	int handoff_pending;
 	struct mdss_prefill_data prefill_data;
-	bool ulps;
+	bool idle_pc;
+	struct mdss_perf_tune perf_tune;
 	int iommu_ref_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
@@ -228,6 +237,18 @@ void mdss_disable_irq_nosync(struct mdss_hw *hw);
 void mdss_bus_bandwidth_ctrl(int enable);
 int mdss_iommu_ctrl(int enable);
 int mdss_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota);
+void mdss_mdp_dump_power_clk(void);
+
+
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+int mdss_mdp_debug_bus(void);
+void xlog(const char *name, u32 data0, u32 data1, u32 data2, u32 data3, u32 data4, u32 data5);
+void xlog_dump(void);
+#endif
+
+#if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
+void mdss_dbg_tick_save(int op_name);
+#endif
 
 static inline struct ion_client *mdss_get_ionclient(void)
 {
