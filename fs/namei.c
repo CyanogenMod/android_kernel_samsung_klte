@@ -37,9 +37,6 @@
 
 #include "internal.h"
 #include "mount.h"
-#ifdef CONFIG_SDCARD_FS
-#include "sdcardfs/sdcardfs.h"
-#endif
 
 /* [Feb-1997 T. Schoebel-Theuer]
  * Fundamental changes in the pathname lookup mechanisms (namei)
@@ -2895,11 +2892,6 @@ long do_unlinkat(int dfd, const char __user *pathname, bool propagate)
 	struct dentry *dentry;
 	struct nameidata nd;
 	struct inode *inode = NULL;
-#ifdef CONFIG_SDCARD_FS
-	/* temp code to avoid issue */
-	char *path_buf = NULL;
-	char *propagate_path = NULL;
-#endif
 
 	error = user_path_parent(dfd, pathname, &nd, &name);
 	if (error)
@@ -2921,20 +2913,6 @@ long do_unlinkat(int dfd, const char __user *pathname, bool propagate)
 		inode = dentry->d_inode;
 		if (!inode)
 			goto slashes;
-#ifdef CONFIG_SDCARD_FS
-		/* temp code to avoid issue */
-		if (inode->i_sb->s_op->unlink_callback && propagate) {
-			struct inode *lower_inode = inode;
-			while (lower_inode->i_op->get_lower_inode) {
-				if (inode->i_sb->s_magic == SDCARDFS_SUPER_MAGIC
-						&& SDCARDFS_SB(inode->i_sb)->options.label) {
-					path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
-					propagate_path = dentry_path_raw(dentry, path_buf, PATH_MAX);
-				}
-				lower_inode = lower_inode->i_op->get_lower_inode(lower_inode);
-			}
-		}
-#endif
 		ihold(inode);
 		error = mnt_want_write(nd.path.mnt);
 		if (error)
@@ -2949,13 +2927,6 @@ exit3:
 		dput(dentry);
 	}
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
-#ifdef CONFIG_SDCARD_FS
-	/* temp code to avoid issue */
-	if (path_buf && !IS_ERR(path_buf) && !error && propagate) {
-		inode->i_sb->s_op->unlink_callback(inode, propagate_path);
-		kfree(path_buf);
-	}
-#endif
 	if (inode)
 		iput(inode);	/* truncate the inode here */
 exit1:
