@@ -902,6 +902,11 @@ int msm_audio_effects_popless_eq_handler(struct audio_client *ac,
 			}
 			for (j = 0; j < eq->config.num_bands; j++) {
 				idx = GET_NEXT(values, param_max_offset, rc);
+				if (idx >= MAX_EQ_BANDS) {
+					pr_err("EQ_CONFIG: GET_NEXT invalid idx %u\n", idx);
+					rc = -EINVAL;
+					goto invalid_config;
+				}
 				eq->per_band_cfg[idx].band_idx = idx;
 				eq->per_band_cfg[idx].filter_type =
 					GET_NEXT(values, param_max_offset, rc);
@@ -958,7 +963,7 @@ int msm_audio_effects_popless_eq_handler(struct audio_client *ac,
 				goto invalid_config;
 			}
 			idx = GET_NEXT(values, param_max_offset, rc);
-			if (idx > MAX_EQ_BANDS) {
+			if (idx >= MAX_EQ_BANDS) {
 				pr_err("EQ_BAND_INDEX:invalid band index\n");
 				rc = -EINVAL;
 				goto invalid_config;
@@ -990,7 +995,7 @@ int msm_audio_effects_popless_eq_handler(struct audio_client *ac,
 				rc = -EINVAL;
 				goto invalid_config;
 			}
-			if (eq->band_index > MAX_EQ_BANDS) {
+			if (eq->band_index >= MAX_EQ_BANDS) {
 				pr_err("EQ_SINGLE_BAND_FREQ:invalid index\n");
 				break;
 			}
