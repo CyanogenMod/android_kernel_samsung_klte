@@ -36,6 +36,9 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 
+
+#include "internal.h"
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
