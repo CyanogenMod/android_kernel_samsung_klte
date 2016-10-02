@@ -66,10 +66,6 @@
 /* Timeout value for polling DRDY signal assertion */
 #define DRDY_TIMEOUT_MS      40
 
-#ifdef FEATURE_SPI_WAKELOCK
-#undef FEATURE_SPI_WAKELOCK
-#endif
-
 /*
  * Definitions of structures which are used by IOCTL commands
  */
