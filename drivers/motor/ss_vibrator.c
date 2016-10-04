@@ -732,7 +732,7 @@ static ssize_t intensity_store(struct device *dev,
 	ret = kstrtoint(buf, 0, &set_intensity);
 
 	if ((set_intensity < 0) || (set_intensity > MAX_INTENSITY)) {
-		pr_err("[VIB]: %sout of rage\n", __func__);
+		pr_err("[VIB]: %sout of range\n", __func__);
 		return -EINVAL;
 	}
 
