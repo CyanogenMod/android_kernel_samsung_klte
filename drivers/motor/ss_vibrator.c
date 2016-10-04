@@ -51,17 +51,17 @@ struct ss_vib {
 
 void vibe_set_intensity(int intensity)
 {
-	if (0 == intensity)
+	if (intensity == 0)
 		vibe_pwm_onoff(0);
 	else {
-		if (MAX_INTENSITY == intensity)
+		if (intensity == MAX_INTENSITY)
 			intensity = 1;
-		else if (0 != intensity) {
+		else if (intensity != 0) {
 			int tmp = MAX_INTENSITY - intensity;
 			intensity = (tmp / 79);	// 79 := 10000 / 127
 		}
-			
-		if (vibrator_drvdata.is_pmic_vib_pwm){ 
+
+		if (vibrator_drvdata.is_pmic_vib_pwm){
 			//PMIC  PWM
 			if (vib_config_pwm_device() < 0)
 				pr_err("%s vib_config_pwm_device failed\n", __func__);
@@ -77,7 +77,7 @@ int32_t vibe_set_pwm_freq(int intensity)
 	int32_t calc_d;
 
 	/* Put the MND counter in reset mode for programming */
-	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_SEL_VAL_BMSK, 
+	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_SEL_VAL_BMSK,
 				0 << HWIO_GP_SRC_SEL_VAL_SHFT); //SRC_SEL = 000(cxo)
 #if defined(CONFIG_SEC_BERLUTI_PROJECT) || defined(CONFIG_MACH_S3VE3G_EUR)
 	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_DIV_VAL_BMSK,
@@ -86,7 +86,7 @@ int32_t vibe_set_pwm_freq(int intensity)
 	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_SRC_DIV_VAL_BMSK,
 				31 << HWIO_GP_SRC_DIV_VAL_SHFT); //SRC_DIV = 11111 (Div 16)
 #endif
-	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_MODE_VAL_BMSK, 
+	HWIO_OUTM(GP1_CFG_RCGR, HWIO_GP_MODE_VAL_BMSK,
 				2 << HWIO_GP_MODE_VAL_SHFT); //Mode Select 10
 	//M value
 	HWIO_OUTM(GP_M_REG, HWIO_GP_MD_REG_M_VAL_BMSK,
@@ -125,11 +125,11 @@ int32_t vibe_set_pwm_freq(int intensity)
 	// D value
 	HWIO_OUTM(GP_D_REG, HWIO_GP_MD_REG_D_VAL_BMSK,
 	 (~((int16_t)calc_d << 1)) << HWIO_GP_MD_REG_D_VAL_SHFT);
-	
-	//N value	
+
+	//N value
 	HWIO_OUTM(GP_NS_REG, HWIO_GP_NS_REG_GP_N_VAL_BMSK,
 	 ~(g_nlra_gp_clk_n - g_nlra_gp_clk_m) << 0);
-	
+
 	return VIBRATION_SUCCESS;
 }
 
@@ -139,16 +139,16 @@ int32_t vibe_pwm_onoff(u8 onoff)
 		HWIO_OUTM(GP1_CMD_RCGR,HWIO_UPDATE_VAL_BMSK,
 					1 << HWIO_UPDATE_VAL_SHFT);//UPDATE ACTIVE
 		HWIO_OUTM(GP1_CMD_RCGR,HWIO_ROOT_EN_VAL_BMSK,
-					1 << HWIO_ROOT_EN_VAL_SHFT);//ROOT_EN		
+					1 << HWIO_ROOT_EN_VAL_SHFT);//ROOT_EN
 		HWIO_OUTM(CAMSS_GP1_CBCR, HWIO_CLK_ENABLE_VAL_BMSK,
 					1 << HWIO_CLK_ENABLE_VAL_SHFT); //CLK_ENABLE
 	} else {
-		
-		HWIO_OUTM(GP1_CMD_RCGR,HWIO_UPDATE_VAL_BMSK, 
+
+		HWIO_OUTM(GP1_CMD_RCGR,HWIO_UPDATE_VAL_BMSK,
 					0 << HWIO_UPDATE_VAL_SHFT);
 		HWIO_OUTM(GP1_CMD_RCGR,HWIO_ROOT_EN_VAL_BMSK,
-					0 << HWIO_ROOT_EN_VAL_SHFT);		
-		HWIO_OUTM(CAMSS_GP1_CBCR, HWIO_CLK_ENABLE_VAL_BMSK, 
+					0 << HWIO_ROOT_EN_VAL_SHFT);
+		HWIO_OUTM(CAMSS_GP1_CBCR, HWIO_CLK_ENABLE_VAL_BMSK,
 					0 << HWIO_CLK_ENABLE_VAL_SHFT);
 	}
 	return VIBRATION_SUCCESS;
@@ -161,9 +161,9 @@ int vib_config_pwm_device(void)
 	//u32	pwm_period_us, duty_us;
 #if defined(CONFIG_MACH_HLTEDCM) || defined(CONFIG_MACH_HLTEKDI) || \
 	defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM)
-	vibrator_drvdata.pwm_dev = pwm_request(0,"lpg_3"); // 0 index for LPG3 channel. 
+	vibrator_drvdata.pwm_dev = pwm_request(0,"lpg_3"); // 0 index for LPG3 channel.
 #else
-	vibrator_drvdata.pwm_dev = pwm_request(0,"lpg_1"); // 0 index for LPG1 channel. 
+	vibrator_drvdata.pwm_dev = pwm_request(0,"lpg_1"); // 0 index for LPG1 channel.
 #endif
 
 	if (IS_ERR_OR_NULL(vibrator_drvdata.pwm_dev)) {
@@ -172,23 +172,23 @@ int vib_config_pwm_device(void)
 		vibrator_drvdata.pwm_dev = NULL;
 		return -ENODEV;
 	}
-	//pwm_period_us = 19; // 2000000; 
+	//pwm_period_us = 19; // 2000000;
 	//duty_us = 18; //1000000; (90% Duty Cycle)
-	
+
 	ret = pwm_config(vibrator_drvdata.pwm_dev,
 					 vibrator_drvdata.duty_us,
-					 vibrator_drvdata.pwm_period_us); 
+					 vibrator_drvdata.pwm_period_us);
 	if (ret) {
 		pr_err("pwm_config in vibrator enable failed %d\n", ret);
 		return ret;
 	}
-	ret = pwm_enable(vibrator_drvdata.pwm_dev);	
+	ret = pwm_enable(vibrator_drvdata.pwm_dev);
 	if (ret < 0) {
 		pr_err("pwm_enable in vibrator  failed %d\n", ret);
 		return ret;
 	}
 	} else {
-		ret = pwm_enable(vibrator_drvdata.pwm_dev); 
+		ret = pwm_enable(vibrator_drvdata.pwm_dev);
 		if (ret < 0) {
 			pr_err("pwm_enable in vibrator  failed %d\n", ret);
 			return ret;
@@ -419,21 +419,21 @@ static int vibrator_parse_dt(struct ss_vib *vib)
 		pr_err("%s:%d, max77888_en_gpio not specified\n",__func__, __LINE__);
 	}
 #endif
-	
+
 	rc = of_property_read_u32(np, "samsung,pmic_vib_en", &vibrator_drvdata.is_pmic_vib_en);
 	if (rc) {
 		pr_err("%s:%d, is_pmic_vib_en not specified\n",
 						__func__, __LINE__);
 		return -EINVAL;
 	}
-	
+
 	rc = of_property_read_u32(np, "samsung,pmic_haptic_pwr_en", &vibrator_drvdata.is_pmic_haptic_pwr_en);
 	if (rc) {
 		pr_err("%s:%d, is_pmic_haptic_pwr_en not specified\n",
 						__func__, __LINE__);
 		return -EINVAL;
 	}
-	
+
 	//vibrator_drvdata.is_pmic_vib_pwm = 0;  AP PWM PIN
 	//vibrator_drvdata.is_pmic_vib_pwm = 1;  PMIC PWM PIN
 	rc = of_property_read_u32(np, "samsung,is_pmic_vib_pwm", &vibrator_drvdata.is_pmic_vib_pwm);
@@ -717,27 +717,27 @@ static ssize_t store_vib_tuning(struct device *dev,
 			g_nlra_gp_clk_m, g_nlra_gp_clk_n, g_nlra_gp_clk_d,
 			g_nlra_gp_clk_pwm_mul, motor_strength, motor_min_strength);
 
-	return count;                                                              
-}                                                                                  
+	return count;
+}
 
-static DEVICE_ATTR(vib_tuning, 0660, show_vib_tuning, store_vib_tuning);           
+static DEVICE_ATTR(vib_tuning, 0660, show_vib_tuning, store_vib_tuning);
 
 static ssize_t intensity_store(struct device *dev,
 		struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct timed_output_dev *t_dev = dev_get_drvdata(dev);
-	struct ss_vib *vib = container_of(t_dev, struct ss_vib, timed_dev); 
-	int ret = 0, set_intensity = 0; 
+	struct ss_vib *vib = container_of(t_dev, struct ss_vib, timed_dev);
+	int ret = 0, set_intensity = 0;
 
 	ret = kstrtoint(buf, 0, &set_intensity);
 
-	if ((set_intensity < 0) || (set_intensity > MAX_INTENSITY)) {
+	if ((set_intensity < 0) || (set_intensity > (MAX_INTENSITY / 100))) {
 		pr_err("[VIB]: %sout of range\n", __func__);
 		return -EINVAL;
 	}
 
-	vibe_set_intensity(set_intensity);
-	vib->intensity = set_intensity;
+	vibe_set_intensity((set_intensity * 100));
+	vib->intensity = (set_intensity * 100);
 
 	return count;
 }
@@ -746,12 +746,40 @@ static ssize_t intensity_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct timed_output_dev *t_dev = dev_get_drvdata(dev);
-	struct ss_vib *vib = container_of(t_dev, struct ss_vib, timed_dev); 
+	struct ss_vib *vib = container_of(t_dev, struct ss_vib, timed_dev);
 
-	return sprintf(buf, "intensity: %u\n", vib->intensity);
+	return sprintf(buf, "%u\n", (vib->intensity / 100));
 }
 
-static DEVICE_ATTR(intensity, 0660, intensity_show, intensity_store);
+static ssize_t pwm_default_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", 50);
+}
+
+static ssize_t pwm_max_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", 100);
+}
+
+static ssize_t pwm_min_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", 0);
+}
+
+static ssize_t pwm_threshold_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", 75);
+}
+
+static DEVICE_ATTR(pwm_default, 0444, pwm_default_show, NULL);
+static DEVICE_ATTR(pwm_max, 0444, pwm_max_show, NULL);
+static DEVICE_ATTR(pwm_min, 0444, pwm_min_show, NULL);
+static DEVICE_ATTR(pwm_threshold, 0444, pwm_threshold_show, NULL);
+static DEVICE_ATTR(pwm_value, 0644, intensity_show, intensity_store);
 
 static int ss_vibrator_probe(struct platform_device *pdev)
 {
@@ -797,7 +825,7 @@ static int ss_vibrator_probe(struct platform_device *pdev)
 	vib->state = 0;
 	vib->intensity = MAX_INTENSITY;
 	vib->timeout = VIB_DEFAULT_TIMEOUT;
-	
+
 	vibrator_initialize();
 	vibe_set_intensity(vib->intensity);
 	INIT_WORK(&vib->work, ss_vibrator_update);
@@ -824,7 +852,11 @@ static int ss_vibrator_probe(struct platform_device *pdev)
 		goto err_read_vib;
 	}
 
-	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_intensity.attr);
+	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_pwm_default.attr);
+	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_pwm_min.attr);
+	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_pwm_max.attr);
+	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_pwm_threshold.attr);
+	rc = sysfs_create_file(&vib->timed_dev.dev->kobj, &dev_attr_pwm_value.attr);
 	if (rc < 0) {
 		pr_err("[VIB]: Failed to register sysfs intensity: %d\n", rc);
 	}
