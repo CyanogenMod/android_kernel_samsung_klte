@@ -310,15 +310,7 @@ static void control_init(sdp_fs_handler_control_t *con) {
 }
 
 static int __init sdp_fs_handler_mod_init(void) {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0))
-    struct netlink_kernel_cfg cfg = {
-            .input  = recver,
-    };
-
-    g_sock = netlink_kernel_create(&init_net, SDP_FS_HANDLER_NETLINK, &cfg);
-#else
     g_sock = netlink_kernel_create(&init_net, SDP_FS_HANDLER_NETLINK, 0, recver, NULL, THIS_MODULE);
-#endif
 
     if (!g_sock) {
         SDP_FS_HANDLER_LOGE("Failed to create Crypto Netlink Socket .. Exiting \n");
