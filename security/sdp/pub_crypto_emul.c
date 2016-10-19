@@ -471,15 +471,7 @@ void pub_crypto_control_init(pub_crypto_control_t *con) {
 }
 
 static int __init pub_crypto_mod_init(void) {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0))
-	struct netlink_kernel_cfg cfg = {
-		.input  = crypto_recver,
-	};
-
-	crypto_sock = netlink_kernel_create(&init_net, NETLINK_FIPS_CRYPTO, &cfg);
-#else
 	crypto_sock = netlink_kernel_create(&init_net, NETLINK_FIPS_CRYPTO, 0, crypto_recver, NULL, THIS_MODULE);
-#endif
 
 	if (!crypto_sock) {
 		PUB_CRYPTO_LOGE("Failed to create Crypto Netlink Socket .. Exiting \n");
