@@ -420,11 +420,9 @@ static void put_css_set(struct css_set *cg)
 		 * rcu_read_lock is used to keep it alive.
 		 */
 		rcu_read_lock();
-		if (atomic_dec_and_test(&cgrp->count) &&
-		    notify_on_release(cgrp)) {
-			if (taskexit)
-				set_bit(CGRP_RELEASABLE, &cgrp->flags);
+		if (atomic_dec_and_test(&cgrp->count)) {
 			check_for_release(cgrp);
+			cgroup_wakeup_rmdir_waiter(cgrp);
 		}
 		rcu_read_unlock();
 
