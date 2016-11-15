@@ -1003,7 +1003,6 @@ static void hci_power_on(struct work_struct *work)
 	err = hci_dev_open(hdev->id);
 	if (err && err != -EALREADY)
 		return;
-	}
 
 	if (test_bit(HCI_AUTO_OFF, &hdev->flags) &&
 				hdev->dev_type == HCI_BREDR)
