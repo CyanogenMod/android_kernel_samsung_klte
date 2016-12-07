@@ -65,52 +65,7 @@ struct cpufreq_work_struct {
 
 static DEFINE_PER_CPU(struct cpufreq_work_struct, cpufreq_work);
 static struct workqueue_struct *msm_cpufreq_wq;
-#ifdef CONFIG_SEC_DVFS
-static unsigned int upper_limit_freq;
-static unsigned int lower_limit_freq;
-static unsigned int cpuinfo_max_freq;
-static unsigned int cpuinfo_min_freq;
 
-unsigned int get_min_lock(void)
-{
-	return lower_limit_freq;
-}
-
-unsigned int get_max_lock(void)
-{
-	return upper_limit_freq;
-}
-
-void set_min_lock(int freq)
-{
-	if (freq <= MIN_FREQ_LIMIT)
-		lower_limit_freq = 0;
-	else if (freq > MAX_FREQ_LIMIT)
-		lower_limit_freq = 0;
-	else
-		lower_limit_freq = freq;
-}
-
-void set_max_lock(int freq)
-{
-	if (freq < MIN_FREQ_LIMIT)
-		upper_limit_freq = 0;
-	else if (freq >= MAX_FREQ_LIMIT)
-		upper_limit_freq = 0;
-	else
-		upper_limit_freq = freq;
-}
-
-int get_max_freq(void)
-{
-	return cpuinfo_max_freq;
-}
-
-int get_min_freq(void)
-{
-	return cpuinfo_min_freq;
-}
-#endif
 struct cpufreq_suspend_t {
 	struct mutex suspend_mutex;
 	int device_suspended;
@@ -162,27 +117,6 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	struct cpufreq_freqs freqs;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 
-#ifdef CONFIG_SEC_DVFS
-	if (lower_limit_freq || upper_limit_freq) {
-		unsigned int t_freq = new_freq;
-
-		if (lower_limit_freq && new_freq < lower_limit_freq)
-			t_freq = lower_limit_freq;
-
-		if (upper_limit_freq && new_freq > upper_limit_freq)
-			t_freq = upper_limit_freq;
-
-		new_freq = t_freq;
-
-		if (new_freq < policy->min)
-			new_freq = policy->min;
-		if (new_freq > policy->max)
-			new_freq = policy->max;
-
-		if (new_freq == policy->cur)
-			return 0;
-	}
-#endif
 	freqs.old = policy->cur;
 	freqs.new = new_freq;
 	freqs.cpu = policy->cpu;
@@ -353,14 +287,6 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
 	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
-#endif
-#ifdef CONFIG_SEC_DVFS
-	cpuinfo_max_freq = policy->cpuinfo.max_freq;
-	cpuinfo_min_freq = policy->cpuinfo.min_freq;
-	/*For debugging
-	pr_info("cpufreq: cpuinfo_max_freq: %d\n", cpuinfo_max_freq);
-	pr_info("cpufreq: cpuinfo_min_freq: %d\n", cpuinfo_min_freq);
-	*/
 #endif
 
 	if (is_clk)

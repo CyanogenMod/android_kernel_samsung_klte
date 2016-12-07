@@ -933,102 +933,6 @@ static ssize_t touchkey_threshold_show(struct device *dev,
 }
 #endif
 
-#ifdef TOUCHKEY_BOOSTER
-static void touchkey_change_dvfs_lock(struct work_struct *work)
-{
-	struct touchkey_i2c *tkey_i2c =
-			container_of(work,
-				struct touchkey_i2c, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&tkey_i2c->dvfs_lock);
-
-	retval = set_freq_limit(DVFS_TOUCH_ID, tkey_i2c->dvfs_freq);
-	if (retval < 0)
-		pr_info("%s: booster change failed(%d).\n",
-			__func__, retval);
-
-	tkey_i2c->dvfs_lock_status = false;
-	mutex_unlock(&tkey_i2c->dvfs_lock);
-}
-
-static void touchkey_set_dvfs_off(struct touchkey_i2c *tkey_i2c)
-{
-	int retval;
-
-	mutex_lock(&tkey_i2c->dvfs_lock);
-
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0){
-		pr_err("%s: booster stop failed(%d).\n",
-					__func__, retval);
-		tkey_i2c->dvfs_lock_status = false;
-	}
-	else
-		tkey_i2c->dvfs_lock_status = true;
-
-	mutex_unlock(&tkey_i2c->dvfs_lock);
-}
-
-static void touchkey_set_dvfs_off_work(struct work_struct *work)
-{
-	struct touchkey_i2c *tkey_i2c =
-				container_of(work,
-					struct touchkey_i2c, work_dvfs_off.work);
-
-	touchkey_set_dvfs_off(tkey_i2c);
-}
-
-static void touchkey_set_dvfs_lock(struct touchkey_i2c *tkey_i2c,
-					uint32_t on)
-{
-	int retval;
-	if (TKEY_BOOSTER_DISABLE == tkey_i2c->dvfs_boost_mode)
-		return;
-
-	mutex_lock(&tkey_i2c->dvfs_lock);
-	if (on == 0) {
-		cancel_delayed_work(&tkey_i2c->work_dvfs_chg);
-
-		if (tkey_i2c->dvfs_lock_status) {
-			retval = set_freq_limit(DVFS_TOUCH_ID, tkey_i2c->dvfs_freq);
-			if (retval < 0)
-				pr_info("%s: cpu first lock failed(%d)\n", __func__, retval);
-			tkey_i2c->dvfs_lock_status = false;
-		}
-
-		schedule_delayed_work(&tkey_i2c->work_dvfs_off,
-			msecs_to_jiffies(TKEY_BOOSTER_OFF_TIME));
-
-	} else if (on == 1) {
-		cancel_delayed_work(&tkey_i2c->work_dvfs_off);
-		schedule_delayed_work(&tkey_i2c->work_dvfs_chg,
-			msecs_to_jiffies(TKEY_BOOSTER_CHG_TIME));
-
-	} else if (on == 2) {
-		if (tkey_i2c->dvfs_lock_status) {
-			cancel_delayed_work(&tkey_i2c->work_dvfs_off);
-			cancel_delayed_work(&tkey_i2c->work_dvfs_chg);
-			schedule_work(&tkey_i2c->work_dvfs_off.work);
-		}
-	}
-	mutex_unlock(&tkey_i2c->dvfs_lock);
-}
-
-static int touchkey_init_dvfs(struct touchkey_i2c *tkey_i2c)
-{
-	mutex_init(&tkey_i2c->dvfs_lock);
-
-	INIT_DELAYED_WORK(&tkey_i2c->work_dvfs_off, touchkey_set_dvfs_off_work);
-	INIT_DELAYED_WORK(&tkey_i2c->work_dvfs_chg, touchkey_change_dvfs_lock);
-
-	tkey_i2c->dvfs_boost_mode = TKEY_BOOSTER_LEVEL2;
-	tkey_i2c->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-	tkey_i2c->dvfs_lock_status = true;
-	return 0;
-}
-#endif
-
 #if defined(TK_HAS_FIRMWARE_UPDATE)
 /* To check firmware compatibility */
 int get_module_class(u8 ver)
@@ -1425,10 +1329,6 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 		}
 		input_sync(tkey_i2c->input_dev);
 
-		#ifdef TOUCHKEY_BOOSTER
-		touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
-		#endif
-
 	} else { /* old version. */
 		ret = i2c_touchkey_read(tkey_i2c, KEYCODE_REG, data, 3);
 		if (ret < 0){
@@ -1487,9 +1387,6 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 		dev_info(&tkey_i2c->client->dev, "pressed:%d %d\n",
 			pressed, ic_mode);
 		#endif
-		#ifdef TOUCHKEY_BOOSTER
-		touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
-		#endif
 	}
 	return IRQ_HANDLED;
 }
@@ -1538,9 +1435,6 @@ static int touchkey_stop(struct touchkey_i2c *tkey_i2c)
 	
 	tkey_i2c->enabled = false;
 	tkey_i2c->status_update = false;
-#ifdef TOUCHKEY_BOOSTER
-	touchkey_set_dvfs_lock(tkey_i2c, 2);
-#endif
 
  err_stop_out:
 	mutex_unlock(&tkey_i2c->lock);
@@ -2122,43 +2016,6 @@ static ssize_t set_touchkey_firm_status_show(struct device *dev,
 
 	return count;
 }
-#if defined(TOUCHKEY_BOOSTER)
-static ssize_t touchkey_boost_level(struct device *dev,
-						struct device_attribute *attr, const char *buf,
-						size_t count)
-{
-	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(dev);
-	unsigned int level;
-
-	sscanf(buf, "%d", &level);
-
-	if (level > 2) {
-		dev_err(dev, "err to set boost_level %d\n", level);
-		return count;
-	}
-
-#ifdef TOUCHKEY_BOOSTER
-	tkey_i2c->dvfs_boost_mode = level;
-#endif
-	dev_info(dev, "%s %d\n", __func__, level);
-
-	if (tkey_i2c->dvfs_boost_mode == TKEY_BOOSTER_LEVEL2) {
-		tkey_i2c->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-		dev_info(dev,
-			"%s: boost_mode DUAL, dvfs_freq = %d\n",
-			__func__, tkey_i2c->dvfs_freq);
-	} else if (tkey_i2c->dvfs_boost_mode == TKEY_BOOSTER_LEVEL1) {
-		tkey_i2c->dvfs_freq = MIN_TOUCH_LIMIT;
-		dev_info(dev,
-			"%s: boost_mode SINGLE, dvfs_freq = %d\n",
-			__func__, tkey_i2c->dvfs_freq);
-	} else if (tkey_i2c->dvfs_boost_mode == TKEY_BOOSTER_DISABLE) {
-		touchkey_set_dvfs_off(tkey_i2c);
-	}
-
-	return count;
-}
-#endif
 
 #if defined(TKEY_GRIP_MODE)
 static ssize_t touchkey_grip_mode_show(struct device *dev,
@@ -2258,9 +2115,6 @@ static DEVICE_ATTR(glove_mode, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
 static DEVICE_ATTR(flip_mode, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
 		   flip_cover_mode_enable);
 #endif
-#if defined(TOUCHKEY_BOOSTER)
-static DEVICE_ATTR(boost_level, S_IWUSR | S_IWGRP, NULL, touchkey_boost_level);
-#endif
 
 #ifdef TKEY_GRIP_MODE
 static DEVICE_ATTR(grip_mode, S_IRUGO | S_IWUSR | S_IWGRP, touchkey_grip_mode_show,
@@ -2312,9 +2166,6 @@ static struct attribute *touchkey_attributes[] = {
 #endif
 #ifdef TKEY_FLIP_MODE
 	&dev_attr_flip_mode.attr,
-#endif
-#if defined(TOUCHKEY_BOOSTER)
-	&dev_attr_boost_level.attr,
 #endif
 #ifdef TKEY_GRIP_MODE
 	&dev_attr_grip_mode.attr,
@@ -2867,10 +2718,6 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 		goto err_create_fw_wq;
 	}
 
-#ifdef TOUCHKEY_BOOSTER
-	touchkey_init_dvfs(tkey_i2c);
-#endif
-
 #if defined(CONFIG_GLOVE_TOUCH)
 		mutex_init(&tkey_i2c->tsk_glove_lock);
 	INIT_WORK(&tkey_i2c->glove_change_work, touchkey_glove_change_work);
@@ -2928,9 +2775,6 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 err_request_threaded_irq:
 #ifdef CONFIG_GLOVE_TOUCH
 	mutex_destroy(&tkey_i2c->tsk_glove_lock);
-#endif
-#ifdef TOUCHKEY_BOOSTER
-	mutex_destroy(&tkey_i2c->dvfs_lock);
 #endif
 	destroy_workqueue(tkey_i2c->fw_wq);
 err_create_fw_wq:

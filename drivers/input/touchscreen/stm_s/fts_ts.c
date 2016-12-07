@@ -421,157 +421,6 @@ static int fts_set_noise_param(struct fts_ts_info *info)
 }
 #endif// FTS_SUPPORT_NOISE_PARAM
 
-#ifdef TOUCH_BOOSTER_DVFS
-int useing_in_tsp_or_epen = 0;
-static void fts_change_dvfs_lock(struct work_struct *work)
-{
-	struct fts_ts_info *info =
-		container_of(work, struct fts_ts_info, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&info->dvfs_lock);
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-        if (info->stay_awake) {
-            dev_info(&info->client->dev,
-                "%s: do fw update, do not change cpu frequency.\n",
-                __func__);
-        } else {
-            retval = set_freq_limit(DVFS_TOUCH_ID,
-                MIN_TOUCH_LIMIT_SECOND);
-            info->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-		}
-    } else if (info->dvfs_boost_mode == DVFS_STAGE_SINGLE ||
-        info->dvfs_boost_mode == DVFS_STAGE_TRIPLE) {
-	        retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	        info->dvfs_freq = -1;
-	}
-	else if (info->dvfs_boost_mode == DVFS_STAGE_NINTH){
-		retval = set_freq_limit(DVFS_TOUCH_ID,
-				MIN_TOUCH_LIMIT_SECOND_9LEVEL);
-		info->dvfs_freq = MIN_TOUCH_LIMIT_SECOND_9LEVEL;
-	}
-    if (retval < 0)
-        dev_err(&info->client->dev,
-            "%s: booster change failed(%d).\n",
-            __func__, retval);
-
-	mutex_unlock(&info->dvfs_lock);
-}
-
-static void fts_set_dvfs_off(struct work_struct *work)
-{
-	struct fts_ts_info *info =
-		container_of(work, struct fts_ts_info, work_dvfs_off.work);
-	int retval;
-
-	if (info->stay_awake) {
-		dev_info(&info->client->dev,
-			"%s: do fw update, do not change cpu frequency.\n",
-			__func__);
-	} else {
-		mutex_lock(&info->dvfs_lock);
-
-		if((useing_in_tsp_or_epen & 0x01)== 0x01){
-			useing_in_tsp_or_epen = 0x01;
-			retval = 0;
-		}else{
-        retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		useing_in_tsp_or_epen = 0;
-		}
-        info->dvfs_freq = -1;
-
-        if (retval < 0)
-			dev_err(&info->client->dev,
-				"%s: booster stop failed(%d).\n",
-				__func__, retval);
-		info->dvfs_lock_status = false;
-		mutex_unlock(&info->dvfs_lock);
-	}
-}
-
-static void fts_set_dvfs_lock(struct fts_ts_info *info, int on)
-{
-	int ret = 0;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-                dev_dbg(&info->client->dev,
-			"%s: DVFS stage is none(%d)\n",
-			__func__, info->dvfs_boost_mode);
-		return;
-	}
-
-	mutex_lock(&info->dvfs_lock);
-    if (on == 0) {
-		if (info->dvfs_lock_status){
-			if(info->dvfs_boost_mode == DVFS_STAGE_NINTH)
-				schedule_delayed_work(&info->work_dvfs_off,
-					msecs_to_jiffies(INPUT_BOOSTER_HIGH_OFF_TIME_TSP));
-			else
-			schedule_delayed_work(&info->work_dvfs_off,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on > 0) {
-		cancel_delayed_work(&info->work_dvfs_off);
-
-		if ((!info->dvfs_lock_status) || (info->dvfs_old_stauts < on)) {
-			cancel_delayed_work(&info->work_dvfs_chg);
-			useing_in_tsp_or_epen = useing_in_tsp_or_epen | 0x2;
-
-			if(info->dvfs_boost_mode == DVFS_STAGE_NINTH){
-				if (info->dvfs_freq != MIN_TOUCH_HIGH_LIMIT) {
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-							MIN_TOUCH_HIGH_LIMIT);
-					info->dvfs_freq = MIN_TOUCH_HIGH_LIMIT;
-				}
-				schedule_delayed_work(&info->work_dvfs_chg,
-					msecs_to_jiffies(INPUT_BOOSTER_HIGH_CHG_TIME_TSP));
-			}
-			else
-			{
-            if (info->dvfs_freq != MIN_TOUCH_LIMIT) {
-                if (info->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
-                    ret = set_freq_limit(DVFS_TOUCH_ID,
-                            MIN_TOUCH_LIMIT_SECOND);
-                else
-                    ret = set_freq_limit(DVFS_TOUCH_ID,
-                            MIN_TOUCH_LIMIT);
-                info->dvfs_freq = MIN_TOUCH_LIMIT;
-
-				}
-				schedule_delayed_work(&info->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-			}
-				if (ret < 0)
-					dev_err(&info->client->dev,
-						"%s: cpu first lock failed(%d)\n",
-							__func__, ret);
-			info->dvfs_lock_status = true;
-		}
-    } else if (on < 0) {
-		if (info->dvfs_lock_status) {
-			cancel_delayed_work(&info->work_dvfs_off);
-			cancel_delayed_work(&info->work_dvfs_chg);
-			schedule_work(&info->work_dvfs_off.work);
-		}
-	}
-	info->dvfs_old_stauts = on;
-	mutex_unlock(&info->dvfs_lock);
-}
-
-static int fts_init_dvfs(struct fts_ts_info *info)
-{
-	mutex_init(&info->dvfs_lock);
-	info->dvfs_boost_mode = DVFS_STAGE_DUAL;
-
-	INIT_DELAYED_WORK(&info->work_dvfs_off, fts_set_dvfs_off);
-	INIT_DELAYED_WORK(&info->work_dvfs_chg, fts_change_dvfs_lock);
-
-	info->dvfs_lock_status = false;
-	return 0;
-}
-#endif
-
 /* Added for samsung dependent codes such as Factory test,
  * Touch booster, Related debug sysfs.
  */
@@ -898,12 +747,6 @@ static unsigned char fts_event_handler_type_b(struct fts_ts_info *info,
 
 	input_sync(info->input_dev);
 
-#ifdef TOUCH_BOOSTER_DVFS
-	if ((EventID == EVENTID_ENTER_POINTER)
-	    || (EventID == EVENTID_LEAVE_POINTER)) {
-			fts_set_dvfs_lock(info, info->touch_count);
-	}
-#endif
 	return LastLeftEvent;
 }
 
@@ -1331,10 +1174,6 @@ static int fts_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 		goto err_enable_irq;
 	}
 
-#ifdef TOUCH_BOOSTER_DVFS
-	fts_init_dvfs(info);
-#endif
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	info->early_suspend.suspend = fts_early_suspend;
@@ -1731,10 +1570,6 @@ void fts_release_all_finger(struct fts_ts_info *info)
 #endif
 
 	input_sync(info->input_dev);
-
-#ifdef TOUCH_BOOSTER_DVFS
-	fts_set_dvfs_lock(info, -1);
-#endif
 }
 
 static int fts_stop_device(struct fts_ts_info *info)

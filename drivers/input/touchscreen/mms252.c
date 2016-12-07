@@ -46,17 +46,6 @@
 #include <asm/mach-types.h>
 #include <linux/delay.h>
 
-#ifdef CONFIG_SEC_DVFS
-#include <linux/cpufreq.h>
-#define TOUCH_BOOSTER_DVFS
-
-#define DVFS_STAGE_TRIPLE       3
-
-#define DVFS_STAGE_DUAL         2
-#define DVFS_STAGE_SINGLE       1
-#define DVFS_STAGE_NONE         0
-#endif
-
 /* #include <mach/dev.h> */
 
 #include <linux/regulator/consumer.h>
@@ -138,11 +127,6 @@
 #define MMS_NOTIFY_EVENT		0xE
 #define MMS_ERROR_EVENT			0xF
 #define MMS_TOUCH_KEY_EVENT		0x40
-
-#ifdef TOUCH_BOOSTER_DVFS
-#define TOUCH_BOOSTER_OFF_TIME	500
-#define TOUCH_BOOSTER_CHG_TIME	130
-#endif
 
 enum {
 	GET_RX_NUM	= 1,
@@ -271,18 +255,6 @@ struct mms_ts_info {
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	struct mutex		dvfs_lock;
-	bool dvfs_lock_status;
-	u8								finger_cnt1;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-	int dvfs_old_stauts;
-	bool stay_awake;
 #endif
 
 #if TOUCHKEY
@@ -439,10 +411,6 @@ static void run_cm_delta_read(void *device_data);
 static void run_intensity_read(void *device_data);
 static void not_support_cmd(void *device_data);
 
-#ifdef TOUCH_BOOSTER_DVFS
-static void boost_level(void *device_data);
-#endif
-
 struct tsp_cmd tsp_cmds[] = {
 	{TSP_CMD("fw_update", fw_update),},
 	{TSP_CMD("get_fw_ver_bin", get_fw_ver_bin),},
@@ -467,137 +435,7 @@ struct tsp_cmd tsp_cmds[] = {
 	{TSP_CMD("run_cm_delta_read", run_cm_delta_read),},
 	{TSP_CMD("run_intensity_read", run_intensity_read),},
 	{TSP_CMD("not_support_cmd", not_support_cmd),},
-#ifdef TOUCH_BOOSTER_DVFS
-        {TSP_CMD("boost_level", boost_level),},
-#endif
 };
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-static void samsung_change_dvfs_lock(struct work_struct *work)
-{
-	struct mms_ts_info *info =
-		container_of(work,
-			struct mms_ts_info, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&info->dvfs_lock);
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-                if (info->stay_awake) {
-                        dev_info(&info->client->dev,
-                                        "%s: do fw update, do not change cpu frequency.\n",
-                                        __func__);
-                } else {
-                        retval = set_freq_limit(DVFS_TOUCH_ID,
-                                        MIN_TOUCH_LIMIT_SECOND);
-                        info->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-                }
-        } else if (info->dvfs_boost_mode == DVFS_STAGE_SINGLE ||
-                        info->dvfs_boost_mode == DVFS_STAGE_TRIPLE) {
-                retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-                info->dvfs_freq = -1;
-        }
-
-        if (retval < 0)
-                dev_err(&info->client->dev,
-                                "%s: booster change failed(%d).\n",
-                                __func__, retval);
-
-	mutex_unlock(&info->dvfs_lock);
-}
-
-static void samsung_set_dvfs_off(struct work_struct *work)
-{
-	struct mms_ts_info *info =
-		container_of(work,
-			struct mms_ts_info, work_dvfs_off.work);
-	int retval;
-
-	if (info->stay_awake) {
-                dev_info(&info->client->dev,
-                                "%s: do fw update, do not change cpu frequency.\n",
-                                __func__);
-        } else {
-                mutex_lock(&info->dvfs_lock);
-
-                retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-                info->dvfs_freq = -1;
-
-                if (retval < 0)
-                        dev_err(&info->client->dev,
-                                        "%s: booster stop failed(%d).\n",
-                                        __func__, retval);
-                info->dvfs_lock_status = false;
-
-                mutex_unlock(&info->dvfs_lock);
-        }
-}
-
-static void samsung_set_dvfs_lock(struct mms_ts_info *info,
-					int32_t on)
-{
-	int ret = 0;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-                dev_dbg(&info->client->dev,
-                                "%s: DVFS stage is none(%d)\n",
-                                __func__, info->dvfs_boost_mode);
-                return;
-        }
-
-        mutex_lock(&info->dvfs_lock);
-        if (on == 0) {
-                if (info->dvfs_lock_status)
-                        schedule_delayed_work(&info->work_dvfs_off,
-                                        msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-        } else if (on > 0) {
-                cancel_delayed_work(&info->work_dvfs_off);
-
-                if ((!info->dvfs_lock_status) || (info->dvfs_old_stauts < on)) {
-                        cancel_delayed_work(&info->work_dvfs_chg);
-
-                        if (info->dvfs_freq != MIN_TOUCH_LIMIT) {
-                                if (info->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
-                                        ret = set_freq_limit(DVFS_TOUCH_ID,
-                                                MIN_TOUCH_LIMIT_SECOND);
-                                else
-                                        ret = set_freq_limit(DVFS_TOUCH_ID,
-                                                MIN_TOUCH_LIMIT);
-                                info->dvfs_freq = MIN_TOUCH_LIMIT;
-
-                                if (ret < 0)
-					dev_err(&info->client->dev,
-                                                        "%s: cpu first lock failed(%d)\n",
-                                                        __func__, ret);
-                        }
-			schedule_delayed_work(&info->work_dvfs_chg,
-				msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-                        info->dvfs_lock_status = true;
-                }
-        } else if (on < 0) {
-                if (info->dvfs_lock_status) {
-                        cancel_delayed_work(&info->work_dvfs_off);
-                        cancel_delayed_work(&info->work_dvfs_chg);
-                        schedule_work(&info->work_dvfs_off.work);
-                }
-        }
-        info->dvfs_old_stauts = on;
-        mutex_unlock(&info->dvfs_lock);
-}
-
-
-static void samsung_init_dvfs(struct mms_ts_info *info)
-{
-	mutex_init(&info->dvfs_lock);
-
-	info->dvfs_boost_mode = DVFS_STAGE_DUAL;
-
-	INIT_DELAYED_WORK(&info->work_dvfs_off, samsung_set_dvfs_off);
-	INIT_DELAYED_WORK(&info->work_dvfs_chg, samsung_change_dvfs_lock);
-
-	info->dvfs_lock_status = false;
-}
 #endif
 
 #if 0
@@ -658,11 +496,6 @@ static void release_all_fingers(struct mms_ts_info *info)
 					   false);
 	}
 	input_sync(info->input_dev);
-
-#ifdef TOUCH_BOOSTER_DVFS
-	info->finger_cnt1=0;
-	samsung_set_dvfs_lock(info, -1);
-#endif
 }
 
 static void mms_set_noise_mode(struct mms_ts_info *info)
@@ -1027,10 +860,6 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 #endif /* CONFIG_SAMSUNG_PRODUCT_SHIP */
 	}
 	input_sync(info->input_dev);
-
-#ifdef TOUCH_BOOSTER_DVFS
-	samsung_set_dvfs_lock(info, touch_is_pressed);
-#endif
 
 out:
 	mutex_unlock(&info->lock);
@@ -1561,54 +1390,6 @@ static void not_support_cmd(void *device_data)
 				buff, strnlen(buff, sizeof(buff)));
 	return;
 }
-
-#ifdef TOUCH_BOOSTER_DVFS
-static void boost_level(void *device_data)
-{
-	struct mms_ts_info *info = (struct mms_ts_info *)device_data;
-	struct i2c_client *client = info->client;
-	char buff[16] = {0};
-
-	int retval = 0;
-
-	dev_info(&client->dev, "%s\n", __func__);
-
-	set_default_result(info);
-
-	info->dvfs_boost_mode = info->cmd_param[0];
-
-	dev_info(&client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, info->dvfs_boost_mode);
-
-	snprintf(buff, sizeof(buff), "OK");
-	info->cmd_state = RUNNING;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&info->client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			snprintf(buff, sizeof(buff), "NG");
-			info->cmd_state = FAIL;
-
-			info->dvfs_lock_status = false;
-		}
-	}
-
-	set_cmd_result(info, buff,
-			strnlen(buff, sizeof(buff)));
-
-	mutex_lock(&info->cmd_lock);
-	info->cmd_is_running = false;
-	mutex_unlock(&info->cmd_lock);
-
-	info->cmd_state = WAITING;
-
-	return;
-}
-#endif
 
 static int mms_isc_read_status(struct mms_ts_info *info, u32 val)
 {
@@ -4058,10 +3839,6 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 		goto err_reg_input_dev;
 	}
 
-#ifdef TOUCH_BOOSTER_DVFS
-	samsung_init_dvfs(info);
-#endif
-
 	info->enabled = true;
 
 	client->irq = gpio_to_irq(pdata->gpio_int);
@@ -4265,11 +4042,6 @@ static int mms_ts_suspend(struct device *dev)
 	rapid frequently pressing of PWR key. */
 	msleep(50);
 
-#ifdef TOUCH_BOOSTER_DVFS
-	samsung_set_dvfs_lock(info, -1);
-	dev_info(&info->client->dev,
-			"%s: dvfs_lock free.\n", __func__);
-#endif
 out:
 	mutex_unlock(&info->lock);
 	return 0;

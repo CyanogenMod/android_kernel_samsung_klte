@@ -28,114 +28,6 @@
 #define CONFIG_SAMSUNG_KERNEL_DEBUG_USER
 #endif
 
-#ifdef WACOM_BOOSTER
-static void wacom_change_dvfs_lock(struct work_struct *work)
-{
-	struct wacom_i2c *wac_i2c =
-		container_of(work,
-			struct wacom_i2c, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&wac_i2c->dvfs_lock);
-
-	if (wac_i2c->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-		retval = set_freq_limit(DVFS_TOUCH_ID,
-			MIN_TOUCH_LIMIT_SECOND);
-		wac_i2c->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-	} else if (wac_i2c->dvfs_boost_mode == DVFS_STAGE_SINGLE ||
-		wac_i2c->dvfs_boost_mode == DVFS_STAGE_TRIPLE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		wac_i2c->dvfs_freq = -1;
-	}
-
-	if (retval < 0)
-		dev_info(&wac_i2c->client->dev,
-			"%s: booster change failed(%d).\n",
-			__func__, retval);
-	mutex_unlock(&wac_i2c->dvfs_lock);
-}
-
-static void wacom_set_dvfs_off(struct work_struct *work)
-{
-	struct wacom_i2c *wac_i2c =
-		container_of(work,
-			struct wacom_i2c, work_dvfs_off.work);
-	int retval;
-
-	mutex_lock(&wac_i2c->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0)
-		dev_info(&wac_i2c->client->dev,
-			"%s: booster stop failed(%d).\n",
-			__func__, retval);
-
-	wac_i2c->dvfs_lock_status = false;
-	mutex_unlock(&wac_i2c->dvfs_lock);
-}
-
-void wacom_set_dvfs_lock(struct wacom_i2c *wac_i2c, int on)
-{
-	int ret = 0;
-
-	if (wac_i2c->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		dev_dbg(&wac_i2c->client->dev,
-				"%s: DVFS stage is none(%d)\n",
-				__func__, wac_i2c->dvfs_boost_mode);
-		return;
-	}
-
-	mutex_lock(&wac_i2c->dvfs_lock);
-	if (on == 0) {
-		if (wac_i2c->dvfs_lock_status) {
-			schedule_delayed_work(&wac_i2c->work_dvfs_off,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on > 0) {
-		cancel_delayed_work(&wac_i2c->work_dvfs_off);
-
-		if (!wac_i2c->dvfs_lock_status || wac_i2c->dvfs_old_stauts < on) {
-			cancel_delayed_work(&wac_i2c->work_dvfs_chg);
-			if (wac_i2c->dvfs_freq != MIN_TOUCH_LIMIT) {
-				if (wac_i2c->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-						MIN_TOUCH_LIMIT_SECOND);
-				else
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-						MIN_TOUCH_LIMIT);
-				wac_i2c->dvfs_freq = MIN_TOUCH_LIMIT;
-				if (ret < 0)
-					dev_info(&wac_i2c->client->dev,
-						"%s: cpu first lock failed(%d)\n",
-						__func__, ret);
-			}
-			schedule_delayed_work(&wac_i2c->work_dvfs_chg,
-				msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-			wac_i2c->dvfs_lock_status = true;
-		}
-	} else if (on < 0) {
-		if (wac_i2c->dvfs_lock_status) {
-			cancel_delayed_work(&wac_i2c->work_dvfs_off);
-			cancel_delayed_work(&wac_i2c->work_dvfs_chg);
-			schedule_work(&wac_i2c->work_dvfs_off.work);
-		}
-	}
-	wac_i2c->dvfs_old_stauts = on;
-	mutex_unlock(&wac_i2c->dvfs_lock);
-}
-
-void wacom_init_dvfs(struct wacom_i2c *wac_i2c)
-{
-	mutex_init(&wac_i2c->dvfs_lock);
-	wac_i2c->dvfs_boost_mode = DVFS_STAGE_DUAL;
-
-	INIT_DELAYED_WORK(&wac_i2c->work_dvfs_off, wacom_set_dvfs_off);
-	INIT_DELAYED_WORK(&wac_i2c->work_dvfs_chg, wacom_change_dvfs_lock);
-
-	wac_i2c->dvfs_lock_status = false;
-}
-#endif
-
 void forced_release(struct wacom_i2c *wac_i2c)
 {
 #if defined(CONFIG_SAMSUNG_KERNEL_DEBUG_USER)
@@ -891,10 +783,6 @@ void wacom_i2c_softkey(struct wacom_i2c *wac_i2c, s16 key, s16 pressed)
 			keycode[key], pressed);
 	input_sync(wac_i2c->input_dev);
 
-#ifdef WACOM_BOOSTER
-	wacom_set_dvfs_lock(wac_i2c, pressed);
-#endif
-
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	dev_info(&wac_i2c->client->dev,
 			"%s: keycode:%d pressed:%d. pen_prox=%d\n",
@@ -1002,9 +890,6 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			}
 #endif
 
-#ifdef WACOM_BOOSTER
-			wacom_set_dvfs_lock(wac_i2c, 1);
-#endif
 			wac_i2c->pen_prox = 1;
 
 			if (data[0] & 0x40)
@@ -1206,9 +1091,6 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		wac_i2c->last_x = 0;
 		wac_i2c->last_y = 0;
 
-#ifdef WACOM_BOOSTER
-		wacom_set_dvfs_lock(wac_i2c, 0);
-#endif
 	}
 
 	return 0;

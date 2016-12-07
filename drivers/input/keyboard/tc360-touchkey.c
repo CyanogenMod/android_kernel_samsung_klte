@@ -187,15 +187,6 @@ struct tc300k_data {
 	int led_wq_passed;
 	int ic_fw_ver;
 
-#ifdef TSP_BOOSTER
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	struct mutex		dvfs_lock;
-	bool dvfs_lock_status;
-	int dvfs_old_stauts;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-#endif
 };
 
 static void tc300k_destroy_interface(struct tc300k_data *data);
@@ -209,95 +200,6 @@ static void tc300k_input_close(struct input_dev *dev);
 #endif
 
 static int tc300k_keycodes[]={KEY_BACK,KEY_RECENT,KEY_DUMMY_BACK,KEY_DUMMY_MENU};
-
-
-#ifdef TSP_BOOSTER
-static void tc300k_change_dvfs_lock(struct work_struct *work)
-{
-	struct tc300k_data *data = container_of(work, struct tc300k_data, work_dvfs_chg.work);
-	int retval = 0;
-	mutex_lock(&data->dvfs_lock);
-
-	retval = set_freq_limit(DVFS_TOUCH_ID, data->dvfs_freq);
-	if (retval < 0)
-		dev_info(&data->client->dev,
-			"%s: booster change failed(%d).\n",
-			__func__, retval);
-	data->dvfs_lock_status = false;
-	mutex_unlock(&data->dvfs_lock);
-}
-
-static void tc300k_set_dvfs_off(struct work_struct *work)
-{
-	struct tc300k_data *data =
-		container_of(work, struct tc300k_data, work_dvfs_off.work);
-	int retval;
-
-	mutex_lock(&data->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0)
-		dev_info(&data->client->dev,
-			"%s: booster stop failed(%d).\n",
-			__func__, retval);
-
-	data->dvfs_lock_status = true;
-	mutex_unlock(&data->dvfs_lock);
-}
-
-static void tc300k_set_dvfs_lock(struct tc300k_data *data,
-					uint32_t on)
-{
-	int ret = 0;
-	
-	if (data->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		dev_dbg(&data->client->dev,
-				"%s: DVFS stage is none(%d)\n",
-				__func__, data->dvfs_boost_mode);
-		return;
-	}
-
-	mutex_lock(&data->dvfs_lock);
-	if (on == 1) {
-			cancel_delayed_work(&data->work_dvfs_chg);
-
-		if (data->dvfs_lock_status) {
-			ret = set_freq_limit(DVFS_TOUCH_ID, data->dvfs_freq);
-					if (ret < 0)
-						dev_info(&data->client->dev,
-					"%s: cpu first lock failed(%d)\n", __func__, ret);
-			data->dvfs_lock_status = false;
-		}
-
-		schedule_delayed_work(&data->work_dvfs_off,
-			msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-	} else if (on == 0) {
-		cancel_delayed_work(&data->work_dvfs_off);
-				schedule_delayed_work(&data->work_dvfs_chg,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-
-	} else if (on == 2) {
-		if (data->dvfs_lock_status) {
-			cancel_delayed_work(&data->work_dvfs_off);
-			cancel_delayed_work(&data->work_dvfs_chg);
-			schedule_work(&data->work_dvfs_off.work);
-		}
-	}
-	mutex_unlock(&data->dvfs_lock);
-}
-
-static void tc300k_init_dvfs(struct tc300k_data *data)
-{
-	mutex_init(&data->dvfs_lock);
-	data->dvfs_boost_mode = DVFS_STAGE_DUAL;
-	data->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-
-	INIT_DELAYED_WORK(&data->work_dvfs_off, tc300k_set_dvfs_off);
-	INIT_DELAYED_WORK(&data->work_dvfs_chg, tc300k_change_dvfs_lock);
-
-	data->dvfs_lock_status = true;
-}
-#endif
 
 static void tc300k_gpio_request(struct tc300k_data *data)
 {
@@ -517,10 +419,6 @@ static irqreturn_t tc300k_interrupt(int irq, void *dev_id)
 #endif
 	}
 	input_sync(data->input_dev);
-
-#ifdef TSP_BOOSTER
-		tc300k_set_dvfs_lock(data, !!press);
-#endif
 
 	return IRQ_HANDLED;
 }
@@ -1864,52 +1762,6 @@ static ssize_t tc300k_modecheck_show(struct device *dev,
 	return sprintf(buf, "glove:%d, factory:%d\n", glove, factory);
 }
 
-#ifdef TSP_BOOSTER
-static ssize_t boost_level_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t count)
-{
-	struct tc300k_data *data = dev_get_drvdata(dev);
-	int val, retval;
-
-	dev_info(&data->client->dev, "%s\n", __func__);
-	sscanf(buf, "%d", &val);
-
-	if (val != 1 && val != 2 && val != 0) {
-		dev_info(&data->client->dev,
-			"%s: wrong cmd %d\n", __func__, val);
-		return count;
-	}
-	data->dvfs_boost_mode = val;
-	dev_info(&data->client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, data->dvfs_boost_mode);
-
-	if (data->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-		data->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-		dev_info(&data->client->dev,
-			"%s: boost_mode DUAL, dvfs_freq = %d\n",
-			__func__, data->dvfs_freq);
-	} else if (data->dvfs_boost_mode == DVFS_STAGE_SINGLE) {
-		data->dvfs_freq = MIN_TOUCH_LIMIT;
-		dev_info(&data->client->dev,
-			"%s: boost_mode SINGLE, dvfs_freq = %d\n",
-			__func__, data->dvfs_freq);
-	} else if (data->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		data->dvfs_freq = -1;
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&data->client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			data->dvfs_lock_status = false;
-		}
-	}
-	return count;
-}
-#endif
-
-
 static DEVICE_ATTR(touchkey_threshold, S_IRUGO, tc300k_threshold_show, NULL);
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO | S_IWUSR | S_IWGRP,
 		   tc300k_fw_ver_ic_show, NULL);
@@ -1937,10 +1789,6 @@ static DEVICE_ATTR(touchkey_factory_mode, S_IRUGO | S_IWUSR | S_IWGRP,
 		tc300k_factory_mode_show, tc300k_factory_mode);
 static DEVICE_ATTR(modecheck, S_IRUGO, tc300k_modecheck_show, NULL);
 
-#ifdef TSP_BOOSTER
-static DEVICE_ATTR(boost_level, S_IWUSR | S_IWGRP, NULL, boost_level_store);
-#endif
-
 static struct attribute *touchkey_attributes[] = {
 	&dev_attr_touchkey_threshold.attr,
 	&dev_attr_touchkey_firm_version_panel.attr,
@@ -1962,9 +1810,6 @@ static struct attribute *touchkey_attributes[] = {
 	&dev_attr_touchkey_factory_mode.attr,
 	&dev_attr_glove_mode.attr,
 	&dev_attr_modecheck.attr,
-#ifdef TSP_BOOSTER
-	&dev_attr_boost_level.attr,
-#endif
 	NULL,
 };
 
@@ -2143,10 +1988,6 @@ static int __devinit tc300k_probe(struct i2c_client *client,
 	input_dev->open = tc300k_input_open;
 	input_dev->close = tc300k_input_close;
 #endif
-	
-#ifdef TSP_BOOSTER
-		tc300k_init_dvfs(data);
-#endif
 
 	data->fw_up_running = false;	
 	data->fw_wq = create_singlethread_workqueue(client->name);
@@ -2276,13 +2117,6 @@ static int tc300k_suspend(struct device *dev)
 		dev_info(&client->dev, "%s, already disabled.\n", __func__);
 		return 0;
 	}
-
-#ifdef TSP_BOOSTER
-	tc300k_set_dvfs_lock(data, 2);
-	dev_info(&data->client->dev,
-			"%s: dvfs_lock free.\n", __func__);
-#endif
-
 
 	disable_irq(client->irq);
 	data->enabled = false;

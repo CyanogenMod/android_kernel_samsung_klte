@@ -71,10 +71,6 @@ static void interrupt_control(void *device_data);
 static int read_touchkey_data(struct fts_ts_info *info, unsigned char type, unsigned int keycode);
 #endif
 
-#if defined(TOUCH_BOOSTER_DVFS)
-static void boost_level(void *device_data);
-#endif
-
 static void not_support_cmd(void *device_data);
 static ssize_t store_cmd(struct device *dev, struct device_attribute *devattr,
 			   const char *buf, size_t count);
@@ -125,9 +121,6 @@ struct ft_cmd ft_cmds[] = {
 	{FT_CMD("report_rate", report_rate),},
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	{FT_CMD("interrupt_control", interrupt_control),},
-#endif
-#if defined(TOUCH_BOOSTER_DVFS)
-	{FT_CMD("boost_level", boost_level),},
 #endif
 	{FT_CMD("not_support_cmd", not_support_cmd),},
 };
@@ -1868,55 +1861,6 @@ out:
 	mutex_unlock(&info->cmd_lock);
 
 	tsp_debug_info(true, &info->client->dev, "%s: %s\n", __func__, buff);
-}
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-static void boost_level(void *device_data)
-{
-	struct fts_ts_info *info = (struct fts_ts_info *)device_data;
-	struct i2c_client *client = info->client;
-	char buff[CMD_STR_LEN] = { 0 };
-	int retval = 0;
-
-	set_default_result(info);
-
-#ifdef CONFIG_SEC_S_PROJECT
-	/* Level 5 is replaced to Level 3  */
-	if(info->cmd_param[0] == DVFS_STAGE_PENTA){
-		info->cmd_param[0] = DVFS_STAGE_TRIPLE;
-	}
-#endif
-	info->dvfs_boost_mode = info->cmd_param[0];
-
-	dev_info(&client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, info->dvfs_boost_mode);
-
-	snprintf(buff, sizeof(buff), "OK");
-	info->cmd_state = CMD_STATUS_OK;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&info->client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			snprintf(buff, sizeof(buff), "NG");
-			info->cmd_state = CMD_STATUS_FAIL;
-
-			info->dvfs_lock_status = false;
-		}
-	}
-
-	set_cmd_result(info, buff, strnlen(buff, sizeof(buff)));
-	info->cmd_state = CMD_STATUS_WAITING;
-
-	mutex_lock(&info->cmd_lock);
-	info->cmd_is_running = false;
-	mutex_unlock(&info->cmd_lock);
-
-	return;
 }
 #endif
 #endif

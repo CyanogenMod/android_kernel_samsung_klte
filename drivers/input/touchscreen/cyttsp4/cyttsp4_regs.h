@@ -451,11 +451,6 @@ enum cyttsp4_cmd_status {
 #define CY_RAM_ID_BTN_THRSH_MUT			0xA0
 #define CY_RAM_ID_TOUCHMODE_ENABLED		0xD0 /* Enable proximity */
 
-#ifdef CONFIG_SEC_DVFS
-#define TSP_BOOSTER
-#else
-#undef TSP_BOOSTER
-#endif
 /* TOUCH PARSE */
 /* abs signal capabilities offsets in the frameworks array */
 enum cyttsp4_sig_caps {
@@ -771,16 +766,6 @@ struct cyttsp4_mt_data {
 	struct input_dev *input;
 	struct cyttsp4_mt_function mt_function;
 	struct mutex mt_lock;
-#if defined(TSP_BOOSTER)
-		u8 touch_pressed_num;
-		struct delayed_work work_dvfs_off;
-		struct delayed_work work_dvfs_chg;
-		bool	dvfs_lock_status;
-		struct mutex dvfs_lock;
-		int dvfs_old_status;
-		unsigned char boost_level;
-		int dvfs_freq;
-#endif
 	bool input_device_registered;
 	char phys[NAME_MAX];
 	int num_prv_rec; /* Number of previous touch records */

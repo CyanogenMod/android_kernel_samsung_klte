@@ -41,7 +41,6 @@
 
 #define PROXIMITY
 #define TYPE_B_PROTOCOL
-#define TSP_BOOSTER
 #define CONFIG_GLOVE_TOUCH
 #define	USE_OPEN_CLOSE
 #define TSP_PATTERN_TRACKING_METHOD
@@ -57,17 +56,6 @@ enum tsp_target{
 	TSP_MAIN = 0,
 	TSP_SUB,
 };
-
-/* DVFS feature : TOUCH BOOSTER */
-#define DVFS_STAGE_TRIPLE			3
-#ifdef TSP_BOOSTER
-#define DVFS_STAGE_DUAL				2
-#define DVFS_STAGE_SINGLE			1
-#define DVFS_STAGE_NONE				0
-#include <linux/cpufreq.h>
-#define TOUCH_BOOSTER_OFF_TIME			300
-#define TOUCH_BOOSTER_CHG_TIME			200
-#endif
 
 #ifdef USE_OPEN_CLOSE
 /*#define USE_OPEN_DWORK*/
@@ -487,16 +475,6 @@ struct synaptics_rmi4_data {
 	const struct firmware *fpga_fw;
 	int Is_clk_enabled;
 	int enable_counte;
-
-#ifdef TSP_BOOSTER
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	struct mutex		dvfs_lock;
-	bool dvfs_lock_status;
-	int dvfs_old_stauts;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-#endif
 
 	bool hover_status_in_normal_mode;
 	bool hover_called;

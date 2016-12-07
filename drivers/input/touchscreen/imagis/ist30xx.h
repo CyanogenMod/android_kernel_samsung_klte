@@ -141,12 +141,6 @@
 #define tsp_debug(fmt, ...) tsp_printk(DEV_DEBUG, fmt, ## __VA_ARGS__)
 #define tsp_verb(fmt, ...)  tsp_printk(DEV_VERB, fmt, ## __VA_ARGS__)
 
-#if defined(CONFIG_SEC_DVFS) || defined (CONFIG_CPU_FREQ_LIMIT_USERSPACE)
-#define TOUCH_BOOSTER			1
-#define TOUCH_BOOSTER_OFF_TIME	100
-#define TOUCH_BOOSTER_CHG_TIME	200
-#endif
-
 enum ist30xx_commands {
 	CMD_ENTER_UPDATE            = 0x02,
 	CMD_EXIT_UPDATE             = 0x03,
@@ -321,11 +315,6 @@ struct ist30xx_data {
 	struct ist30xx_tags	tags;
 #if SEC_FACTORY_MODE
 	struct sec_factory	sec;
-#endif
-#if defined(TOUCH_BOOSTER)
-	struct delayed_work work_dvfs_off;
-	struct mutex dvfs_lock;
-	bool	                         dvfs_lock_status;
 #endif
 	u32			chip_id;
 	u32			tsp_type;

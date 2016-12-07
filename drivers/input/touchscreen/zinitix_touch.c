@@ -21,7 +21,6 @@
 #define USE_OPEN_CLOSE
 
 #define SUPPORTED_TOUCH_KEY
-//#define TOUCH_BOOSTER
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/i2c.h>
@@ -56,21 +55,6 @@
 #include <linux/input/mt.h>
 #include <linux/of_gpio.h>
 
-#ifdef CONFIG_SEC_DVFS
-#include <linux/cpufreq.h>
-#define TOUCH_BOOSTER_DVFS
-
-#define DVFS_STAGE_TRIPLE       3
-
-#define DVFS_STAGE_DUAL         2
-#define DVFS_STAGE_SINGLE       1
-#define DVFS_STAGE_NONE         0
-#endif
-
-#if defined(TOUCH_BOOSTER)
-#include <linux/pm_qos.h>
-#endif
-
 #include "zinitix_touch_zxt_firmware_ZI012311.h"
 #include "zinitix_touch_zxt_firmware_ZI032311.h"
 #define TSP_TYPE_COUNT	2
@@ -86,11 +70,6 @@ u8 m_FirmwareIdx = 0;
 #define TOUCH_POINT_MODE			2
 
 #define MAX_SUPPORTED_FINGER_NUM	5 /* max 10 */
-
-#ifdef TOUCH_BOOSTER_DVFS
-#define TOUCH_BOOSTER_OFF_TIME	500
-#define TOUCH_BOOSTER_CHG_TIME	130
-#endif
 
 #ifdef SUPPORTED_TOUCH_KEY
 #define MAX_SUPPORTED_BUTTON_NUM	2 /* max 8 */
@@ -373,9 +352,6 @@ static void get_scantime(void *device_data);
 */
 static void run_delta_read(void *device_data);
 static void get_delta(void *device_data);
-#ifdef TOUCH_BOOSTER_DVFS
-static void boost_level(void *device_data);
-#endif
 
 static void clear_cover_mode(void *device_data);
 
@@ -412,9 +388,6 @@ static struct tsp_cmd tsp_cmds[] = {
 */
 	{TSP_CMD("run_delta_read", run_delta_read),},
 	{TSP_CMD("get_delta", get_delta),},
-#ifdef TOUCH_BOOSTER_DVFS
-        {TSP_CMD("boost_level", boost_level),},
-#endif
 	{TSP_CMD("clear_cover_mode", clear_cover_mode),},
 };
 
@@ -541,24 +514,6 @@ struct bt532_ts_info {
 	struct semaphore				work_lock;
 
 	/*u16								debug_reg[8];*/ /* for debug */
-
-#if defined(TOUCH_BOOSTER)
-	struct pm_qos_request			cpufreq_qos_req_min;
-	u8								finger_cnt;
-	bool							double_booster;
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	struct mutex		dvfs_lock;
-	bool dvfs_lock_status;
-	u8								finger_cnt1;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-	int dvfs_old_stauts;
-	bool stay_awake;
-#endif
 
 #if ESD_TIMER_INTERVAL
 	struct workqueue_struct			*esd_tmr_workqueue;
@@ -1914,173 +1869,6 @@ fail_mini_init:
 	return true;
 }
 
-#ifdef TOUCH_BOOSTER_DVFS
-static void zinitix_change_dvfs_lock(struct work_struct *work)
-{
-	struct bt532_ts_info *info =
-		container_of(work,
-			struct bt532_ts_info, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&info->dvfs_lock);
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-                if (info->stay_awake) {
-                        dev_info(&info->client->dev,
-                                        "%s: do fw update, do not change cpu frequency.\n",
-                                        __func__);
-                } else {
-                        retval = set_freq_limit(DVFS_TOUCH_ID,
-                                        MIN_TOUCH_LIMIT_SECOND);
-                        info->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-                }
-        } else if (info->dvfs_boost_mode == DVFS_STAGE_SINGLE ||
-                        info->dvfs_boost_mode == DVFS_STAGE_TRIPLE) {
-                retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-                info->dvfs_freq = -1;
-        }
-
-        if (retval < 0)
-                dev_err(&info->client->dev,
-                                "%s: booster change failed(%d).\n",
-                                __func__, retval);
-
-	mutex_unlock(&info->dvfs_lock);
-}
-
-static void zinitix_set_dvfs_off(struct work_struct *work)
-{
-	struct bt532_ts_info *info =
-		container_of(work,
-			struct bt532_ts_info, work_dvfs_off.work);
-	int retval;
-
-	if (info->stay_awake) {
-                dev_info(&info->client->dev,
-                                "%s: do fw update, do not change cpu frequency.\n",
-                                __func__);
-        } else {
-                mutex_lock(&info->dvfs_lock);
-
-                retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-                info->dvfs_freq = -1;
-
-                if (retval < 0)
-                        dev_err(&info->client->dev,
-                                        "%s: booster stop failed(%d).\n",
-                                        __func__, retval);
-                info->dvfs_lock_status = false;
-
-                mutex_unlock(&info->dvfs_lock);
-        }
-
-	/*mutex_lock(&info->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0)
-		dev_info(&info->client->dev,
-			"%s: booster stop failed(%d).\n",
-			__func__, retval);
-
-	info->dvfs_lock_status = false;
-	mutex_unlock(&info->dvfs_lock);*/
-}
-
-static void zinitix_set_dvfs_lock(struct bt532_ts_info *info,
-					int32_t on)
-{
-	int ret = 0;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-                dev_dbg(&info->client->dev,
-                                "%s: DVFS stage is none(%d)\n",
-                                __func__, info->dvfs_boost_mode);
-                return;
-        }
-
-        mutex_lock(&info->dvfs_lock);
-        if (on == 0) {
-                if (info->dvfs_lock_status)
-                        schedule_delayed_work(&info->work_dvfs_off,
-                                        msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-        } else if (on > 0) {
-                cancel_delayed_work(&info->work_dvfs_off);
-
-                if ((!info->dvfs_lock_status) || (info->dvfs_old_stauts < on)) {
-                        cancel_delayed_work(&info->work_dvfs_chg);
-
-                        if (info->dvfs_freq != MIN_TOUCH_LIMIT) {
-                                if (info->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
-                                        ret = set_freq_limit(DVFS_TOUCH_ID,
-                                                MIN_TOUCH_LIMIT_SECOND);
-                                else
-                                        ret = set_freq_limit(DVFS_TOUCH_ID,
-                                                MIN_TOUCH_LIMIT);
-                                info->dvfs_freq = MIN_TOUCH_LIMIT;
-
-                                if (ret < 0)
-					dev_err(&info->client->dev,
-                                                        "%s: cpu first lock failed(%d)\n",
-                                                        __func__, ret);
-                        }
-                        schedule_delayed_work(&info->work_dvfs_chg,
-                                        msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-                        info->dvfs_lock_status = true;
-                }
-        } else if (on < 0) {
-                if (info->dvfs_lock_status) {
-                        cancel_delayed_work(&info->work_dvfs_off);
-                        cancel_delayed_work(&info->work_dvfs_chg);
-                        schedule_work(&info->work_dvfs_off.work);
-                }
-        }
-        info->dvfs_old_stauts = on;
-        mutex_unlock(&info->dvfs_lock);
-
-	/*mutex_lock(&info->dvfs_lock);
-	if (on == 0) {
-		if (info->dvfs_lock_status) {
-			schedule_delayed_work(&info->work_dvfs_off,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&info->work_dvfs_off);
-		if (!info->dvfs_lock_status) {
-			ret = set_freq_limit(DVFS_TOUCH_ID,
-					MIN_TOUCH_LIMIT);
-			if (ret < 0)
-				dev_info(&info->client->dev,
-					"%s: cpu first lock failed(%d)\n",
-					__func__, ret);
-
-			schedule_delayed_work(&info->work_dvfs_chg,
-				msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-			info->dvfs_lock_status = true;
-		}
-	} else if (on == 2) {
-		if (info->dvfs_lock_status) {
-			cancel_delayed_work(&info->work_dvfs_off);
-			cancel_delayed_work(&info->work_dvfs_chg);
-			schedule_work(&info->work_dvfs_off.work);
-		}
-	}
-	mutex_unlock(&info->dvfs_lock);*/
-}
-
-
-static void zinitix_init_dvfs(struct bt532_ts_info *info)
-{
-	mutex_init(&info->dvfs_lock);
-
-	info->dvfs_boost_mode = DVFS_STAGE_DUAL;
-
-	INIT_DELAYED_WORK(&info->work_dvfs_off, zinitix_set_dvfs_off);
-	INIT_DELAYED_WORK(&info->work_dvfs_chg, zinitix_change_dvfs_lock);
-
-	info->dvfs_lock_status = false;
-}
-#endif
-
 static void clear_report_data(struct bt532_ts_info *info)
 {
 	struct i2c_client *client = info->client;
@@ -2113,17 +1901,6 @@ static void clear_report_data(struct bt532_ts_info *info)
 	if (reported) {
 		input_sync(info->input_dev);
 	}
-
-#if defined(TOUCH_BOOSTER)
-	info->finger_cnt = 0;
-	info->double_booster = false;
-	pm_qos_update_request(&info->cpufreq_qos_req_min, PM_QOS_DEFAULT_VALUE);
-#endif
-#ifdef TOUCH_BOOSTER_DVFS
-	info->finger_cnt1=0;
-	/*zinitix_set_dvfs_lock(info, info->finger_cnt1);*/
-	zinitix_set_dvfs_lock(info, -1);
-#endif
 }
 
 #define	PALM_REPORT_WIDTH	200
@@ -2324,26 +2101,7 @@ static irqreturn_t bt532_touch_irq_handler(int irq, void *data)
 #else*/
 				dev_info(&client->dev, "Finger [%02d] down\n", i);
 /*#endif*/
-#ifdef TOUCH_BOOSTER_DVFS
-	info->finger_cnt1++;
-	/*zinitix_set_dvfs_lock(info, !!info->finger_cnt1);*/
-#endif
 
-#if defined(TOUCH_BOOSTER)
-				info->finger_cnt++;
-
-
-				if (info->finger_cnt == 1) {
-					pm_qos_update_request(&info->cpufreq_qos_req_min, 1066);
-					/*dev_info(&client->dev, "finger count = %d, cpu = 1066\n",
-								info->finger_cnt);*/
-				} else if (info->double_booster == false) {
-					pm_qos_update_request(&info->cpufreq_qos_req_min, 1205);
-					info->double_booster = true;
-					/*dev_info(&client->dev, "finger count = %d, cpu = 1205\n",
-								info->finger_cnt);*/
-				}
-#endif
 			}
 		} else if (zinitix_bit_test(sub_status, SUB_BIT_UP)||
 			zinitix_bit_test(prev_sub_status, SUB_BIT_EXIST)) {
@@ -2352,26 +2110,6 @@ static irqreturn_t bt532_touch_irq_handler(int irq, void *data)
 			input_mt_report_slot_state(info->input_dev, MT_TOOL_FINGER, 0);
 			dev_info(&client->dev, "Finger [%02d] up\n", i);
 
-#ifdef TOUCH_BOOSTER_DVFS
-			info->finger_cnt1--;
-			/*zinitix_set_dvfs_lock(info, info->finger_cnt1);*/
-#endif
-
-#if defined(TOUCH_BOOSTER)
-			info->finger_cnt--;
-
-			if (info->finger_cnt == 1) {
-				info->double_booster = false;
-				pm_qos_update_request(&info->cpufreq_qos_req_min, 1066);
-				/*dev_info(&client->dev, "finger count = %d, cpu = 1066\n",
-							info->finger_cnt);*/
-			}
-
-			if (!info->finger_cnt) {
-				pm_qos_update_request(&info->cpufreq_qos_req_min,
-										PM_QOS_DEFAULT_VALUE);
-			}
-#endif
 		} else {
 			memset(&info->touch_info.coord[i], 0x0, sizeof(struct coord));
 		}
@@ -2379,10 +2117,6 @@ static irqreturn_t bt532_touch_irq_handler(int irq, void *data)
 	memcpy((char *)&info->reported_touch_info, (char *)&info->touch_info,
 			sizeof(struct point_info));
 	input_sync(info->input_dev);
-
-#ifdef TOUCH_BOOSTER_DVFS
-	zinitix_set_dvfs_lock(info, info->finger_cnt1);
-#endif
 
 out:
 	if (info->work_state == NORMAL) {
@@ -2548,12 +2282,6 @@ static int bt532_ts_suspend(struct device *dev)
 		up(&info->work_lock);
 #ifndef CONFIG_HAS_EARLYSUSPEND
 		enable_irq(info->irq);
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-	zinitix_set_dvfs_lock(info, -1);
-	dev_info(&info->client->dev,
-			"%s: dvfs_lock free.\n", __func__);
 #endif
 
 		return 0;
@@ -3308,54 +3036,6 @@ static void get_delta(void *device_data)
 
 	return;
 }
-
-#ifdef TOUCH_BOOSTER_DVFS
-static void boost_level(void *device_data)
-{
-	struct bt532_ts_info *info = (struct bt532_ts_info *)device_data;
-	struct i2c_client *client = info->client;
-	struct tsp_factory_info *finfo = info->factory_info;
-
-	int retval = 0;
-
-	dev_info(&client->dev, "%s\n", __func__);
-
-	set_default_result(info);
-
-	info->dvfs_boost_mode = info->factory_info->cmd_param[0];
-
-	dev_info(&client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, info->dvfs_boost_mode);
-
-	snprintf(finfo->cmd_buff, sizeof(finfo->cmd_buff), "OK");
-	finfo->cmd_state = OK;
-
-	if (info->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&info->client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			snprintf(finfo->cmd_buff, sizeof(finfo->cmd_buff), "NG");
-			finfo->cmd_state = FAIL;
-
-			info->dvfs_lock_status = false;
-		}
-	}
-
-	set_cmd_result(info, finfo->cmd_buff,
-			strnlen(finfo->cmd_buff, sizeof(finfo->cmd_buff)));
-
-	mutex_lock(&finfo->cmd_lock);
-	finfo->cmd_is_running = false;
-	mutex_unlock(&finfo->cmd_lock);
-
-	finfo->cmd_state = WAITING;
-
-	return;
-}
-#endif
 
 static void cover_set(struct bt532_ts_info *info, int state){
 	u16	reg_val;
@@ -4623,11 +4303,6 @@ static int bt532_ts_probe(struct i2c_client *client,
 	info->work_state = NOTHING;
 	sema_init(&info->work_lock, 1);
 
-#if defined(TOUCH_BOOSTER)
-	//pm_qos_add_request(&info->cpufreq_qos_req_min, 1132,
-	//					PM_QOS_DEFAULT_VALUE);
-#endif
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	info->early_suspend.suspend = bt532_ts_early_suspend;
@@ -4681,10 +4356,6 @@ w1_out:
 	esd_timer_start(CHECK_ESD_TIMER, info);
 #endif
 
-#ifdef TOUCH_BOOSTER_DVFS
-	zinitix_init_dvfs(info);
-#endif
-
 	ret = request_threaded_irq(info->irq, NULL, bt532_touch_irq_handler,
 		IRQF_TRIGGER_FALLING | IRQF_ONESHOT , BT532_TS_DEVICE, info);
 
@@ -4728,9 +4399,6 @@ static int bt532_ts_remove(struct i2c_client *client)
 
 	kfree(info->factory_info);
 	kfree(info->raw_data);
-#ifdef TOUCH_BOOSTER_DVFS
-	mutex_destroy(&info->dvfs_lock);
-#endif
 #if ESD_TIMER_INTERVAL
 	flush_work(&info->tmr_work);
 	/*write_reg(info->client, BT532_PERIODICAL_INTERRUPT_INTERVAL, 0);*/

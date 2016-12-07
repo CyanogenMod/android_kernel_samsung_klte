@@ -49,30 +49,6 @@
 
 #define USE_OPEN_CLOSE
 
-//#ifdef CONFIG_SEC_DVFS
-#include <linux/cpufreq.h>
-#define TOUCH_BOOSTER_DVFS
-
-#ifdef CONFIG_SEC_S_PROJECT
-#define DVFS_STAGE_NINTH	9
-#define DVFS_STAGE_PENTA	5
-#endif
-#define DVFS_STAGE_TRIPLE       3
-#define DVFS_STAGE_DUAL         2
-#define DVFS_STAGE_SINGLE       1
-#define DVFS_STAGE_NONE         0
-//#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-#define TOUCH_BOOSTER_OFF_TIME	500
-#define TOUCH_BOOSTER_CHG_TIME	300//130
-
-#ifdef CONFIG_SEC_S_PROJECT
-#define INPUT_BOOSTER_HIGH_OFF_TIME_TSP		1000
-#define INPUT_BOOSTER_HIGH_CHG_TIME_TSP		500
-#endif
-#endif
-
 #ifdef USE_OPEN_DWORK
 #define TOUCH_OPEN_DWORK_TIME 10
 #endif
@@ -260,17 +236,6 @@ struct fts_ts_info {
 	int SenseChannelLength;
 	int ForceChannelLength;
 	short *pFrame;
-#endif
-
-#ifdef TOUCH_BOOSTER_DVFS
-	struct delayed_work work_dvfs_off;
-	struct delayed_work work_dvfs_chg;
-	struct mutex dvfs_lock;
-	bool dvfs_lock_status;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-	int dvfs_old_stauts;
-	bool stay_awake;
 #endif
 
 	struct completion init_done;

@@ -258,47 +258,6 @@ int ist30xx_intr_wait(long ms)
 	return 0;
 }
 
-#if defined(TOUCH_BOOSTER)
-static void set_dvfs_off(struct work_struct *work)
-{
-	struct ist30xx_data *data = container_of(work,
-				struct ist30xx_data, work_dvfs_off.work);
-	mutex_lock(&data->dvfs_lock);
-	set_freq_limit(DVFS_TOUCH_ID, -1);
-	data->dvfs_lock_status = false;
-	mutex_unlock(&data->dvfs_lock);
-	tsp_debug("%s: DVFS Off!\n", __func__);
-}
-
-static void set_dvfs_lock(struct ist30xx_data *data, uint32_t on)
-{
-	int ret = 0;
-
-	mutex_lock(&data->dvfs_lock);
-	if (on == 0) {
-		if (data->dvfs_lock_status) {
-			schedule_delayed_work(&data->work_dvfs_off,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&data->work_dvfs_off);
-		if (!data->dvfs_lock_status) {
-			ret = set_freq_limit(DVFS_TOUCH_ID, 998400);
-			if (ret < 0)
-				tsp_err("%s: cpu lock failed(%d)\n",\
-							__func__, ret);
-
-			data->dvfs_lock_status = true;
-			tsp_debug("%s: DVFS On!\n", __func__);
-		}
-	} else if (on == 2) {
-		cancel_delayed_work(&data->work_dvfs_off);
-		schedule_work(&data->work_dvfs_off.work);
-	}
-	mutex_unlock(&data->dvfs_lock);
-}
-#endif
-
 void ist30xx_disable_irq(struct ist30xx_data *data)
 {
 	if (likely(data->irq_enabled)) {
@@ -717,9 +676,6 @@ static void clear_input_data(struct ist30xx_data *data)
 			release_key(&keys[i], RELEASE_KEY);
 	}
 #endif
-#if defined(TOUCH_BOOSTER)
-	set_dvfs_lock(data, 2);
-#endif
 }
 
 static int check_report_fingers(struct ist30xx_data *data, int finger_counts)
@@ -1092,9 +1048,6 @@ irq_end:
 	ist30xx_irq_working = false;
 	event_ms = (u32)get_milli_second();
 
-#if defined(TOUCH_BOOSTER)
-	set_dvfs_lock(data, !!touch_is_pressed);
-#endif
 	return IRQ_HANDLED;
 
 irq_ic_err:
@@ -1104,9 +1057,6 @@ irq_ic_err:
 	//printk("[TSP] %s : %d\n", __func__, __LINE__);
 	event_ms = (u32)get_milli_second();
 
-#if defined(TOUCH_BOOSTER)
-	set_dvfs_lock(data, !!touch_is_pressed);
-#endif
 	return IRQ_HANDLED;
 }
 
@@ -1638,12 +1588,6 @@ static int ist30xx_probe(struct i2c_client *		client,
 		input_free_device(input_dev);
 		goto err_reg_dev;
 	}
-
-#if defined(TOUCH_BOOSTER)
-	mutex_init(&data->dvfs_lock);
-	INIT_DELAYED_WORK(&data->work_dvfs_off, set_dvfs_off);
-	data->dvfs_lock_status = false;
-#endif
 
 	INIT_DELAYED_WORK(&work_reset_check, reset_work_func);
 #if IST30XX_EVENT_MODE

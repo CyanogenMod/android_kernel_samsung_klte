@@ -26,8 +26,6 @@
 #define SUPPORTED_TOUCH_KEY 0
 #endif
 
-#define TSP_BOOSTER
-
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/i2c.h>
@@ -68,15 +66,6 @@
 #include "zinitix_touch_zxt_firmware_ZI002516.h"
 #else
 #include "zinitix_touch_zxt_firmware_ZI002517.h"
-#endif
-
-#ifdef TSP_BOOSTER
-#include <linux/cpufreq.h>
-#define DVFS_STAGE_DUAL		2
-#define DVFS_STAGE_SINGLE		1
-#define DVFS_STAGE_NONE		0
-#define TOUCH_BOOSTER_OFF_TIME	300
-#define TOUCH_BOOSTER_CHG_TIME	200
 #endif
 
 #define NOT_SUPPORTED_TOUCH_DUMMY_KEY
@@ -622,16 +611,6 @@ struct bt532_ts_info {
 	struct regulator *vdd_en;
 	bool device_enabled;
 
-#ifdef TSP_BOOSTER
-	u8 touch_pressed_num;
-	bool dvfs_lock_status;
-	struct delayed_work work_dvfs_off;
-	struct delayed_work work_dvfs_chg;
-	struct mutex dvfs_lock;
-	int dvfs_old_status;
-	unsigned char boost_level;
-	int dvfs_freq;
-#endif
 };
 /* Dummy touchkey code */
 #define KEY_DUMMY_HOME1		249
@@ -2167,92 +2146,6 @@ fail_mini_init:
 	return true;
 }
 
-#ifdef TSP_BOOSTER
-static void change_dvfs_lock(struct work_struct *work)
-{
-	struct bt532_ts_info *info = container_of(work,
-		struct bt532_ts_info, work_dvfs_chg.work);
-	int ret = 0;
-
-	mutex_lock(&info->dvfs_lock);
-
-	if (info->boost_level == DVFS_STAGE_DUAL) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, MIN_TOUCH_LIMIT_SECOND);
-		info->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-	} else if (info->boost_level == DVFS_STAGE_SINGLE) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-		info->dvfs_freq = -1;
-	}
-	if (ret < 0)
-		printk(KERN_ERR "bt532_ts_device TSP %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-
-	mutex_unlock(&info->dvfs_lock);
-}
-static void set_dvfs_off(struct work_struct *work)
-{
-
-	struct bt532_ts_info *info = container_of(work,
-				struct bt532_ts_info, work_dvfs_off.work);
-	int ret;
-	mutex_lock(&info->dvfs_lock);
-	ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (ret < 0)
-		printk(KERN_ERR "bt532_ts_device TSP %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-	info->dvfs_freq = -1;
-	info->dvfs_lock_status = false;
-	mutex_unlock(&info->dvfs_lock);
-
-}
-
-static void set_dvfs_lock(struct bt532_ts_info *info, uint32_t on, bool mode)
-{
-	int ret = 0;
-
-	if (DVFS_STAGE_NONE == info->boost_level)
-		return;
-
-	mutex_lock(&info->dvfs_lock);
-	if (on == 0) {
-		if (info->dvfs_lock_status) {
-			schedule_delayed_work(&info->work_dvfs_off,
-				msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&info->work_dvfs_off);
-		if (!info->dvfs_lock_status || mode) {
-			if (info->dvfs_old_status != on) {
-				cancel_delayed_work(&info->work_dvfs_chg);
-					if (info->dvfs_freq != MIN_TOUCH_LIMIT) {
-						ret = set_freq_limit(DVFS_TOUCH_ID,
-								MIN_TOUCH_LIMIT);
-						info->dvfs_freq = MIN_TOUCH_LIMIT;
-
-						if (ret < 0)
-							printk(KERN_ERR
-								"%s: cpu first lock failed(%d)\n",
-								__func__, ret);
-
-				schedule_delayed_work(&info->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-					info->dvfs_lock_status = true;
-				}
-			}
-		}
-	} else if (on == 2) {
-		if (info->dvfs_lock_status) {
-			cancel_delayed_work(&info->work_dvfs_off);
-			cancel_delayed_work(&info->work_dvfs_chg);
-			schedule_work(&info->work_dvfs_off.work);
-		}
-	}
-	info->dvfs_old_status = on;
-	mutex_unlock(&info->dvfs_lock);
-}
-#endif
-
 static void clear_report_data(struct bt532_ts_info *info)
 {
 	int i;
@@ -2286,13 +2179,6 @@ static void clear_report_data(struct bt532_ts_info *info)
 
 	if (reported)
 		input_sync(info->input_dev);
-#ifdef TSP_BOOSTER
-	if (info->touch_pressed_num != 0) {
-		printk("bt532_ts_device : %s force dvfs off\n", __func__);
-		info->touch_pressed_num = 0;
-		set_dvfs_lock(info, 2, false);
-	}
-#endif
 
 }
 
@@ -2312,9 +2198,6 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 	u32 w;
 	u32 tmp;
 	u8 palm = 0;
-#ifdef TSP_BOOSTER
-	bool touch_press = false;
-#endif
 
 	if (gpio_get_value(info->pdata->gpio_int)) {
 		dev_err(&client->dev, "Invalid interrupt\n");
@@ -2416,9 +2299,6 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 				input_mt_slot(info->input_dev, i);
 				input_mt_report_slot_state(info->input_dev,
 							MT_TOOL_FINGER, 0);
-#ifdef TSP_BOOSTER
-				info->touch_pressed_num--;
-#endif
 			}
 		}
 		memset(&info->reported_touch_info, 0x0, sizeof(struct point_info));
@@ -2427,11 +2307,7 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 		if (reported == true) /* for button event */
 			udelay(100);
 
-#ifdef TSP_BOOSTER
-		goto touch_booster_out;
-#else
 		goto out;
-#endif
 	}
 #ifdef SUPPORTED_PALM_TOUCH
 	if (zinitix_bit_test(info->touch_info.status, BIT_PALM)) {
@@ -2491,10 +2367,6 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 #else
 				dev_info(&client->dev, "Finger down\n");
 #endif
-#ifdef TSP_BOOSTER
-				info->touch_pressed_num++;
-				touch_press = true;
-#endif
 			}
 			if (w == 0)
 				w = 1;
@@ -2543,9 +2415,6 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 			memset(&info->touch_info.coord[i], 0x0, sizeof(struct coord));
 			input_mt_slot(info->input_dev, i);
 			input_mt_report_slot_state(info->input_dev, MT_TOOL_FINGER, 0);
-#ifdef TSP_BOOSTER
-			info->touch_pressed_num--;
-#endif
 		} else {
 			memset(&info->touch_info.coord[i], 0x0, sizeof(struct coord));
 		}
@@ -2553,17 +2422,6 @@ static irqreturn_t bt532_touch_work(int irq, void *data)
 	memcpy((char *)&info->reported_touch_info, (char *)&info->touch_info,
 		sizeof(struct point_info));
 	input_sync(info->input_dev);
-
-#ifdef TSP_BOOSTER
-touch_booster_out:
-	if (!!info->touch_pressed_num){
-		if(touch_press)
-			set_dvfs_lock(info, 1, true);
-	}
-	else{
-		set_dvfs_lock(info, 0, false);
-	}
-#endif
 
 out:
 	if (info->work_state == NORMAL) {
@@ -5120,15 +4978,6 @@ static int bt532_ts_probe(struct i2c_client *client,
 		ret = -ENODEV;
 		goto err_irq_of_parse;
 	}
-#endif
-
-#ifdef TSP_BOOSTER
-	mutex_init(&info->dvfs_lock);
-	info->touch_pressed_num = 0;
-	info->dvfs_lock_status = false;
-	info->boost_level = DVFS_STAGE_DUAL;
-	INIT_DELAYED_WORK(&info->work_dvfs_off, set_dvfs_off);
-	INIT_DELAYED_WORK(&info->work_dvfs_chg, change_dvfs_lock);
 #endif
 
 	/* configure irq */

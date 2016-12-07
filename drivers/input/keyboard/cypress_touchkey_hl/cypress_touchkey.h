@@ -91,7 +91,6 @@
 #define CYPRESS_CRC_CHECK
 #define TK_USE_RECENT
 #define FW_PATH "tkey/s_cypress_tkey.fw"
-#define TOUCHKEY_BOOSTER
 #else
 #define FW_PATH "tkey/fresco_n_cypress_tkey.fw"
 #endif
@@ -107,20 +106,6 @@
 #define CYPRESS_RECENT_BACK_REPORT_FW_VER	0x0B
 #else
 #define CYPRESS_RECENT_BACK_REPORT_FW_VER	0xFF
-#endif
-
-#ifdef TOUCHKEY_BOOSTER
-#include <linux/cpufreq.h>
-
-#define TKEY_BOOSTER_ON_TIME	500
-#define TKEY_BOOSTER_OFF_TIME	500
-#define TKEY_BOOSTER_CHG_TIME	130
-
-enum BOOST_LEVEL {
-	TKEY_BOOSTER_DISABLE = 0,
-	TKEY_BOOSTER_LEVEL1,
-	TKEY_BOOSTER_LEVEL2,
-};
 #endif
 
 /* #define TK_USE_OPEN_DWORK */
@@ -183,15 +168,6 @@ struct touchkey_i2c {
 	int (*power)(int on);
 	int update_status;
 	bool enabled;
-#ifdef TOUCHKEY_BOOSTER
-	bool dvfs_lock_status;
-	struct delayed_work work_dvfs_off;
-	struct delayed_work work_dvfs_chg;
-	struct mutex dvfs_lock;
-	int dvfs_old_stauts;
-	int dvfs_boost_mode;
-	int dvfs_freq;
-#endif
 #ifdef TK_USE_OPEN_DWORK
 	struct delayed_work open_work;
 #endif

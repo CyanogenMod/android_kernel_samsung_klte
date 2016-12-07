@@ -1066,11 +1066,6 @@ static ssize_t touchkey_led_control(struct device *dev,
 static ssize_t touchkey_led_state_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
 
-#ifdef TKEY_BOOSTER
-static ssize_t boost_level_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count);
-#endif
-
 static DEVICE_ATTR(touchkey_threshold, S_IRUGO | S_IWUSR, sec_touchkey_threshold_show, NULL);
 #ifdef USE_RECENT_TOUCHKEY
 static DEVICE_ATTR(touchkey_recent, S_IRUGO | S_IWUSR, sec_touchkey_menu_show, NULL);
@@ -1079,9 +1074,6 @@ static DEVICE_ATTR(touchkey_menu, S_IRUGO | S_IWUSR, sec_touchkey_menu_show, NUL
 #endif
 static DEVICE_ATTR(touchkey_back, S_IRUGO | S_IWUSR, sec_touchkey_back_show, NULL);
 static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, touchkey_led_state_show, touchkey_led_control);
-#ifdef TKEY_BOOSTER
-static DEVICE_ATTR(boost_level, S_IWUSR | S_IWGRP, NULL, boost_level_store);
-#endif
 
 #endif
 
@@ -1109,9 +1101,6 @@ static struct attribute *tskey_attributes[] = {
 #endif
 	&dev_attr_touchkey_back.attr,
 	&dev_attr_brightness.attr,
-#ifdef TKEY_BOOSTER
-	&dev_attr_boost_level.attr,
-#endif
 	NULL,
 };
 
@@ -1165,9 +1154,6 @@ int synaptics_rmi4_glove_mode_enables(struct synaptics_rmi4_data *rmi4_data);
 #endif
 #ifdef TOUCHKEY_ENABLE
 static void run_deltacap_read(void);
-#endif
-#ifdef TSP_BOOSTER
-static void boost_level(void);
 #endif
 #ifdef SIDE_TOUCH
 static void sidekey_enable(void);
@@ -1234,9 +1220,6 @@ struct ft_cmd ft_cmds[] = {
 	{FT_CMD("clear_cover_mode", clear_cover_mode),},
 	{FT_CMD("get_glove_sensitivity", get_glove_sensitivity),},
 	{FT_CMD("fast_glove_mode", fast_glove_mode),},
-#endif
-#ifdef TSP_BOOSTER
-	{FT_CMD("boost_level", boost_level),},
 #endif
 #ifdef SIDE_TOUCH
 	{FT_CMD("sidekey_enable", sidekey_enable),},
@@ -4046,59 +4029,6 @@ static void get_glove_sensitivity(void)
 }
 #endif
 
-#ifdef TSP_BOOSTER
-static void boost_level(void)
-{
-	struct factory_data *data = f54->factory_data;
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-	int retval;
-
-	set_default_result(data);
-
-	if ((data->cmd_param[0] != DVFS_STAGE_NONE) &&
-		(data->cmd_param[0] != DVFS_STAGE_SINGLE) &&
-		(data->cmd_param[0] != DVFS_STAGE_DUAL) &&
-		(data->cmd_param[0] != DVFS_STAGE_TRIPLE) &&
-		(data->cmd_param[0] != DVFS_STAGE_PENTA) &&
-		(data->cmd_param[0] != DVFS_STAGE_NINTH)) {
-
-		snprintf(data->cmd_buff, sizeof(data->cmd_buff), "NG");
-		data->cmd_state = CMD_STATUS_FAIL;
-
-		goto boost_out;
-	}
-
-	rmi4_data->dvfs_boost_mode = data->cmd_param[0];
-
-	snprintf(data->cmd_buff, sizeof(data->cmd_buff), "OK");
-	data->cmd_state = CMD_STATUS_OK;
-
-	if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			snprintf(data->cmd_buff, sizeof(data->cmd_buff), "NG");
-			data->cmd_state = CMD_STATUS_FAIL;
-
-			rmi4_data->dvfs_lock_status = false;
-		}
-	}
-
-boost_out:
-	set_cmd_result(data, data->cmd_buff, strlen(data->cmd_buff));
-
-	mutex_lock(&data->cmd_lock);
-	data->cmd_is_running = false;
-	mutex_unlock(&data->cmd_lock);
-
-	data->cmd_state = CMD_STATUS_WAITING;
-
-	return;
-}
-#endif
-
 #ifdef SIDE_TOUCH
 static void sidekey_enable(void)
 {
@@ -6343,49 +6273,6 @@ static ssize_t touchkey_led_state_show(struct device *dev,
 		return snprintf(buf, PAGE_SIZE, "%d\n", rmi4_data->touchkey_led);
 }
 
-#ifdef TKEY_BOOSTER
-static ssize_t boost_level_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-	int val, retval;
-
-	dev_info(&rmi4_data->i2c_client->dev, "%s\n", __func__);
-	sscanf(buf, "%d", &val);
-
-	if (val != 1 && val != 2 && val != 0) {
-		dev_info(&rmi4_data->i2c_client->dev,
-			"%s: wrong cmd %d\n", __func__, val);
-		return count;
-	}
-	rmi4_data->tkey_dvfs_boost_mode = val;
-	dev_info(&rmi4_data->i2c_client->dev,
-			"%s: tkey_dvfs_boost_mode = %d\n",
-			__func__, rmi4_data->tkey_dvfs_boost_mode);
-
-	if (rmi4_data->tkey_dvfs_boost_mode == DVFS_STAGE_DUAL) {
-		rmi4_data->tkey_dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-		dev_info(&rmi4_data->i2c_client->dev,
-			"%s: boost_mode DUAL, tkey_dvfs_freq = %d\n",
-			__func__, rmi4_data->tkey_dvfs_freq);
-	} else if (rmi4_data->tkey_dvfs_boost_mode == DVFS_STAGE_SINGLE) {
-		rmi4_data->tkey_dvfs_freq = MIN_TOUCH_LIMIT;
-		dev_info(&rmi4_data->i2c_client->dev,
-			"%s: boost_mode SINGLE, tkey_dvfs_freq = %d\n",
-			__func__, rmi4_data->tkey_dvfs_freq);
-	} else if (rmi4_data->tkey_dvfs_boost_mode == DVFS_STAGE_NONE) {
-		rmi4_data->tkey_dvfs_freq = -1;
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-			rmi4_data->tkey_dvfs_lock_status = false;
-		}
-	}
-	return count;
-}
-#endif
 #endif /* TOUCHKEY_ENABLE */
 
 static void synaptics_rmi5_f55_init(struct synaptics_rmi4_data *rmi4_data)

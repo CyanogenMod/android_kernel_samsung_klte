@@ -71,9 +71,4 @@ extern void forced_release(struct wacom_i2c *wac_i2c);
 extern void forced_hover(struct wacom_i2c *wac_i2c);
 #endif
 
-#ifdef WACOM_BOOSTER
-extern void wacom_set_dvfs_lock(struct wacom_i2c *wac_i2c, int on);
-extern void wacom_init_dvfs(struct wacom_i2c *wac_i2c);
-#endif
-
 #endif	/* _LINUX_WACOM_I2C_FUNC_H */

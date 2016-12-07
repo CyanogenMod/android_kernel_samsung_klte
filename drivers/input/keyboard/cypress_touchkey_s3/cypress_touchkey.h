@@ -14,14 +14,6 @@
 extern struct class *sec_class;
 extern int ISSP_main(void);
 
-/* DVFS feature : TOUCH BOOSTER */
-#define TSP_BOOSTER
-#ifdef TSP_BOOSTER
-#include <linux/cpufreq.h>
-
-#define TOUCH_BOOSTER_OFF_TIME	300
-#define TOUCH_BOOSTER_CHG_TIME	200
-#endif
 #ifdef CONFIG_LEDS_CLASS
 #include <linux/leds.h>
 #endif
@@ -110,13 +102,6 @@ struct cypress_touchkey_info {
 
 #ifdef TKEY_FLIP_MODE
 	bool enabled_flip;
-#endif
-
-#ifdef TSP_BOOSTER
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	bool dvfs_lock_status;
-	struct mutex		dvfs_lock;
 #endif
 
 #ifdef TK_INFORM_CHARGER

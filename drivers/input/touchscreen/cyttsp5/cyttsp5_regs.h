@@ -238,11 +238,6 @@
 /* FW RAM parameters */
 #define CY_RAM_ID_TOUCHMODE_ENABLED	0xD0 /* Enable proximity */
 
-#ifdef CONFIG_SEC_DVFS
-#define TSP_BOOSTER
-#else
-#undef TSP_BOOSTER
-#endif
 /* abs signal capabilities offsets in the frameworks array */
 enum cyttsp5_sig_caps {
 	CY_SIGNAL_OST,
@@ -705,16 +700,6 @@ struct cyttsp5_mt_data {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend es;
 	bool is_suspended;
-#endif
-#if defined(TSP_BOOSTER)
-		u8 touch_pressed_num;
-		struct delayed_work work_dvfs_off;
-		struct delayed_work work_dvfs_chg;
-		bool	dvfs_lock_status;
-		struct mutex dvfs_lock;
-		int dvfs_old_status;
-		unsigned char boost_level;
-		int dvfs_freq;
 #endif
 	bool input_device_registered;
 	char phys[NAME_MAX];

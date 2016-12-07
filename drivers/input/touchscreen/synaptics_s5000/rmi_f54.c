@@ -1016,9 +1016,6 @@ static void fast_glove_mode(void);
 #ifdef SECURE_TSP
 static void secure_mode(void);
 #endif
-#ifdef TSP_BOOSTER
-static void boost_level(void);
-#endif
 static void not_support_cmd(void);
 
 struct ft_cmd ft_cmds[] = {
@@ -1053,9 +1050,6 @@ struct ft_cmd ft_cmds[] = {
 #endif
 #ifdef SECURE_TSP
 	{FT_CMD("secure_mode", secure_mode),},
-#endif
-#ifdef TSP_BOOSTER
-	{FT_CMD("boost_level", boost_level),},
 #endif
 	{FT_CMD("not_support_cmd", not_support_cmd),},
 };
@@ -3335,51 +3329,6 @@ static void secure_mode(void)
 	} else {
 		snprintf(data->cmd_buff, sizeof(data->cmd_buff), "OK");
 		data->cmd_state = CMD_STATUS_OK;
-	}
-
-	set_cmd_result(data, data->cmd_buff, strlen(data->cmd_buff));
-
-	mutex_lock(&data->cmd_lock);
-	data->cmd_is_running = false;
-	mutex_unlock(&data->cmd_lock);
-
-	data->cmd_state = CMD_STATUS_WAITING;
-
-	return;
-}
-#endif
-
-#ifdef TSP_BOOSTER
-static void boost_level(void)
-{
-	struct factory_data *data = f54->factory_data;
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-	int retval;
-
-	dev_info(&rmi4_data->i2c_client->dev, "%s\n", __func__);
-
-	set_default_result(data);
-
-	rmi4_data->dvfs_boost_mode = data->cmd_param[0];
-
-	dev_info(&rmi4_data->i2c_client->dev,
-			"%s: dvfs_boost_mode = %d\n",
-			__func__, rmi4_data->dvfs_boost_mode);
-
-		snprintf(data->cmd_buff, sizeof(data->cmd_buff), "OK");
-		data->cmd_state = CMD_STATUS_OK;
-
-	if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NONE) {
-			retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-			if (retval < 0) {
-				dev_err(&rmi4_data->i2c_client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-				snprintf(data->cmd_buff, sizeof(data->cmd_buff), "NG");
-				data->cmd_state = CMD_STATUS_FAIL;
-
-				rmi4_data->dvfs_lock_status = false;
-			}
 	}
 
 	set_cmd_result(data, data->cmd_buff, strlen(data->cmd_buff));

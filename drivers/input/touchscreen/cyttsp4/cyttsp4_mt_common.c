@@ -27,95 +27,6 @@
 
 #include <linux/cpufreq.h>
 
-#if defined(TSP_BOOSTER)
-#define DVFS_STAGE_DUAL		2
-#define DVFS_STAGE_SINGLE		1
-#define DVFS_STAGE_NONE		0
-#define TOUCH_BOOSTER_OFF_TIME	300
-#define TOUCH_BOOSTER_CHG_TIME	200
-
-static void change_dvfs_lock(struct work_struct *work)
-{
-	struct cyttsp4_mt_data *md = container_of(work,struct cyttsp4_mt_data, work_dvfs_chg.work);
-	int ret = 0;
-	mutex_lock(&md->dvfs_lock);
-
-	if (md->boost_level == DVFS_STAGE_DUAL) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, MIN_TOUCH_LIMIT_SECOND);
-		md->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-	} else if (md->boost_level == DVFS_STAGE_SINGLE) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-		md->dvfs_freq = -1;
-	}
-	if (ret < 0)
-		printk(KERN_ERR "[TSP] %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-
-	mutex_unlock(&md->dvfs_lock);
-}
-
-static void set_dvfs_off(struct work_struct *work)
-{
-	struct cyttsp4_mt_data *md = container_of(work,struct cyttsp4_mt_data, work_dvfs_off.work);
-	int ret;
-	mutex_lock(&md->dvfs_lock);
-	ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (ret < 0)
-		printk(KERN_ERR "[TSP] %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-	md->dvfs_freq = -1;
-	md->dvfs_lock_status = false;
-	mutex_unlock(&md->dvfs_lock);
-}
-
-static void set_dvfs_lock(struct cyttsp4_mt_data *md, int32_t on, bool mode)
-{
-
-	int ret = 0;
-
-	if (md->boost_level == DVFS_STAGE_NONE) {
-		printk(KERN_INFO "%s: DVFS stage is none(%d)\n", __func__, md->boost_level);
-		return;
-	}
-
-	mutex_lock(&md->dvfs_lock);
-	if (on == 0) {
-		if (md->dvfs_lock_status) {
-			schedule_delayed_work(&md->work_dvfs_off,msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&md->work_dvfs_off);
-		if (!md->dvfs_lock_status || mode) {
-			if (md->dvfs_old_status != on) {
-				cancel_delayed_work(&md->work_dvfs_chg);
-					if (md->dvfs_freq != MIN_TOUCH_LIMIT) {
-						ret = set_freq_limit(DVFS_TOUCH_ID,
-								MIN_TOUCH_LIMIT);
-						md->dvfs_freq = MIN_TOUCH_LIMIT;
-
-						if (ret < 0)
-							printk(KERN_ERR
-								"%s: cpu first lock failed(%d)\n",
-								__func__, ret);
-
-				schedule_delayed_work(&md->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-					md->dvfs_lock_status = true;
-				}
-			}
-		}
-	} else if (on == 2) {
-		if (md->dvfs_lock_status) {
-			cancel_delayed_work(&md->work_dvfs_off);
-			cancel_delayed_work(&md->work_dvfs_chg);
-			schedule_work(&md->work_dvfs_off.work);
-		}
-	}
-	md->dvfs_old_status = on;
-	mutex_unlock(&md->dvfs_lock);
-}
-#endif
 static void cyttsp4_lift_all(struct cyttsp4_mt_data *md)
 {
 	if (!md->si)
@@ -128,13 +39,6 @@ static void cyttsp4_lift_all(struct cyttsp4_mt_data *md)
 		input_sync(md->input);
 		md->num_prv_rec = 0;
 	}
-	#if defined(TSP_BOOSTER)
-		if (md->touch_pressed_num != 0) {
-			dev_err(md->dev, "%s force dvfs off\n", __func__);
-			md->touch_pressed_num = 0;
-			set_dvfs_lock(md, 0, false);
-		}
-	#endif
 }
 
 static void cyttsp4_mt_process_touch(struct cyttsp4_mt_data *md,
@@ -225,11 +129,6 @@ static void cyttsp4_get_mt_touches(struct cyttsp4_mt_data *md, int num_cur_rec)
 			if (tch.abs[CY_TCH_E] == CY_EV_LIFTOFF) {
 				dev_dbg(dev, "%s: t=%d e=%d lift-off\n",
 					__func__, t, tch.abs[CY_TCH_E]);
-			#if defined(TSP_BOOSTER)
-				if(num_cur_rec==1){
-					set_dvfs_lock(md, 0, false);
-				}
-			#endif
 			printk("TSP is released \n");
 				printk("%s: tcn=[%d] e=%d RELEASE x=%d, y=%d \n",__func__,
 					num_cur_rec,  tch.abs[CY_TCH_E], tch.abs[CY_TCH_X], tch.abs[CY_TCH_Y]);
@@ -239,9 +138,6 @@ static void cyttsp4_get_mt_touches(struct cyttsp4_mt_data *md, int num_cur_rec)
 				printk("TSP is pressed \n");
 				printk("%s: tcn=[%d] e=%d PRESS x=%d, y=%d \n",__func__,
 					num_cur_rec,  tch.abs[CY_TCH_E], tch.abs[CY_TCH_X], tch.abs[CY_TCH_Y]);
-				#if defined(TSP_BOOSTER)
-					set_dvfs_lock(md, 1,true);
-				#endif
 			}
 			if (md->mt_function.input_report)
 				md->mt_function.input_report(md->input, sig,
@@ -470,10 +366,6 @@ static void cyttsp4_mt_close(struct input_dev *input)
 	struct cyttsp4_mt_data *md = &cd->md;
 	dev_info(dev, "%s\n", __func__);
 
-#if defined(TSP_BOOSTER)
-		dev_err(md->dev, "%s force dvfs off\n", __func__);
-		set_dvfs_lock(md, 2, false);
-#endif
 	_cyttsp4_unsubscribe_attention(dev, CY_ATTEN_IRQ, CY_MODULE_MT,
 		cyttsp4_mt_attention, CY_MODE_OPERATIONAL);
 
@@ -613,14 +505,6 @@ int cyttsp4_mt_probe(struct device *dev)
 	md->prv_tch_type = CY_OBJ_STANDARD_FINGER;
 	md->dev = dev;
 	md->pdata = mt_pdata;
-#if defined(TSP_BOOSTER)
-	mutex_init(&md->dvfs_lock);
-	md->touch_pressed_num = 0;
-	md->dvfs_lock_status = false;
-	md->boost_level = DVFS_STAGE_DUAL;
-	INIT_DELAYED_WORK(&md->work_dvfs_off, set_dvfs_off);
-	INIT_DELAYED_WORK(&md->work_dvfs_chg, change_dvfs_lock);
-#endif
 
 	/* Create the input device and register it. */
 	dev_vdbg(dev, "%s: Create the input device and register it\n",

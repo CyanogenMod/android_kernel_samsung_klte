@@ -811,265 +811,6 @@ static ssize_t synaptics_rmi4_fast_detect_enable_store(struct device *dev,
 }
 #endif
 
-#ifdef TSP_BOOSTER
-static void synaptics_change_dvfs_lock(struct work_struct *work)
-{
-	struct synaptics_rmi4_data *rmi4_data =
-		container_of(work,
-				struct synaptics_rmi4_data, work_dvfs_chg.work);
-	int retval = 0;
-
-	mutex_lock(&rmi4_data->dvfs_lock);
-
-	if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_DUAL) {
-		if (rmi4_data->stay_awake) {
-			dev_info(&rmi4_data->i2c_client->dev,
-					"%s: do fw update, do not change cpu frequency.\n",
-					__func__);
-		} else {
-			retval = set_freq_limit(DVFS_TOUCH_ID,
-					MIN_TOUCH_LIMIT_SECOND);
-			rmi4_data->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-		}
-	} else if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NINTH) {
-		if (rmi4_data->stay_awake) {
-			dev_info(&rmi4_data->i2c_client->dev,
-					"%s: do fw update, do not change cpu frequency.\n",
-					__func__);
-		} else {
-			retval = set_freq_limit(DVFS_TOUCH_ID,
-					MIN_TOUCH_LIMIT);
-			rmi4_data->dvfs_freq = MIN_TOUCH_LIMIT;
-		}
-	} else if ((rmi4_data->dvfs_boost_mode == DVFS_STAGE_SINGLE) ||
-			(rmi4_data->dvfs_boost_mode == DVFS_STAGE_TRIPLE) ||
-			(rmi4_data->dvfs_boost_mode == DVFS_STAGE_PENTA)) {
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		rmi4_data->dvfs_freq = -1;
-	}
-
-	if (retval < 0)
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: booster change failed(%d).\n",
-				__func__, retval);
-	mutex_unlock(&rmi4_data->dvfs_lock);
-}
-
-static void synaptics_set_dvfs_off(struct work_struct *work)
-{
-	struct synaptics_rmi4_data *rmi4_data =
-		container_of(work,
-				struct synaptics_rmi4_data, work_dvfs_off.work);
-	int retval;
-
-	if (rmi4_data->stay_awake) {
-		dev_info(&rmi4_data->i2c_client->dev,
-				"%s: do fw update, do not change cpu frequency.\n",
-				__func__);
-	} else {
-		mutex_lock(&rmi4_data->dvfs_lock);
-
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		rmi4_data->dvfs_freq = -1;
-
-		if (retval < 0)
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: booster stop failed(%d).\n",
-					__func__, retval);
-		rmi4_data->dvfs_lock_status = false;
-
-		mutex_unlock(&rmi4_data->dvfs_lock);
-	}
-}
-
-static void synaptics_set_dvfs_lock(struct synaptics_rmi4_data *rmi4_data,
-		int on)
-{
-	int ret = 0;
-
-	if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NONE) {
-		dev_dbg(&rmi4_data->i2c_client->dev,
-				"%s: DVFS stage is none(%d)\n",
-				__func__, rmi4_data->dvfs_boost_mode);
-		return;
-	}
-
-	mutex_lock(&rmi4_data->dvfs_lock);
-	if (on == 0) {
-		if (rmi4_data->dvfs_lock_status) {
-			if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NINTH)
-				schedule_delayed_work(&rmi4_data->work_dvfs_off,
-					msecs_to_jiffies(TOUCH_BOOSTER_HIGH_OFF_TIME));
-			else
-				schedule_delayed_work(&rmi4_data->work_dvfs_off,
-					msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on > 0) {
-		cancel_delayed_work(&rmi4_data->work_dvfs_off);
-
-		if ((!rmi4_data->dvfs_lock_status) || (rmi4_data->dvfs_old_stauts < on)) {
-			cancel_delayed_work(&rmi4_data->work_dvfs_chg);
-
-			if ((rmi4_data->dvfs_freq != MIN_TOUCH_LIMIT) &&
-					(rmi4_data->dvfs_boost_mode != DVFS_STAGE_NINTH)) {
-				if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_TRIPLE)
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-						MIN_TOUCH_LIMIT_SECOND);
-				else if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_PENTA)
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-						MIN_TOUCH_LOW_LIMIT);
-				else
-					ret = set_freq_limit(DVFS_TOUCH_ID,
-						MIN_TOUCH_LIMIT);
-				rmi4_data->dvfs_freq = MIN_TOUCH_LIMIT;
-
-				if (ret < 0)
-					dev_err(&rmi4_data->i2c_client->dev,
-							"%s: cpu first lock failed(%d)\n",
-							__func__, ret);
-			} else if ((rmi4_data->dvfs_freq != MIN_TOUCH_HIGH_LIMIT) &&
-					(rmi4_data->dvfs_boost_mode == DVFS_STAGE_NINTH)) {
-				ret = set_freq_limit(DVFS_TOUCH_ID,
-							MIN_TOUCH_HIGH_LIMIT);
-				rmi4_data->dvfs_freq = MIN_TOUCH_HIGH_LIMIT;
-
-				if (ret < 0)
-					dev_err(&rmi4_data->i2c_client->dev,
-							"%s: cpu first lock failed(%d)\n",
-							__func__, ret);
-			}
-
-			if (rmi4_data->dvfs_boost_mode == DVFS_STAGE_NINTH)
-				schedule_delayed_work(&rmi4_data->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_HIGH_CHG_TIME));
-			else
-			schedule_delayed_work(&rmi4_data->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-			rmi4_data->dvfs_lock_status = true;
-		}
-	} else if (on < 0) {
-		if (rmi4_data->dvfs_lock_status) {
-			cancel_delayed_work(&rmi4_data->work_dvfs_off);
-			cancel_delayed_work(&rmi4_data->work_dvfs_chg);
-			schedule_work(&rmi4_data->work_dvfs_off.work);
-		}
-	}
-	rmi4_data->dvfs_old_stauts = on;
-	mutex_unlock(&rmi4_data->dvfs_lock);
-}
-
-static void synaptics_init_dvfs(struct synaptics_rmi4_data *rmi4_data)
-{
-	mutex_init(&rmi4_data->dvfs_lock);
-
-	rmi4_data->dvfs_boost_mode = DVFS_STAGE_DUAL;
-
-	INIT_DELAYED_WORK(&rmi4_data->work_dvfs_off, synaptics_set_dvfs_off);
-	INIT_DELAYED_WORK(&rmi4_data->work_dvfs_chg, synaptics_change_dvfs_lock);
-
-	rmi4_data->dvfs_lock_status = false;
-}
-#endif
-
-#ifdef TKEY_BOOSTER
-static void synaptics_tkey_change_dvfs_lock(struct work_struct *work)
-{
-	struct synaptics_rmi4_data *rmi4_data =
-		container_of(work,
-			struct synaptics_rmi4_data, work_tkey_dvfs_chg.work);
-	int retval = 0;
-	mutex_lock(&rmi4_data->tkey_dvfs_lock);
-
-	retval = set_freq_limit(DVFS_TOUCH_ID, rmi4_data->tkey_dvfs_freq);
-	if (retval < 0)
-		dev_info(&rmi4_data->i2c_client->dev,
-			"%s: booster change failed(%d).\n",
-			__func__, retval);
-	rmi4_data->tkey_dvfs_lock_status = false;
-	mutex_unlock(&rmi4_data->tkey_dvfs_lock);
-}
-
-static void synaptics_tkey_set_dvfs_off(struct work_struct *work)
-{
-	struct synaptics_rmi4_data *rmi4_data =
-		container_of(work,
-			struct synaptics_rmi4_data, work_tkey_dvfs_off.work);
-	int retval;
-
-	if (rmi4_data->stay_awake) {
-		dev_info(&rmi4_data->i2c_client->dev,
-				"%s: do fw update, do not change cpu frequency.\n",
-				__func__);
-	} else {
-		mutex_lock(&rmi4_data->tkey_dvfs_lock);
-		retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-		if (retval < 0)
-			dev_info(&rmi4_data->i2c_client->dev,
-				"%s: booster stop failed(%d).\n",
-				__func__, retval);
-
-		rmi4_data->tkey_dvfs_lock_status = true;
-		mutex_unlock(&rmi4_data->tkey_dvfs_lock);
-	}
-}
-
-static void synaptics_tkey_set_dvfs_lock(struct synaptics_rmi4_data *rmi4_data,
-		int on)
-{
-	int ret = 0;
-
-	if (rmi4_data->tkey_dvfs_boost_mode == DVFS_STAGE_NONE) {
-		dev_dbg(&rmi4_data->i2c_client->dev,
-				"%s: DVFS stage is none(%d)\n",
-				__func__, rmi4_data->tkey_dvfs_boost_mode);
-		return;
-	}
-
-	mutex_lock(&rmi4_data->tkey_dvfs_lock);
-	if (on == 0) {
-		cancel_delayed_work(&rmi4_data->work_tkey_dvfs_chg);
-
-		if (rmi4_data->tkey_dvfs_lock_status) {
-			ret = set_freq_limit(DVFS_TOUCH_ID, rmi4_data->tkey_dvfs_freq);
-			if (ret < 0)
-				dev_info(&rmi4_data->i2c_client->dev,
-					"%s: cpu first lock failed(%d)\n", __func__, ret);
-			rmi4_data->tkey_dvfs_lock_status = false;
-		}
-
-		schedule_delayed_work(&rmi4_data->work_tkey_dvfs_off,
-			msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-
-	} else if (on == 1) {
-		cancel_delayed_work(&rmi4_data->work_tkey_dvfs_off);
-		schedule_delayed_work(&rmi4_data->work_tkey_dvfs_chg,
-			msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-
-	} else if (on == 2) {
-		if (rmi4_data->tkey_dvfs_lock_status) {
-			cancel_delayed_work(&rmi4_data->work_tkey_dvfs_off);
-			cancel_delayed_work(&rmi4_data->work_tkey_dvfs_chg);
-			schedule_work(&rmi4_data->work_tkey_dvfs_off.work);
-		}
-	}
-	mutex_unlock(&rmi4_data->tkey_dvfs_lock);
-}
-
-
-static void synaptics_tkey_init_dvfs(struct synaptics_rmi4_data *rmi4_data)
-{
-	mutex_init(&rmi4_data->tkey_dvfs_lock);
-	rmi4_data->tkey_dvfs_boost_mode = DVFS_STAGE_DUAL;
-	rmi4_data->tkey_dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-
-	INIT_DELAYED_WORK(&rmi4_data->work_tkey_dvfs_off, synaptics_tkey_set_dvfs_off);
-	INIT_DELAYED_WORK(&rmi4_data->work_tkey_dvfs_chg, synaptics_tkey_change_dvfs_lock);
-
-	rmi4_data->tkey_dvfs_lock_status = true;
-}
-#endif
-
 static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1796,18 +1537,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 
 	input_sync(rmi4_data->input_dev);
 
-#ifdef COMMON_INPUT_BOOSTER
-	if (rmi4_data->tsp_booster->dvfs_set)
-		rmi4_data->tsp_booster->dvfs_set(rmi4_data->tsp_booster, touch_count);
-#endif
-
-#ifdef TSP_BOOSTER
-	if (touch_count)
-		synaptics_set_dvfs_lock(rmi4_data, touch_count);
-	else
-		synaptics_set_dvfs_lock(rmi4_data, 0);
-#endif
-
 	return touch_count;
 }
 
@@ -1905,9 +1634,6 @@ static void synaptics_rmi4_f1a_report(struct synaptics_rmi4_data *rmi4_data,
 #endif
 	}
 
-#ifdef TKEY_BOOSTER
-	synaptics_tkey_set_dvfs_lock(rmi4_data, !!status);
-#endif
 	if (touch_count)
 		input_sync(rmi4_data->input_dev);
 
@@ -4363,17 +4089,6 @@ int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data)
 	rmi4_data->f51_finger = false;
 #endif
 
-#ifdef COMMON_INPUT_BOOSTER
-	if (rmi4_data->tsp_booster->dvfs_set)
-		rmi4_data->tsp_booster->dvfs_set(rmi4_data->tsp_booster, -1);
-#endif
-
-#ifdef TSP_BOOSTER
-	synaptics_set_dvfs_lock(rmi4_data, -1);
-#endif
-#ifdef TKEY_BOOSTER
-	synaptics_tkey_set_dvfs_lock(rmi4_data, 2);
-#endif
 #ifdef EDGE_SWIPE
 	if (rmi4_data->f51_handle->surface_data.palm)
 		rmi4_data->f51_handle->surface_data.palm = 0;
@@ -5256,27 +4971,10 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 				 rmi4_data->supplies);
 	if (retval)
 		goto err_get_regulator;
-#ifdef COMMON_INPUT_BOOSTER
-	rmi4_data->tsp_booster = kzalloc(sizeof(struct input_booster), GFP_KERNEL);
-	if (!rmi4_data->tsp_booster) {
-		dev_err(&client->dev,
-			"%s: Failed to alloc mem for tsp_booster\n", __func__);
-		goto err_get_tsp_booster;
-	} else {
-		input_booster_init_dvfs(rmi4_data->tsp_booster, INPUT_BOOSTER_ID_TSP);
-	}
-#endif
 
 err_tsp_reboot:
 	synaptics_power_ctrl(rmi4_data, true);
 	msleep(SYNAPTICS_POWER_MARGIN_TIME);
-
-#ifdef TSP_BOOSTER
-	synaptics_init_dvfs(rmi4_data);
-#endif
-#ifdef TKEY_BOOSTER
-	synaptics_tkey_init_dvfs(rmi4_data);
-#endif
 
 	retval = synaptics_rmi4_set_input_device(rmi4_data);
 	if (retval < 0) {
@@ -5416,10 +5114,6 @@ err_init_exp_fn:
 	rmi4_data->input_dev = NULL;
 err_set_input_device:
 	synaptics_power_ctrl(rmi4_data, false);
-#ifdef COMMON_INPUT_BOOSTER
-	kfree(rmi4_data->tsp_booster);
-err_get_tsp_booster:
-#endif
 err_get_regulator:
 	kfree(rmi4_data->supplies);
 err_mem_regulator:
@@ -5490,10 +5184,6 @@ static int __devexit synaptics_rmi4_remove(struct i2c_client *client)
 	input_unregister_device(rmi4_data->input_dev);
 	input_free_device(rmi4_data->input_dev);
 	rmi4_data->input_dev = NULL;
-
-#ifdef COMMON_INPUT_BOOSTER
-	kfree(rmi4_data->tsp_booster);
-#endif
 
 	kfree(rmi4_data->supplies);
 

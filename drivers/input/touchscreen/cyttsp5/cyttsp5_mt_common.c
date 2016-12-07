@@ -29,97 +29,6 @@
 
 #define FORCE_SATISFY_PALMPAUSE_FOR_LARGEOBJ
 
-#if defined(TSP_BOOSTER)
-#include <linux/cpufreq.h>
-#define DVFS_STAGE_DUAL		2
-#define DVFS_STAGE_SINGLE		1
-#define DVFS_STAGE_NONE		0
-#define TOUCH_BOOSTER_OFF_TIME	300
-#define TOUCH_BOOSTER_CHG_TIME	200
-
-static void change_dvfs_lock(struct work_struct *work)
-{
-	struct cyttsp5_mt_data *md = container_of(work,struct cyttsp5_mt_data, work_dvfs_chg.work);
-	int ret = 0;
-	mutex_lock(&md->dvfs_lock);
-
-	if (md->boost_level == DVFS_STAGE_DUAL) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, MIN_TOUCH_LIMIT_SECOND);
-		md->dvfs_freq = MIN_TOUCH_LIMIT_SECOND;
-	} else if (md->boost_level == DVFS_STAGE_SINGLE) {
-		ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-		md->dvfs_freq = -1;
-	}
-	if (ret < 0)
-		printk(KERN_ERR "[TSP] %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-
-	mutex_unlock(&md->dvfs_lock);
-}
-
-static void set_dvfs_off(struct work_struct *work)
-{
-	struct cyttsp5_mt_data *md = container_of(work,struct cyttsp5_mt_data, work_dvfs_off.work);
-	int ret;
-	mutex_lock(&md->dvfs_lock);
-	ret = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (ret < 0)
-		printk(KERN_ERR "[TSP] %s: booster stop failed(%d)\n",\
-					__func__, __LINE__);
-	md->dvfs_freq = -1;
-	md->dvfs_lock_status = false;
-	mutex_unlock(&md->dvfs_lock);
-}
-
-static void set_dvfs_lock(struct cyttsp5_mt_data *md, int32_t on, bool mode)
-{
-
-	int ret = 0;
-
-	if (md->boost_level == DVFS_STAGE_NONE) {
-		printk(KERN_INFO "%s: DVFS stage is none(%d)\n", __func__, md->boost_level);
-		return;
-	}
-
-	mutex_lock(&md->dvfs_lock);
-	if (on == 0) {
-		if (md->dvfs_lock_status) {
-			schedule_delayed_work(&md->work_dvfs_off,msecs_to_jiffies(TOUCH_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&md->work_dvfs_off);
-		if (!md->dvfs_lock_status || mode) {
-			if (md->dvfs_old_status != on) {
-				cancel_delayed_work(&md->work_dvfs_chg);
-					if (md->dvfs_freq != MIN_TOUCH_LIMIT) {
-						ret = set_freq_limit(DVFS_TOUCH_ID,
-								MIN_TOUCH_LIMIT);
-						md->dvfs_freq = MIN_TOUCH_LIMIT;
-
-						if (ret < 0)
-							printk(KERN_ERR
-								"%s: cpu first lock failed(%d)\n",
-								__func__, ret);
-
-				schedule_delayed_work(&md->work_dvfs_chg,
-					msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
-
-					md->dvfs_lock_status = true;
-				}
-			}
-		}
-	} else if (on == 2) {
-		if (md->dvfs_lock_status) {
-			cancel_delayed_work(&md->work_dvfs_off);
-			cancel_delayed_work(&md->work_dvfs_chg);
-			schedule_work(&md->work_dvfs_off.work);
-		}
-	}
-	md->dvfs_old_status = on;
-	mutex_unlock(&md->dvfs_lock);
-}
-#endif
-
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MT_B
 #ifdef SAMSUNG_PALM_MOTION
 static void cyttsp5_final_sync(struct input_dev *input, int max_slots,
@@ -210,13 +119,6 @@ static void cyttsp5_mt_lift_all(struct cyttsp5_mt_data *md)
 		input_sync(md->input);
 		md->num_prv_tch = 0;
 	}
-#if defined(TSP_BOOSTER)
-	if (md->touch_pressed_num != 0) {
-		dev_err(md->dev, "%s force dvfs off\n", __func__);
-		md->touch_pressed_num = 0;
-		set_dvfs_lock(md, 0, false);
-	}
-#endif
 }
 
 static void cyttsp5_get_touch_axis(struct cyttsp5_mt_data *md,
@@ -513,10 +415,6 @@ static void cyttsp5_get_mt_touches(struct cyttsp5_mt_data *md,
 	u16 sum_maj_mnr;
 	bool hover = 0;
 #endif
-#if defined(TSP_BOOSTER)
-	u8 touch_num = 0;
-	bool booster_status = false;
-#endif
 
 	bitmap_zero(ids, MAX_TOUCH_ID_NUMBER);
 	memset(tch->abs, 0, sizeof(tch->abs));
@@ -563,11 +461,6 @@ static void cyttsp5_get_mt_touches(struct cyttsp5_mt_data *md,
 #ifdef SAMSUNG_TOUCH_MODE
 			manage_touch_mode(md, tch);
 #endif
-#if defined(TSP_BOOSTER)
-			if ((tch->abs[CY_TCH_O] != CY_OBJ_HOVER) &&
-				(tch->abs[CY_TCH_E] == CY_EV_TOUCHDOWN))
-				booster_status = true;
-#endif
 
 			if (tch->abs[CY_TCH_E] == CY_EV_LIFTOFF)
 				goto cyttsp5_get_mt_touches_pr_tch;
@@ -583,10 +476,7 @@ static void cyttsp5_get_mt_touches(struct cyttsp5_mt_data *md,
 #endif
 			__set_bit(t, ids);
 		}
-#if defined(TSP_BOOSTER)
-		if (tch->abs[CY_TCH_O] != CY_OBJ_HOVER)
-			touch_num++;
-#endif
+
 		/* all devices: position and pressure fields */
 		for (j = 0; j <= CY_ABS_W_OST; j++) {
 			if (!si->tch_abs[j].report)
@@ -645,18 +535,6 @@ cyttsp5_get_mt_touches_pr_tch:
 #else
 	cyttsp5_final_sync(md->input, MAX_TOUCH_ID_NUMBER,
 		mt_sync_count, ids);	// slot state for MTB
-#endif
-#if defined(TSP_BOOSTER)
-	if (touch_num != md->touch_pressed_num) {
-//		dev_dbg(dev, "%s: touch num = (%d -> %d)\n",
-//			__func__, md->touch_pressed_num, touch_num);
-		md->touch_pressed_num = touch_num;
-	}
-
-	if (!!md->touch_pressed_num)
-		set_dvfs_lock(md, 1, booster_status);
-	else
-		set_dvfs_lock(md, 0, false);
 #endif
 
 	md->num_prv_tch = num_cur_tch;
@@ -861,13 +739,6 @@ static void cyttsp5_mt_close(struct input_dev *input)
 
 	dev_dbg(dev, "%s:\n", __func__);
 
-#if defined(TSP_BOOSTER)
-	//if (md->touch_pressed_num != 0) {
-		dev_err(md->dev, "%s force dvfs off\n", __func__);
-		md->touch_pressed_num = 0;
-		set_dvfs_lock(md, 2, false);
-	//}
-#endif
 #ifdef SAMSUNG_TOUCH_MODE
 	input_report_switch(md->input,
 		SW_GLOVE, false);
@@ -1058,14 +929,6 @@ int cyttsp5_mt_probe(struct device *dev)
 	mutex_init(&md->mt_lock);
 	md->dev = dev;
 	md->pdata = mt_pdata;
-#if defined(TSP_BOOSTER)
-	mutex_init(&md->dvfs_lock);
-	md->touch_pressed_num = 0;
-	md->dvfs_lock_status = false;
-	md->boost_level = DVFS_STAGE_DUAL;
-	INIT_DELAYED_WORK(&md->work_dvfs_off, set_dvfs_off);
-	INIT_DELAYED_WORK(&md->work_dvfs_chg, change_dvfs_lock);
-#endif
 
 	/* Create the input device and register it. */
 	dev_vdbg(dev, "%s: Create the input device and register it\n",

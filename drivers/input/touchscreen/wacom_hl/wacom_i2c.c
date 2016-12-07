@@ -136,9 +136,6 @@ static void wacom_power_off(struct wacom_i2c *wac_i2c)
 		goto out_power_off;
 	}
 
-#ifdef WACOM_BOOSTER
-	wacom_set_dvfs_lock(wac_i2c, 2);
-#endif
 	wacom_enable_irq(wac_i2c, false);
 
 	/* release pen, if it is pressed */
@@ -331,9 +328,6 @@ static void wacom_i2c_set_input_values(struct i2c_client *client,
 	__set_bit(BTN_STYLUS, input_dev->keybit);
 	__set_bit(KEY_UNKNOWN, input_dev->keybit);
 	__set_bit(KEY_PEN_PDCT, input_dev->keybit);
-#ifdef CONFIG_INPUT_BOOSTER
-	__set_bit(KEY_BOOSTER_PEN, input_dev->keybit);
-#endif
 #ifdef WACOM_USE_GAIN
 	__set_bit(ABS_DISTANCE, input_dev->absbit);
 #endif
@@ -1063,32 +1057,6 @@ static ssize_t epen_saving_mode_store(struct device *dev,
 }
 #endif
 
-#if defined(WACOM_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
-static ssize_t epen_boost_level(struct device *dev,
-				struct device_attribute *attr, const char *buf,
-				size_t count)
-{
-	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
-	unsigned int level;
-
-	sscanf(buf, "%d", &level);
-
-	if (level > 3) {
-		dev_err(&wac_i2c->client->dev, "err to set boost_level %d\n", level);
-		return count;
-	}
-
-#ifdef CONFIG_INPUT_BOOSTER
-	change_boost_level(level, BOOSTER_DEVICE_PEN);
-#elif defined(WACOM_BOOSTER)
-	wac_i2c->boost_level = level;
-#endif
-	dev_info(&wac_i2c->client->dev, "%s %d\n", __func__, level);
-
-	return count;
-}
-#endif
-
 /* firmware update */
 static DEVICE_ATTR(epen_firm_update,
 		   S_IWUSR | S_IWGRP, NULL, epen_firmware_update_store);
@@ -1116,9 +1084,6 @@ static DEVICE_ATTR(epen_reset_result,
 static DEVICE_ATTR(epen_checksum, S_IWUSR | S_IWGRP, NULL, epen_checksum_store);
 static DEVICE_ATTR(epen_checksum_result, S_IRUSR | S_IRGRP,
 		   epen_checksum_result_show, NULL);
-#if defined(WACOM_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
-static DEVICE_ATTR(boost_level, S_IWUSR | S_IWGRP, NULL, epen_boost_level);
-#endif
 
 #ifdef WACOM_USE_AVE_TRANSITION
 static DEVICE_ATTR(epen_ave, S_IWUSR | S_IWGRP, NULL, epen_ave_store);
@@ -1158,9 +1123,6 @@ static struct attribute *epen_attributes[] = {
 #endif
 #ifdef BATTERY_SAVING_MODE
 	&dev_attr_epen_saving_mode.attr,
-#endif
-#if defined(WACOM_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
-	&dev_attr_boost_level.attr,
 #endif
 	NULL,
 };
@@ -1247,10 +1209,6 @@ static void wacom_init_fw_algo(struct wacom_i2c *wac_i2c)
 #endif
 
 #include <linux/of_gpio.h>
-
-#ifdef CONFIG_INPUT_BOOSTER
-#include <linux/input/input_booster.h>
-#endif
 
 #ifdef CONFIG_INPUT_WACOM_HL
 static struct wacom_g5_callbacks *wacom_callbacks;
@@ -1580,13 +1538,6 @@ static int wacom_i2c_probe(struct i2c_client *client, const struct i2c_device_id
 	wac_i2c->block_softkey = false;	
 #endif
 	INIT_WORK(&wac_i2c->update_work, wacom_i2c_update_work);
-	/*init wacom booster*/
-#if defined(WACOM_BOOSTER_DVFS)	
-	wacom_init_dvfs(wac_i2c);
-#elif defined(WACOM_BOOSTER)
-	wacom_init_dvfs(wac_i2c);
-	wac_i2c->boost_level = WACOM_BOOSTER_LEVEL2;
-#endif
 	printk(KERN_ERR "epen: %s,%d \n", __func__, __LINE__);
 
 	/*Before registering input device, data in each input_dev must be set */

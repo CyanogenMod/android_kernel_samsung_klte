@@ -65,12 +65,6 @@ struct gpio_button_data {
 	spinlock_t lock;
 	bool disabled;
 	bool key_pressed;
-	#ifdef KEY_BOOSTER
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	bool dvfs_lock_status;
-	struct mutex		dvfs_lock;
-	#endif
 };
 
 struct gpio_keys_drvdata {
@@ -421,80 +415,6 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
-#ifdef KEY_BOOSTER
-static void gpio_key_change_dvfs_lock(struct work_struct *work)
-{
-	struct gpio_button_data *bdata =
-		container_of(work,
-			struct gpio_button_data, work_dvfs_chg.work);
-	int retval;
-	mutex_lock(&bdata->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID,
-			MIN_TOUCH_LIMIT_SECOND);
-	if (retval < 0)
-		printk(KERN_ERR
-			"%s: booster change failed(%d).\n",
-			__func__, retval);
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-static void gpio_key_set_dvfs_off(struct work_struct *work)
-{
-	struct gpio_button_data *bdata =
-		container_of(work,
-			struct gpio_button_data, work_dvfs_off.work);
-	int retval;
-	mutex_lock(&bdata->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0)
-		printk(KERN_ERR
-			"%s: booster stop failed(%d).\n",
-			__func__, retval);
-	bdata->dvfs_lock_status = false;
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-static void gpio_key_set_dvfs_lock(struct gpio_button_data *bdata,
-					uint32_t on)
-{
-	mutex_lock(&bdata->dvfs_lock);
-	if (on == 0) {
-		if (bdata->dvfs_lock_status) {
-			schedule_delayed_work(&bdata->work_dvfs_off,
-				msecs_to_jiffies(KEY_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&bdata->work_dvfs_off);
-		if (!bdata->dvfs_lock_status) {
-			int ret = 0;
-			ret = set_freq_limit(DVFS_TOUCH_ID,
-					MIN_TOUCH_LIMIT);
-			if (ret < 0)
-				printk(KERN_ERR
-					"%s: cpu first lock failed(%d)\n",
-					__func__, ret);
-
-			schedule_delayed_work(&bdata->work_dvfs_chg,
-				msecs_to_jiffies(KEY_BOOSTER_CHG_TIME));
-			bdata->dvfs_lock_status = true;
-		}
-	}
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-
-static int gpio_key_init_dvfs(struct gpio_button_data *bdata)
-{
-	mutex_init(&bdata->dvfs_lock);
-
-	INIT_DELAYED_WORK(&bdata->work_dvfs_off, gpio_key_set_dvfs_off);
-	INIT_DELAYED_WORK(&bdata->work_dvfs_chg, gpio_key_change_dvfs_lock);
-
-	bdata->dvfs_lock_status = false;
-	return 0;
-}
-#endif
-
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 {
 	const struct gpio_keys_button *button = bdata->button;
@@ -521,17 +441,7 @@ static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
 	struct gpio_button_data *bdata =
 		container_of(work, struct gpio_button_data, work);
-#ifdef KEY_BOOSTER
-	const struct gpio_keys_button *button = bdata->button;
-	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-#endif
 	gpio_keys_gpio_report_event(bdata);
-#ifdef KEY_BOOSTER
-	if (button->code == KEY_HOMEPAGE)
-	{
-		gpio_key_set_dvfs_lock(bdata, !!state);
-	}
-#endif
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
@@ -1495,13 +1405,6 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		error = gpio_keys_setup_key(pdev, input, bdata, button);
 		if (error)
 			goto fail2;
-#ifdef KEY_BOOSTER
-		error = gpio_key_init_dvfs(bdata);
-		if (error < 0) {
-			dev_err(dev, "Fail get dvfs level for touch booster\n");
-			goto fail2;
-		}
-#endif
 		if (button->wakeup)
 			wakeup = 1;
 	}
