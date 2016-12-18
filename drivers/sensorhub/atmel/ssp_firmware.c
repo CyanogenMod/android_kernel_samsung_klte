@@ -18,7 +18,7 @@
 #if defined(CONFIG_MACH_JACTIVESKT)
 #define SSP_FIRMWARE_REVISION_03	14032500 /*MCU L5, 6500 fortius-skt*/
 #else
-#define SSP_FIRMWARE_REVISION_03	14082100/*MCU L5, 6500*/
+#define SSP_FIRMWARE_REVISION_03	14122201/*MCU L5, 6500*/
 #endif
 
 /* Bootload mode cmd */

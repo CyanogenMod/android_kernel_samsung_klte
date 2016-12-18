@@ -57,7 +57,7 @@ static void max77804k_haptic_i2c(struct max77804k_haptic_data *hap_data, bool en
 		pr_err("[VIB] i2c write error %d\n", ret);
 }
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 void max77804k_vibtonz_en(bool en)
 {
 	if (g_hap_data == NULL) {
@@ -91,7 +91,7 @@ static int __devinit max77804k_haptic_probe(struct platform_device *pdev)
 	struct max77804k_platform_data *max77804k_pdata
 		= dev_get_platdata(max77804k->dev);
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	struct max77804k_haptic_platform_data *pdata
 		= max77804k_pdata->haptic_data;
 #endif
@@ -114,6 +114,7 @@ static int __devinit max77804k_haptic_probe(struct platform_device *pdev)
 	hap_data->pmic_i2c = max77804k->i2c;
 	pdata->reg2 = MOTOR_LRA | EXT_PWM | DIVIDER_128;
 	hap_data->pdata = pdata;
+	max77804k_haptic_i2c(hap_data, true);
 
 	spin_lock_init(&(hap_data->lock));
 
@@ -129,6 +130,19 @@ static int __devexit max77804k_haptic_remove(struct platform_device *pdev)
 	g_hap_data = NULL;
 
 	return 0;
+}
+
+static void max77804k_haptic_shutdown(struct device *dev)
+{
+	struct max77804k_haptic_data *data = dev_get_drvdata(dev);                    
+	int ret;                                                                     
+
+	pr_info("%s: Disable HAPTIC\n", __func__);                                   
+	ret = max77804k_update_reg(data->i2c, MAX77804K_HAPTIC_REG_CONFIG2, 0x0, MOTOR_EN);
+	if (ret < 0) {                                                               
+		pr_err("%s: fail to update reg\n", __func__);                        
+		return;                                                              
+	}                                                                            
 }
 
 static int max77804k_haptic_suspend(struct platform_device *pdev,
@@ -149,6 +163,7 @@ static struct platform_driver max77804k_haptic_driver = {
 	.driver = {
 		.name	= "max77804k-haptic",
 		.owner	= THIS_MODULE,
+		.shutdown = max77804k_haptic_shutdown,
 	},
 };
 

@@ -294,6 +294,13 @@ int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 					continue;
 				}
 #endif
+#ifdef CONFIG_MACH_KLIMT_LTE_DCM
+				/* VREG_LVS1_1P8 Always On due to Audio(MP3) Play Mute Problem */
+				if(!strncmp(in_vreg[i].vreg_name, "vdd3", 4)) {	// VREG_LVS1_1P8 1.8V
+					pr_err("%s : VDD3 disable skip!!\n", __func__);
+					continue;
+				}
+#endif
 
 				if (in_vreg[i].pre_off_sleep)
 					msleep(in_vreg[i].pre_off_sleep);

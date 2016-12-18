@@ -347,7 +347,7 @@ signed char fXRESInitializeTargetForISSP(void)
 */
 signed char fPowerCycleInitializeTargetForISSP(struct cypress_touchkey_info *info)
 {
-	unsigned char n;
+//	unsigned char n;
 
 /*
      Set all pins to highZ to avoid back powering the PSoC through the GPIO
@@ -358,14 +358,19 @@ signed char fPowerCycleInitializeTargetForISSP(struct cypress_touchkey_info *inf
 
 	 /* Turn on power to the target device before other signals */
 	SetTargetVDDStrong();
+	/*
 		for (n = 0; n < 200; n++)
 			Delay(50000);
+	*/
+	msleep(100);
 	ApplyTargetVDD(info);
 	 /* wait 1msec for the power to stabilize */
-
+	/*
 	for (n = 0; n < 10; n++)
 		Delay(DELAY100us);
-	/*printk(KERN_ERR"[TKEY] ___1111\n");*/
+	*/
+	usleep(1000);
+	 /*printk(KERN_ERR"[TKEY] ___1111\n");*/
 
 	/*
 	 Set SCLK to high Z so there is no clock and wait for a high to low
@@ -762,7 +767,7 @@ signed char fAccTargetBankChecksum(unsigned int *pAcc)
 
 void ReStartTarget(struct cypress_touchkey_info *info)
 {
-	int i;
+//	int i;
 	#ifdef RESET_MODE
 	/* Assert XRES, then release, then disable XRES-Enable */
 	AssertXRES();
@@ -776,8 +781,11 @@ void ReStartTarget(struct cypress_touchkey_info *info)
 	SetSDATAHiZ();
 	/* Cycle power on the target to cause a reset */
 	RemoveTargetVDD(info);
+	/*	
 		for (i = 0; i < 100; i++)
 			Delay(50000);
+	*/
+	msleep(100);
 	ApplyTargetVDD(info);
 	#endif
 }

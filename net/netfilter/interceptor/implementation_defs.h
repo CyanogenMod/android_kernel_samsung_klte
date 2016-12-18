@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2011 - 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2011 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 /*
@@ -293,10 +293,10 @@
 
 
 #define DEBUG_DUMP(flow, dumper, data, len, ...) \
-  DEBUG_DUMP_IMPLEMENTATION(flow, dumper, data, len, __VA_ARGS__)
+    DEBUG_DUMP_IMPLEMENTATION(flow, dumper, data, len, __VA_ARGS__)
 
 #define DEBUG_DUMP_LINE(context, ...) \
-  DEBUG_DUMP_LINE_IMPLEMENTATION(context, __VA_ARGS__)
+    DEBUG_DUMP_LINE_IMPLEMENTATION(context, __VA_ARGS__)
 
 /*
   DEBUG_STRBUF_GET
@@ -395,10 +395,10 @@
   }
 */
 #define DEBUG_STRBUF_BUFFER_GET(dsb, buf_p, len_p)           \
-  DEBUG_STRBUF_BUFFER_GET_IMPLEMENTATION(dsb, buf_p, len_p)
+    DEBUG_STRBUF_BUFFER_GET_IMPLEMENTATION(dsb, buf_p, len_p)
 
 #define DEBUG_STRBUF_BUFFER_COMMIT(dsb, len)                 \
-  DEBUG_STRBUF_BUFFER_COMMIT_IMPLEMENTATION(dsb, len)
+    DEBUG_STRBUF_BUFFER_COMMIT_IMPLEMENTATION(dsb, len)
 
 
 /*
@@ -486,7 +486,7 @@
    When condition evaluates to false the compilation fails.
 */
 #define COMPILE_GLOBAL_ASSERT(condition)                \
-  COMPILE_GLOBAL_ASSERT_IMPLEMENTATION(condition)
+    COMPILE_GLOBAL_ASSERT_IMPLEMENTATION(condition)
 
 
 /* COMPILE_STATIC_ASSERT

@@ -268,7 +268,8 @@ int tima_is_pg_protected(unsigned long va)
 EXPORT_SYMBOL(tima_is_pg_protected);
 #endif
 
-#ifdef	CONFIG_TIMA_RKP_30
+#ifdef	CONFIG_TIMA_RKP
+#if defined(CONFIG_TIMA_RKP_30) || defined(CONFIG_ARCH_MSM8974)
 #define INS_STR_R1	0xe5801000
 #define INS_STR_R3	0xe5a03800
 extern void* cpu_v7_set_pte_ext_proc_end;
@@ -320,6 +321,7 @@ static unsigned int rkp_fixup(unsigned long addr, struct pt_regs *regs) {
 	return false;		
 }
 #endif
+#endif
 
 /*
  * Oops.  The kernel tried to access some page that wasn't present.
@@ -334,7 +336,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	if (fixup_exception(regs))
 		return;
 #ifdef	CONFIG_TIMA_RKP
-#ifdef  CONFIG_TIMA_RKP_30
+#if defined(CONFIG_TIMA_RKP_30) || defined(CONFIG_ARCH_MSM8974)
 	if (addr >= 0xc0000000 && (fsr & FSR_WRITE)) {
 		if (rkp_fixup(addr, regs)) {
 			return;

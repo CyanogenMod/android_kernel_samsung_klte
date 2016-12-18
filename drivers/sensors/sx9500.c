@@ -33,7 +33,7 @@
 #define VENDOR_NAME              "SEMTECH"
 #define MODEL_NAME               "SX9500"
 #define MODULE_NAME              "grip_sensor"
-#define CALIBRATION_FILE_PATH    "/efs/grip_cal_data"
+#define CALIBRATION_FILE_PATH    "/efs/FactoryApp/grip_cal_data"
 
 #define I2C_M_WR                 0 /* for i2c Write */
 #define I2c_M_RD                 1 /* for i2c Read */

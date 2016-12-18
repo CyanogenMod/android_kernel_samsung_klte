@@ -172,7 +172,7 @@ extern "C" {
 	{
 		return i & ~HIGH_INDEX_MASK;
 	}
-	
+
 	typedef struct {
 		UINT8       jmp_boot[3];
 		UINT8       oem_name[8];
@@ -395,42 +395,42 @@ extern "C" {
 	} FS_FUNC_T;
 
 	typedef struct __FS_INFO_T {
-		UINT32      drv;                    
-		UINT32      vol_type;               
-		UINT32      vol_id;                 
+		UINT32      drv;
+		UINT32      vol_type;
+		UINT32      vol_id;
 
-		UINT32      num_sectors;            
-		UINT32      num_clusters;           
-		UINT32      cluster_size;           
+		UINT32      num_sectors;
+		UINT32      num_clusters;
+		UINT32      cluster_size;
 		UINT32      cluster_size_bits;
-		UINT32      sectors_per_clu;        
+		UINT32      sectors_per_clu;
 		UINT32      sectors_per_clu_bits;
 
-		UINT32      PBR_sector;             
-		UINT32      FAT1_start_sector;      
-		UINT32      FAT2_start_sector;      
-		UINT32      root_start_sector;      
-		UINT32      data_start_sector;      
-		UINT32      num_FAT_sectors;        
+		UINT32      PBR_sector;
+		UINT32      FAT1_start_sector;
+		UINT32      FAT2_start_sector;
+		UINT32      root_start_sector;
+		UINT32      data_start_sector;
+		UINT32      num_FAT_sectors;
 
-		UINT32      root_dir;               
-		UINT32      dentries_in_root;       
-		UINT32      dentries_per_clu;       
+		UINT32      root_dir;
+		UINT32      dentries_in_root;
+		UINT32      dentries_per_clu;
 
-		UINT32      vol_flag;               
-		struct buffer_head *pbr_bh;         
+		UINT32      vol_flag;
+		struct buffer_head *pbr_bh;
 
-		UINT32      map_clu;                
-		UINT32      map_sectors;            
-		struct buffer_head **vol_amap;      
+		UINT32      map_clu;
+		UINT32      map_sectors;
+		struct buffer_head **vol_amap;
 
-		UINT16      **vol_utbl;               
+		UINT16      **vol_utbl;
 
-		UINT32      clu_srch_ptr;           
-		UINT32      used_clusters;          
-		UENTRY_T    hint_uentry;            
+		UINT32      clu_srch_ptr;
+		UINT32      used_clusters;
+		UENTRY_T    hint_uentry;
 
-		UINT32      dev_ejected;            
+		UINT32      dev_ejected;
 
 		FS_FUNC_T	*fs_func;
 
@@ -448,11 +448,11 @@ extern "C" {
 #define ES_ALL_ENTRIES	0
 
 	typedef struct {
-		UINT32	sector;		
-		INT32	offset;		
-		INT32	alloc_flag;	
+		UINT32	sector;
+		INT32	offset;
+		INT32	alloc_flag;
 		UINT32 num_entries;
-		
+
 		void *__buf;
 	} ENTRY_SET_CACHE_T;
 
@@ -596,6 +596,6 @@ extern "C" {
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 #endif

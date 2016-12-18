@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -690,6 +690,8 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 		pr_debug("fail to stop the MDP3 dma\n");
 	msleep(20);
 
+	mfd->panel_info->cont_splash_enabled = 0;
+
 	mdp3_irq_deregister();
 
 	pr_debug("mdp3_ctrl_off stop clock\n");
@@ -768,6 +770,7 @@ static int mdp3_ctrl_reset_cmd(struct msm_fb_data_type *mfd)
 		mdp3_dma->vsync_enable(mdp3_dma, &vsync_client);
 
 	mdp3_session->first_commit = true;
+	mfd->panel_info->cont_splash_enabled = 0;
 	mdp3_session->in_splash_screen = 0;
 
 reset_error:
@@ -857,6 +860,7 @@ static int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 		mdp3_dma->vsync_enable(mdp3_dma, &vsync_client);
 
 	mdp3_session->first_commit = true;
+	mfd->panel_info->cont_splash_enabled = 0;
 	mdp3_session->in_splash_screen = 0;
 
 reset_error:
@@ -1615,8 +1619,9 @@ static int mdp3_ctrl_lut_update(struct msm_fb_data_type *mfd,
 	lut_config.lut_sel = mdp3_session->lut_sel;
 	lut_config.lut_position = 0;
 	lut_config.lut_dirty = true;
-	lut.color0_lut = r;
-	lut.color1_lut = g;
+	/* In HW the order is color0 = g, color1 = r and color2 = b*/
+	lut.color0_lut = g;
+	lut.color1_lut = r;
 	lut.color2_lut = b;
 
 	mutex_lock(&mdp3_session->lock);

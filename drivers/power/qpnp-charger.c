@@ -1985,11 +1985,8 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 					#endif
 				}
 			}
-			if (!qpnp_chg_is_dc_chg_plugged_in(chip)) {
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
+			if (!qpnp_chg_is_dc_chg_plugged_in(chip))
 				chip->chg_done = false;
-			}
 
 			if (!qpnp_is_dc_higher_prio(chip))
 				qpnp_chg_idcmax_set(chip, chip->maxinput_dc_ma);
@@ -2022,10 +2019,6 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 				}
 			}
 
-			if (!qpnp_chg_is_dc_chg_plugged_in(chip)) {
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
-			}
 			#ifndef CONFIG_BATTERY_SAMSUNG
 			schedule_delayed_work(&chip->eoc_work,
 				msecs_to_jiffies(EOC_CHECK_PERIOD_MS));
@@ -2219,14 +2212,8 @@ qpnp_chg_dc_dcin_valid_irq_handler(int irq, void *_chip)
 			qpnp_chg_force_run_on_batt(chip, !dc_present ? 1 : 0);
 		if (!dc_present && (!qpnp_chg_is_usb_chg_plugged_in(chip) ||
 					qpnp_chg_is_otg_en_set(chip))) {
-			chip->delta_vddmax_mv = 0;
-			qpnp_chg_set_appropriate_vddmax(chip);
 			chip->chg_done = false;
 		} else {
-			if (!qpnp_chg_is_usb_chg_plugged_in(chip)) {
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
-			}
 			#ifndef CONFIG_BATTERY_SAMSUNG
 			schedule_delayed_work(&chip->eoc_work,
 				msecs_to_jiffies(EOC_CHECK_PERIOD_MS));
@@ -3692,14 +3679,15 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 			pr_err("failed to write SEC_ACCESS rc=%d\n", rc);
 			return rc;
 		}
-
-		rc = qpnp_chg_masked_write(chip,
-			chip->usb_chgpth_base + COMP_OVR1,
-			0xFF,
-			0x2F, 1);
-		if (rc) {
-			pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
-			return rc;
+		if (chip->type != SMBBP) {
+			rc = qpnp_chg_masked_write(chip,
+				chip->usb_chgpth_base + COMP_OVR1,
+				0xFF,
+				0x2F, 1);
+			if (rc) {
+				pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
+				return rc;
+			}
 		}
 	}
 
@@ -3799,16 +3787,16 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 			pr_err("failed to write SEC_ACCESS rc=%d\n", rc);
 			return rc;
 		}
-
-		rc = qpnp_chg_masked_write(chip,
-			chip->usb_chgpth_base + COMP_OVR1,
-			0xFF,
-			0x00, 1);
-		if (rc) {
-			pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
-			return rc;
+		if (chip->type != SMBBP) {
+			rc = qpnp_chg_masked_write(chip,
+				chip->usb_chgpth_base + COMP_OVR1,
+				0xFF,
+				0x00, 1);
+			if (rc) {
+				pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
+				return rc;
+			}
 		}
-
 		usleep(1000);
 
 		qpnp_chg_usb_suspend_enable(chip, 0);
@@ -4094,8 +4082,6 @@ qpnp_eoc_work(struct work_struct *work)
 							? "cool" : "warm",
 						qpnp_chg_vddmax_get(chip));
 				}
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
 				qpnp_chg_charge_en(chip, 0);
 				/* sleep for a second before enabling */
 				msleep(2000);

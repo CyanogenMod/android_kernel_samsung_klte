@@ -52,7 +52,7 @@
 					80 45 00 00 01 66 /*lane3*/
 					40 67 00 00 01 88]; /*Clk*/
 
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-on-cmds = [
 					39 01 00 00 00 04
 						B9 FF 83 79
@@ -112,6 +112,6 @@
 					];
 		qcom,panel-off-cmds = [05 01 00 00 32 02 28 00
 					05 01 00 00 78 02 10 00];
-		qcom,off-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,off-cmds-dsi-state = "dsi_lp_mode";
 	};
 };

@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2011 - 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2011 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 #ifndef DEBUG_OUTPUTF_H
@@ -15,9 +15,9 @@ assert_outputf(
         const char *func,
         const char *description)
 #ifdef __GNUC__
-  __attribute__ ((noreturn))
+    __attribute__ ((noreturn))
 #endif
-  ;
+    ;
 
 extern void
 debug_outputf(
@@ -29,8 +29,8 @@ debug_outputf(
         const char *func,
         const char *format, ...)
 #ifdef __GNUC__
-  __attribute__ ((format (printf, 7, 8)))
+    __attribute__ ((format (printf, 7, 8)))
 #endif
-  ;
+    ;
 
 #endif /* DEBUG_OUTPUTF_H */

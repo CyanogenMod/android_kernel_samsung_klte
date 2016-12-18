@@ -183,6 +183,7 @@ struct audio_client {
 	/* audio cache operations fptr*/
 	int (*fptr_cache_ops)(struct audio_buffer *abuff, int cache_op);
 	atomic_t               unmap_cb_success;
+	atomic_t               reset;
 };
 
 void q6asm_audio_client_free(struct audio_client *ac);
@@ -408,6 +409,8 @@ int q6asm_set_dha(struct audio_client *ac,int *param);
 int q6asm_set_lrsm(struct audio_client *ac,int *param);
 int q6asm_set_sa_ep(struct audio_client *ac,int *param);
 int q6asm_get_sa_ep(struct audio_client *ac);
+
+int q6asm_set_msp(struct audio_client *ac, long *param);
 
 /* Send the stream meta data to remove initial and trailing silence */
 int q6asm_stream_send_meta_data(struct audio_client *ac, uint32_t stream_id,

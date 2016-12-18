@@ -16,7 +16,11 @@ config IRDA_COMMON_LDO
 	default n
 	help
 	  Say Y here to enable the I2C based IRDA for MC96FR116C chip for Kmini
+
+config ANDROID_FFF
+	bool "IRDA new Code for android 4.4.4"
+	default n
+	help
+	  Say Y here to enable the new code and CTS fix for android 4.4.4
+
 endmenu
-
-
-

@@ -36,6 +36,10 @@
 #include <linux/cleancache.h>
 #include "internal.h"
 
+#ifdef CONFIG_SDP
+#include <sdp/cache_cleanup.h>
+#endif
+
 /*
  * FIXME: remove all knowledge of the buffer layer from the core VM
  */
@@ -113,6 +117,11 @@
 void __delete_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
+
+#ifdef CONFIG_SDP
+	if(mapping_sensitive(mapping))
+		sdp_page_cleanup(page);
+#endif
 
 	/*
 	 * if we're uptodate, flush out into the cleancache, otherwise
@@ -1093,6 +1102,7 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	int error;
 
 #ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+	//struct scfs_sb_info *sbi;
 	int is_sequential = (ra->prev_pos == *ppos) ? 1 : 0;
 #endif
 
@@ -1201,34 +1211,27 @@ page_ok:
 		prev_offset = offset;
 
 #ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
-#if 1
-		{
-			extern u64 scfs_lowerpage_total_count;
-			if ((filp->f_flags & O_SCFSLOWER) && (!PageScfslower(page) && !PageNocache(page)))
-				scfs_lowerpage_total_count++;
+		if (filp->f_flags & O_SCFSLOWER) {
+			/*
+			   sbi = ;
+
+			   if (!PageScfslower(page) && !PageNocache(page))
+			   sbi->scfs_lowerpage_total_count++;
+			 */
+
+			/* Internal pages except first and last ones ||
+			 * page was sequentially referenced before due to preceding cluster access ||
+			 * first or last pages: random read
+			 */
+			if ((ret == PAGE_CACHE_SIZE) ||
+					(PageScfslower(page) && !offset) || !is_sequential) {
+				SetPageNocache(page);
+
+				if (PageLRU(page))
+					deactivate_page(page);
+			} else
+				SetPageScfslower(page);
 		}
-#endif
-#if 0
-		if ((filp->f_flags & O_SCFSLOWER) && /* SCFS lower pages */
-			(((ret == PAGE_CACHE_SIZE) || /* Seq.Read : all pages except last one */
-			(PageScfslower(page) && !offset)) /* Seq.Read : last page */
-			|| (ra->size <= 4))) { /* Ran.Read */
-#else
-		if ((filp->f_flags & O_SCFSLOWER) && /* SCFS lower pages */
-			((ret == PAGE_CACHE_SIZE) || /* Internal pages except first and last ones */
-			(PageScfslower(page) && !offset) || /* page was sequentially referenced before due to preceding cluster access */
-#if 0
-			(prev_index >= ra->start))) { /* first or last pages: initial readahead or random read */
-#else
-			!is_sequential)) { /* first or last pages: random read */
-#endif
-#endif
-			SetPageNocache(page);
-			if (PageLRU(page))
-				deactivate_page(page);
-		}
-		else if (filp->f_flags & O_SCFSLOWER)
-			SetPageScfslower(page);
 #endif
 
 		page_cache_release(page);

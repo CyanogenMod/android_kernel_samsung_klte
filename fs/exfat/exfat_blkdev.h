@@ -42,5 +42,5 @@ extern "C" {
 	INT32 bdev_sync(struct super_block *sb);
 #ifdef __cplusplus
 }
-#endif 
+#endif
 #endif

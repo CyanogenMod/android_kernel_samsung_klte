@@ -36,9 +36,9 @@
 		qcom,mdss-pan-dsi-dma-tr = <0x04>;
 		qcom,mdss-pan-dsi-frame-rate = <60>;
 		qcom,panel-on-cmds = [32 01 00 00 00 00 02 00 00];
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-off-cmds = [22 01 00 00 00 00 02 00 00];
-		qcom,off-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,off-cmds-dsi-state = "dsi_lp_mode";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
 	};
 };

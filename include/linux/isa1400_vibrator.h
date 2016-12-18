@@ -19,11 +19,6 @@
 #define ISA1400_STATUS_SLEEP        0
 #define ISA1400_STATUS_STANDBY      1
 
-#define CH1             0
-#define CH2             1
-#define CH3             2
-#define CH4             3
-
 #define ISA1400_REG_ID              0x00
 
 #define ISA1400_REG_RSTCTRL         0x0f
@@ -110,14 +105,12 @@ struct isa1400_vibrator_platform_data {
 	int (*clk_en) (bool) ;
 	const u8 **reg_data;
 	int max_timeout;
-	int actuactor_num;
-	const u8 *actuator;
 };
 
 #if defined(CONFIG_MOTOR_DRV_ISA1400)
 extern int isa1400_i2c_write(u8 addr, int length, u8 *data);
 extern void isa1400_chip_enable(bool en);
-extern void isa1400_clk_config(u8 index, int duty);
+extern void isa1400_clk_config(int duty);
 #endif
 
 

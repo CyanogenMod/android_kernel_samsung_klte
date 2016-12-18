@@ -406,11 +406,28 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	int ret;
 
 	if (!list_empty(&wb->register_queue)) {
+		struct ion_client *iclient = mdss_get_ionclient();
+		struct ion_handle *ihdl;
+
+		if (!iclient) {
+			pr_err("iclient is NULL\n");
+			return NULL;
+		}
+
+		ihdl = ion_import_dma_buf(iclient, data->memory_id);
+		if (IS_ERR_OR_NULL(ihdl)) {
+			pr_err("unable to import fd %d\n", data->memory_id);
+			return NULL;
+		}
+		/* only interested in ptr address, so we can free handle */
+		ion_free(iclient, ihdl);
+
 		list_for_each_entry(node, &wb->register_queue, registered_entry)
-			if ((node->buf_info.memory_id == data->memory_id) &&
+			if ((node->buf_data.p[0].srcp_ihdl == ihdl) &&
 				    (node->buf_info.offset == data->offset)) {
-				pr_debug("found node fd=%x off=%x addr=%x\n",
-						data->memory_id, data->offset,
+				pr_debug("found fd=%d hdl=%p off=%x addr=%x\n",
+						data->memory_id, ihdl,
+						data->offset,
 						node->buf_data.p[0].addr);
 				return node;
 			}
@@ -465,8 +482,9 @@ static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
 
 	if (node->user_alloc) {
 		buf = &node->buf_data.p[0];
-		pr_debug("free user node mem_id=%d offset=%u addr=0x%x\n",
+		pr_debug("free user mem_id=%d ihdl=%p, offset=%u addr=0x%x\n",
 				node->buf_info.memory_id,
+				buf->srcp_ihdl,
 				node->buf_info.offset,
 				buf->addr);
 
@@ -547,10 +565,16 @@ static int mdss_mdp_wb_dequeue(struct msm_fb_data_type *mfd,
 {
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_wb_data *node = NULL;
+	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 	int ret;
 
 	if (!wb) {
 		pr_err("unable to dequeue, writeback is not initialized\n");
+		return -ENODEV;
+	}
+
+	if (!ctl) {
+		pr_err("unable to dequeue, ctl is not initialized\n");
 		return -ENODEV;
 	}
 
@@ -563,6 +587,7 @@ static int mdss_mdp_wb_dequeue(struct msm_fb_data_type *mfd,
 	mutex_lock(&wb->lock);
 	if (wb->state == WB_STOPING) {
 		pr_debug("wfd stopped\n");
+		mdss_mdp_display_wait4comp(ctl);
 		wb->state = WB_STOP;
 		ret = -ENOBUFS;
 	} else if (!list_empty(&wb->busy_queue)) {

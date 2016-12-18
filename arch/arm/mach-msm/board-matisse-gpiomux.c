@@ -1563,12 +1563,24 @@ static struct gpiomux_setting gpio_10_sda_config = {
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_OUT_LOW,
 };
+static struct gpiomux_setting gpio_12_sda_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
 static struct msm_gpiomux_config msm_sda_configs[] = {
 	{
 		.gpio = 10,
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &gpio_10_sda_config,
 			[GPIOMUX_SUSPENDED] = &gpio_10_sda_config,
+		},
+	},
+	{
+		.gpio = 12,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_12_sda_config,
+			[GPIOMUX_SUSPENDED] = &gpio_12_sda_config,
 		},
 	},
 };

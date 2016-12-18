@@ -755,7 +755,11 @@ static void smb358_charger_function_control(
 		case POWER_SUPPLY_TYPE_LAN_HUB:
 		case POWER_SUPPLY_TYPE_MHL_900:
 		case POWER_SUPPLY_TYPE_MHL_1500:
+		case POWER_SUPPLY_TYPE_SMART_OTG:
 		case POWER_SUPPLY_TYPE_SMART_NOTG:
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+		case POWER_SUPPLY_TYPE_MDOCK_TA:
+#endif
                     /* High-current mode */
                     data = 0x03;
 			break;
@@ -765,8 +769,10 @@ static void smb358_charger_function_control(
 		case POWER_SUPPLY_TYPE_USB_ACA:
 		case POWER_SUPPLY_TYPE_MHL_500:
 		case POWER_SUPPLY_TYPE_MHL_USB:
-		case POWER_SUPPLY_TYPE_SMART_OTG:
 		case POWER_SUPPLY_TYPE_POWER_SHARING:
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+		case POWER_SUPPLY_TYPE_MDOCK_USB:
+#endif
 			/* USB5 */
 			data = 0x02;
 			break;
@@ -1253,6 +1259,16 @@ bool smb358_hal_chg_set_property(struct i2c_client *client,
 				pr_info("%s: ps disable\n", __func__);
 			}
 		}
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+		if(charger->is_mdock) {
+			if(charger->is_smartotg)
+				charger->cable_type = POWER_SUPPLY_TYPE_SMART_OTG;
+			else
+				charger->cable_type = POWER_SUPPLY_TYPE_MDOCK_TA;
+
+			pr_debug("%s: cable type %d\n", __func__, charger->cable_type);
+		}
+#endif
 		if (charger->cable_type == POWER_SUPPLY_TYPE_OTG) {
 			smb358_charger_otg_control(client);
 		} else if (charger->cable_type == POWER_SUPPLY_TYPE_BATTERY) {
@@ -1430,9 +1446,22 @@ static int smb358_chg_set_property(struct power_supply *psy,
 				val->intval == POWER_SUPPLY_TYPE_POWER_SHARING) {
 			charger->is_charging = false;
 			charger->is_slow_charging = false;
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+			charger->is_mdock = false;
+			charger->is_smartotg = false;
+#endif
 		}
-		else
+		else {
 			charger->is_charging = true;
+#if defined(CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK)
+			if(val->intval == POWER_SUPPLY_TYPE_SMART_NOTG)
+				charger->is_smartotg = false;
+			else if (val->intval == POWER_SUPPLY_TYPE_SMART_OTG)
+				charger->is_smartotg = true;
+			if (val->intval == POWER_SUPPLY_TYPE_MDOCK_TA)
+				charger->is_mdock = true;
+#endif
+		}
 
 		if (!smb358_hal_chg_set_property(charger->client, psp, val))
 			return -EINVAL;

@@ -647,10 +647,15 @@ static void reduce_input_current(struct max77803_charger_data *charger, int cur)
 static int max77803_get_vbus_state(struct max77803_charger_data *charger)
 {
 	u8 reg_data;
+	union power_supply_propval value;
 
 	max77803_read_reg(charger->max77803->i2c,
 		MAX77803_CHG_REG_CHG_DTLS_00, &reg_data);
-	if (charger->cable_type == POWER_SUPPLY_TYPE_WIRELESS)
+
+	psy_do_property("battery", get, POWER_SUPPLY_PROP_ONLINE,
+			value);
+
+	if (value.intval  == POWER_SUPPLY_TYPE_WIRELESS)
 		reg_data = ((reg_data & MAX77803_WCIN_DTLS) >>
 			MAX77803_WCIN_DTLS_SHIFT);
 	else
@@ -908,6 +913,7 @@ static int sec_chg_set_property(struct power_supply *psy,
 	int set_charging_current, set_charging_current_max;
 	const int usb_charging_current = charger->pdata->charging_current[
 		POWER_SUPPLY_TYPE_USB].fast_charging_current;
+	u8 chg_cnfg_00;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
@@ -917,15 +923,21 @@ static int sec_chg_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		/* check and unlock */
 		check_charger_unlock_state(charger);
+
 		if (val->intval == POWER_SUPPLY_TYPE_POWER_SHARING) {
 			psy_do_property("ps", get,
-				POWER_SUPPLY_PROP_STATUS, value);
+					POWER_SUPPLY_PROP_STATUS, value);
+			chg_cnfg_00 = CHG_CNFG_00_OTG_MASK
+				| CHG_CNFG_00_BOOST_MASK
+				| CHG_CNFG_00_DIS_MUIC_CTRL_MASK;
 			if (value.intval) {
 				max77803_update_reg(charger->max77803->i2c, MAX77803_CHG_REG_CHG_CNFG_00,
-					1 << CHG_CNFG_00_OTG_SHIFT, CHG_CNFG_00_OTG_MASK);
+						chg_cnfg_00, chg_cnfg_00);
+				pr_info("%s: ps enable\n", __func__);
 			} else {
 				max77803_update_reg(charger->max77803->i2c, MAX77803_CHG_REG_CHG_CNFG_00,
-					0, CHG_CNFG_00_OTG_MASK);
+						0, chg_cnfg_00);
+				pr_info("%s: ps disable\n", __func__);
 			}
 			break;
 		}

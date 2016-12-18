@@ -309,34 +309,6 @@ static int sm5502_read_reg(struct i2c_client *client, int reg)
 }
 
 
-static void sm5502_disable_interrupt(void)
-{
-	struct i2c_client *client = local_usbsw->client;
-	int value, ret;
-
-	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value |= CON_INT_MASK;
-
-	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
-	if (ret < 0)
-		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
-
-}
-
-static void sm5502_enable_interrupt(void)
-{
-	struct i2c_client *client = local_usbsw->client;
-	int value, ret;
-
-	value = i2c_smbus_read_byte_data(client, REG_CONTROL);
-	value &= (~CON_INT_MASK);
-
-	ret = i2c_smbus_write_byte_data(client, REG_CONTROL, value);
-	if (ret < 0)
-		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
-
-}
-
 static void sm5502_dock_control(struct sm5502_usbsw *usbsw,
 	int dock_type, int state, int path)
 {
@@ -1047,6 +1019,9 @@ static void muic_update_jig_state(struct sm5502_usbsw *usbsw, int dev_type2, int
 		usbsw->attached_dev = ATTACHED_DEV_JIG_USB_ON_MUIC;
 }
 
+#if defined CONFIG_ID_BYPASS_SBL
+int otg_attached = 0;
+#endif
 
 static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 {
@@ -1172,7 +1147,9 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 	} else if (val1 & DEV_USB_OTG && adc == ADC_OTG) {
 		pr_info("[MUIC] OTG Connected\n");
 		usbsw->attached_dev = ATTACHED_DEV_OTG_MUIC;
-
+#if defined CONFIG_ID_BYPASS_SBL
+		otg_attached = 1;
+#endif
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
 		sm5502_enable_rawdataInterrupts(usbsw);
 		usbsw->dock_attached = SM5502_ATTACHED;
@@ -1207,12 +1184,10 @@ static int sm5502_attach_dev(struct sm5502_usbsw *usbsw)
 	/* MHL */
 	} else if (val3 & DEV_MHL) {
 		pr_info("[MUIC] MHL Connected\n");
-		sm5502_disable_interrupt();
 		if (!poweroff_charging)
 			/*mhl_ret = mhl_onoff_ex(1); support from sii8240*/
 		else
 			pr_info("LPM mode, skip MHL sequence\n");
-		sm5502_enable_interrupt();
 #endif
 	/* Car Dock */
 	} else if (val2 & DEV_JIG_UART_ON) {
@@ -1344,6 +1319,9 @@ static int sm5502_detach_dev(struct sm5502_usbsw *usbsw)
 	/* for SAMSUNG OTG */
 	} else if (usbsw->dev1 & DEV_USB_OTG) {
 		pr_info("[MUIC] OTG Disconnected\n");
+#if defined CONFIG_ID_BYPASS_SBL
+		otg_attached = 0;
+#endif
 #if defined(CONFIG_MUIC_SM5502_SUPPORT_LANHUB_TA)
 		sm5502_disable_rawdataInterrupts(usbsw);
 		pr_info("%s:lanhub_ta_status(%d)\n",
@@ -1482,10 +1460,8 @@ static irqreturn_t sm5502_irq_thread(int irq, void *data)
 	pr_info("sm5502_irq_thread is called\n");
 
 	mutex_lock(&usbsw->mutex);
-	sm5502_disable_interrupt();
 	intr1 = i2c_smbus_read_byte_data(client, REG_INT1);
 	intr2 = i2c_smbus_read_byte_data(client, REG_INT2);
-	sm5502_enable_interrupt();
 
 	adc = i2c_smbus_read_byte_data(client, REG_ADC);
 	dev_info(&client->dev, "%s: intr1 : 0x%x,intr2 : 0x%x, adc : 0x%x\n",

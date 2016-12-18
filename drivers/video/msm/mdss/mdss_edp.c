@@ -33,6 +33,8 @@
 #include <mach/dma.h>
 
 #include "mdss.h"
+#include "mdss_panel.h"
+#include "mdss_mdp.h"
 #include "mdss_edp.h"
 #include "mdss_debug.h"
 #include <linux/qpnp/pin.h>
@@ -886,6 +888,8 @@ int mdss_edp_on(struct mdss_panel_data *pdata)
 
 	pr_info("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+
 #if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
 	mutex_lock(&edp_power_state_chagne);
 	INIT_COMPLETION(edp_power_sync);
@@ -980,7 +984,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	pr_debug("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
+	pr_err("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
 	/* wait until link training is completed */
 	mutex_lock(&edp_drv->train_mutex);
@@ -1014,6 +1018,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 	mdss_edp_clk_disable(edp_drv);
 	mdss_edp_unprepare_clocks(edp_drv);
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	mdss_edp_aux_ctrl(edp_drv, 0);
 
 	mdss_edp_regulator_off(edp_drv);
@@ -1026,8 +1031,9 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 	qpnp_pin_config(edp_drv->gpio_panel_en, &LCD_EN_PM_GPIO_SLEEP);
 #endif
 	msleep(100); /* NDRA needs some delay after shutdown power */
-	pr_info("%s:- %s\n", __func__, eeprom_version);
+	pr_err("%s:-- %s\n", __func__, eeprom_version);
 
+	mutex_unlock(&edp_drv->train_mutex);
 	return 0;
 }
 
@@ -1484,7 +1490,7 @@ irqreturn_t edp_isr(int irq, void *ptr)
 	isr1 &= ~mask1;	/* remove masks bit */
 	isr2 &= ~mask2;
 
-	pr_debug("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
+	pr_err("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
 			__func__, isr1, mask1, isr2, mask2);
 
 	ack = isr1 & EDP_INTR_STATUS1;
@@ -1697,6 +1703,10 @@ static int __devinit mdss_edp_probe(struct platform_device *pdev)
 
 	pr_info("%s:cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
+	/* need mdss clock to receive irq */
+	if (!edp_drv->cont_splash)
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+
 	/* only need aux and ahb clock for aux channel */
 	mdss_edp_prepare_aux_clocks(edp_drv);
 	mdss_edp_aux_clk_enable(edp_drv);
@@ -1730,6 +1740,9 @@ static int __devinit mdss_edp_probe(struct platform_device *pdev)
 
 	mdss_edp_aux_clk_disable(edp_drv);
 	mdss_edp_unprepare_aux_clocks(edp_drv);
+
+	if (!edp_drv->cont_splash)
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 
 	if (edp_drv->cont_splash) { /* vote for clocks */
 		mdss_edp_regulator_on(edp_drv);

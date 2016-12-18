@@ -314,8 +314,10 @@ static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
 			msm_isp_update_framedrop_reg(vfe_dev);
 		}
 	}
-	if (irq_status0 & (1 << 1))
+	if (irq_status0 & (1 << 1)){
+		vfe_dev->eof_event_occur = 1; 
 		ISP_DBG("%s: EOF IRQ\n", __func__);
+	}
 	if (irq_status0 & (1 << 2))
 		ISP_DBG("%s: EPOCH0 IRQ\n", __func__);
 	if (irq_status0 & (1 << 3))

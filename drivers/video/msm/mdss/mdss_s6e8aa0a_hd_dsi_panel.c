@@ -89,7 +89,7 @@ static char panel_cond_aid_ref[] = {
 	0x08, 0x23, 0x37, 0xC0, 0xC1,
 	0x01, 0x81, 0xC1, 0x00, 0xC3,
 	0xF6, 0xF6, 0xC1,
-	
+
 /*	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00,*/
 };
@@ -99,7 +99,7 @@ static char etc_cond_set3_aid_ref[] = {
 	0x14, 0x40, 0x0C, 0xCB, 0xCE,
 	0x6E, 0xC4, 0x07, 0xC0, 0x41,
 	0xC1, 0x00, 0x60, 0x19,
-	
+
 /*	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00,*/
 };
@@ -111,7 +111,7 @@ static char oled_gamma_7500K[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00,
-	
+
 /*	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00,*/
 };
@@ -119,7 +119,7 @@ static char oled_gamma_7500K[] = {
 static char gamma_set_update[] = {
 	0xF7,
 	0x03,
-	
+
 /*	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00,*/
 };
@@ -143,7 +143,7 @@ static char acl_set_zero[] = {
 static char acl_on[] = {
 	0xC0,
 	0x01,
-	
+
 	0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00,
 };
@@ -178,8 +178,8 @@ static char ACL_COND_SET_33[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00,
 	0x01, 0x06, 0x0A, 0x0F, 0x14, 0x19,
 	0x1D, 0x22, 0x27, 0x2B, 0x30,
-	
-	
+
+
 };
 
 
@@ -226,8 +226,8 @@ static int GET_ELVSS_ID_4_8[] = {
 	0x0C,// 0 = 20_dimming,
 	0x0C,// 1 = 30
 	0x0C,  // 2 = 40
-	0x0C,//3        	
-	0x0C,//4 	
+	0x0C,//3
+	0x0C,//4
 	0x0C,//5 = 70
 	0x0C,//6 = 80
 	0x0C,//7 = 90
@@ -267,8 +267,8 @@ static int GET_SMART_ACL_ID_4_8[] = {
 	0x11,// 0 = 20_dimming,
 	0x11,// 1 = 30
 	0x11,  // 2 = 40
-	0x11,//3        	
-	0x11,//4 	
+	0x11,//3
+	0x11,//4
 	0x11,//5 = 70
 	0x11,//6 = 80
 	0x11,//7 = 90
@@ -379,8 +379,8 @@ static struct dsi_cmd_desc samsung_panel_acl_update_cmds[] = {
 	 sizeof(ACL_COND_SET_40)}, ACL_COND_SET_40}
 	,
 };
-	
-	
+
+
 
 static struct dsi_cmd_desc DSI_CMD_ACL_40 = {
 	{DTYPE_DCS_LWRITE, 1, 0, 0, 0, sizeof(ACL_COND_SET_40)}, ACL_COND_SET_40 };
@@ -438,7 +438,7 @@ static int get_candela_index(int bl_level)
 	int backlightlevel;
 
 	//brightness setting from platform is from 0 to 255
-	 // But in this driver, brightness is only supported from 0 to 24 
+	 // But in this driver, brightness is only supported from 0 to 24
 
 	switch (bl_level) {
 	case 0 ... 20:
@@ -584,7 +584,7 @@ static int set_elvss_level_4_8(int bl_level)
 	cd = get_candela_index(bl_level);
 	elvss_pulse = mpd.lcd_elvss_data[0];
 
-	if (msd.dstat.acl_on) 
+	if (msd.dstat.acl_on)
 	{
 		calc_elvss = elvss_pulse + GET_SMART_ACL_ID_4_8[cd];
 	}
@@ -610,7 +610,7 @@ static int set_elvss_level_4_8(int bl_level)
 
 #define aid_ratio_index 18
 static int aid_below_110_ratio_table[10][2] = {
-	//	RATIO	
+	//	RATIO
 	{20,	0x88},
 	{30,	0x7A},
 	{40,	0x6C},
@@ -620,7 +620,7 @@ static int aid_below_110_ratio_table[10][2] = {
 	{80,	0x32},
 	{90,	0x22},
 	{100,	0x12},
-	//upper 110CD 
+	//upper 110CD
 	{110,	0x42},
 };
 static int  aid_operation(int lux)
@@ -702,7 +702,7 @@ static int  aid_operation(int lux)
 			aid_status = 1;
 		}
 		pr_debug("%s brightness_level : %d adi_status:%d\n", __func__,lux, aid_status);
-	
+
 	no_change = (panel_cond_aid_ref_1 == panel_cond_aid_ref[1])
 		&& (panel_cond_aid_ref_18 == panel_cond_aid_ref[18])
 		&& (etc_cond_set3_aid_ref_9 == etc_cond_set3_aid_ref[9]);
@@ -728,7 +728,7 @@ static int set_gamma_level(int bl_level, unsigned char gamma_mode)
 
 	if (gamma_mode == GAMMA_SMART) {
 
-		//  SMART Dimming gamma_lux;  
+		//  SMART Dimming gamma_lux;
 		char pBuffer[256];
 		int i;
 		int gamma_lux;
@@ -798,7 +798,7 @@ static int prepare_brightness_control_cmd_array(int lcd_type, int bl_level)
 	if (!set_elvss_level_4_8(bl_level)){
 		cmds_send_flag |= 1<<1;
 	}
-	
+
 	if (msd.dstat.acl_on) {
 		int acl_change = is_acl_para_change(bl_level);
 		int acl_30_40_case = set_acl_on_level(bl_level);
@@ -824,7 +824,7 @@ static int prepare_brightness_control_cmd_array(int lcd_type, int bl_level)
 		cmd_size++;
 	}
 
-	if (cmds_send_flag & 0x10) { // acl update 
+	if (cmds_send_flag & 0x10) { // acl update
 
 		combined_ctrl[cmd_size].payload =
 			samsung_panel_acl_update_cmds[0].payload;
@@ -844,7 +844,7 @@ static int prepare_brightness_control_cmd_array(int lcd_type, int bl_level)
 	cmd_size++;
 
 	if (cmds_send_flag & 0x1) {
-		// aid change 
+		// aid change
 		combined_ctrl[cmd_size].payload = panel_cond_aid_ref;
 		combined_ctrl[cmd_size].dchdr.dlen = sizeof(panel_cond_aid_ref);
 		cmd_size++;
@@ -854,7 +854,7 @@ static int prepare_brightness_control_cmd_array(int lcd_type, int bl_level)
 		cmd_size++;
 	}
 
-	if (cmds_send_flag & 0x2) { // elvss change 
+	if (cmds_send_flag & 0x2) { // elvss change
 
 		combined_ctrl[cmd_size].payload =
 			samsung_panel_elvss_update_cmds[0].payload;
@@ -929,7 +929,7 @@ void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *c
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = cmds;
 	cmdreq.cmds_cnt = cnt;
-	
+
 	if (flag & CMD_REQ_SINGLE_TX) {
 		cmdreq.flags = CMD_REQ_SINGLE_TX | CMD_CLK_CTRL | CMD_REQ_COMMIT;
 	}else
@@ -937,9 +937,9 @@ void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *c
 
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
-	
+
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
-	
+
 }
 
 
@@ -975,15 +975,15 @@ u32 mdss_dsi_cmd_receive(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *
         cmdreq.flags = CMD_REQ_RX | CMD_REQ_COMMIT;
         cmdreq.rlen = rlen;
         cmdreq.cb = NULL;
-        
+
         // This mutex is to sync up with dynamic FPS changes
     	// so that DSI lockups shall not happen
-    	
+
     	BUG_ON(msd.ctrl_pdata == NULL);
 //    	mutex_lock(&msd.ctrl_pdata->dfps_mutex);
         mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 //      mutex_unlock(&msd.ctrl_pdata->dfps_mutex);
-        
+
          // blocked here, untill call back called
         return ctrl->rx_buf.len;
 }
@@ -995,23 +995,23 @@ static void read_reg(char srcReg, int srcLength, char *destBuffer,
 	const int one_read_size = 4;
 
 	const int loop_limit = 16;
-	// first byte = read-register 
+	// first byte = read-register
 	static char read_reg[2] = { 0xFF, 0x00 };
 	static struct dsi_cmd_desc s6e8aa0_read_reg_cmd[] = {{
 	{DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(read_reg)}, read_reg}, };
-	// first byte is size of Register 
+	// first byte is size of Register
 	static char packet_size[] = { 0x04, 0 };
 	static struct dsi_cmd_desc s6e8aa0_packet_size_cmd[] = {{
 	{DTYPE_MAX_PKTSIZE, 1, 0, 0, 0, sizeof(packet_size)}, packet_size}, };
 
-	// second byte is Read-position 
+	// second byte is Read-position
 	static char reg_read_pos[] = { 0xB0, 0x00 };
 	static struct dsi_cmd_desc s6e8aa0_read_pos_cmd[] = {{
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(reg_read_pos)},reg_read_pos}, };
 
 	struct dsi_cmd_desc *cmd_desc;
 	int cmd_size = 0;
-        
+
 	int flag = 0;
 
 
@@ -1036,7 +1036,7 @@ static void read_reg(char srcReg, int srcLength, char *destBuffer,
 	cmd_size = ARRAY_SIZE(s6e8aa0_packet_size_cmd);
 
 	packet_size[0] = (char)srcLength;
-	
+
 	mdss_dsi_cmds_send(msd.ctrl_pdata, cmd_desc, cmd_size, flag);
 
 
@@ -1174,7 +1174,7 @@ unsigned char mdss_dsi_panel_pwm_scaling(int level)
 	return scaled_level;
 }
 
-#if defined (CONFIG_LCD_CLASS_DEVICE) 
+#if defined (CONFIG_LCD_CLASS_DEVICE)
 static char lcd_cabc[2] = {0x55, 0x0};	/* CABC COMMAND : default disabled */
 static struct dsi_cmd_desc cabc_cmd= {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(lcd_cabc)},
@@ -1183,7 +1183,7 @@ static struct dsi_cmd_desc cabc_cmd= {
 
 static void mdss_dsi_panel_cabc_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int siop_status)
 {
-	
+
 	struct dcs_cmd_req cmdreq;
 
 	pr_debug("%s: cabc=%d\n", __func__, siop_status);
@@ -1267,7 +1267,7 @@ void mdss_dsi_s6e8aa0a_panel_reset(struct mdss_panel_data *pdata, int enable)
 			pr_debug("%s: Reset panel done\n", __func__);
 		}
 	} else {
-		
+
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 
@@ -1329,17 +1329,17 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 			cmd_size = mpd.acl_off.size;
 
 			break;
-			
+
 		case PANEL_ACL_UPDATE:
 
 			cmd_desc = mpd.acl_update.cmd;
 			cmd_size = mpd.acl_update.size;
-			
+
 			break;
 
 		default:
 		pr_err("%s: Unknown acl_ctrl configuration\n",__func__);
-		
+
 		break;
 	}
 
@@ -1352,7 +1352,7 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 				}
 #endif
 
-				mdss_dsi_cmds_send(ctrl_pdata, cmd_desc, cmd_size, flag);		
+				mdss_dsi_cmds_send(ctrl_pdata, cmd_desc, cmd_size, flag);
 
 
 	return;
@@ -1380,7 +1380,7 @@ static void err_fg_work_func(struct work_struct *work)
 	struct mdss_panel_data *pdata = msd.mpd;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct msm_fb_data_type *mfd= msd.mfd;
-	struct mdss_mdp_ctl *msdCtl = mfd_to_ctl(mfd); 
+	struct mdss_mdp_ctl *msdCtl = mfd_to_ctl(mfd);
 
 	if(msd.mfd == NULL){
 		pr_err("%s: mfd not initialized Skip ESD recovery\n", __func__);
@@ -1402,15 +1402,15 @@ static void err_fg_work_func(struct work_struct *work)
 	err_fg_working = 1;
 
 	mdss_mdp_rotator_unset(MDSS_MDP_ROT_SESSION_MASK);
-	
+
 	msd.mfd->fbi->esd_active = true;
 	msd.mfd->fbi->fbops->fb_blank(FB_BLANK_POWERDOWN, msd.mfd->fbi);
 	msd.mfd->fbi->fbops->fb_blank(FB_BLANK_UNBLANK, msd.mfd->fbi);
 
-	if (msdCtl->vsync_handler.enabled == 0) { 
+	if (msdCtl->vsync_handler.enabled == 0) {
 		mdss_mdp_overlay_vsync_ctrl(msd.mfd, 1);
-//	        mdss_mdp_irq_clear(msdCtl->mdata, MDSS_MDP_IRQ_INTF_VSYNC, msdCtl->intf_num); 
-//		mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_VSYNC, msdCtl->intf_num); 
+//	        mdss_mdp_irq_clear(msdCtl->mdata, MDSS_MDP_IRQ_INTF_VSYNC, msdCtl->intf_num);
+//		mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_VSYNC, msdCtl->intf_num);
 	}
 
 	esd_count++;
@@ -1479,11 +1479,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	if(first_boot == 0)
 	{
-		
+
 		msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
 		panel_state = MIPI_RESUME_STATE;
 		msd.mpd = pdata;
-	
+
 		msd.ctrl_pdata = ctrl_pdata;
 		first_boot =1;
 
@@ -1498,9 +1498,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 				psmart->plux_table = mpd.lux_table;
 				psmart->lux_table_max = mpd.lux_table_max_cnt;
 				psmart->ldi_revision = 0x60;
-		
+
 				smart_dimming_init(psmart);
-		
+
 				msd.dstat.is_smart_dim_loaded = true;
 
 			}
@@ -1509,12 +1509,12 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 						GAMMA_SET_MAX);
 			reset_gamma_level();
 #if defined(CONFIG_ESD_ERR_FG_RECOVERY)
-#if defined (CONFIG_LCD_CONNECTION_CHECK)	
+#if defined (CONFIG_LCD_CONNECTION_CHECK)
 			if(lcd_connected_status == 1){
 #endif
 					INIT_WORK(&err_fg_work, err_fg_work_func);
-					
-					rc = request_threaded_irq(err_fg_gpio, NULL, err_fg_irq_handler, 
+
+					rc = request_threaded_irq(err_fg_gpio, NULL, err_fg_irq_handler,
 						IRQF_TRIGGER_LOW | IRQF_ONESHOT, "esd_detect", NULL);
 					if (rc) {
 						pr_err("%s : Failed to request_irq. :ret=%d", __func__, rc);
@@ -1528,7 +1528,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 #endif
 #endif
 	}
-	
+
 #if defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	if (err_fg_working) {
 		pr_info("[LCD] %s : esd is working!! return.. \n", __func__);
@@ -1538,7 +1538,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	if(bl_level)
 	msd.mfd->bl_previous = bl_level;
-	
+
 	switch (ctrl_pdata->bklt_ctrl) {
 
 	case BL_DCS_CMD:
@@ -1553,7 +1553,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 					pr_info("cmds_sent: %x\n", cmds_sent);
 					goto end;
 				}
-				
+
 				cmd_desc = mpd.combined_ctrl.cmd;
 				cmd_size = mpd.combined_ctrl.size;
 
@@ -1566,15 +1566,15 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 				}
 #endif
 
-				mdss_dsi_cmds_send(ctrl_pdata, cmd_desc, cmd_size, flag);				
-				
+				mdss_dsi_cmds_send(ctrl_pdata, cmd_desc, cmd_size, flag);
+
 				}
-			
+
 		break;
-		
+
 	default:
 		pr_err("%s: Unknown bl_ctrl configuration\n",__func__);
-		
+
 		break;
 	}
 
@@ -1585,35 +1585,35 @@ int bl_first_update=0;
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
-	
+
 	msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	
+
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	
+
 	msd.ctrl_pdata = ctrl;
 	msd.mpd = pdata;
-	
+
 	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-	
+
 			get_min_lux_table(&(mpd.gamma_initial[2]),
 						GAMMA_SET_MAX);
 			reset_gamma_level();
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
-		
-#if defined(CONFIG_MACH_S3VE3G_EUR)	
+
+#if defined(CONFIG_MACH_S3VE3G_EUR)
 	if(bl_first_update== 0)
 		pr_err("to maintain ddefault brightness \n");
 	else
 		mdss_dsi_panel_bl_ctrl(pdata,msd.mfd->bl_previous);
 #endif
-	
+
 	panel_state = MIPI_RESUME_STATE;
 #if defined(CONFIG_LCD_CLASS_DEVICE)
 	mdss_dsi_panel_cabc_dcs(ctrl, msd.dstat.siop_status);
@@ -1622,7 +1622,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	is_negative_on();
 #endif
 #if defined(CONFIG_ESD_ERR_FG_RECOVERY)
-#if defined (CONFIG_LCD_CONNECTION_CHECK)	
+#if defined (CONFIG_LCD_CONNECTION_CHECK)
 	if(lcd_connected_status == 1){
 #endif
 		if(!esd_irq_on && !err_fg_working) {
@@ -1888,7 +1888,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len, res[2];
 	const char *data;
 	static const char *pdest;
-	static const char *on_cmds_state, *off_cmds_state; 
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -1942,7 +1941,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mipi.dst_format =
 			DSI_VIDEO_DST_FORMAT_RGB888;
 	}
-	
+
 	pdest = of_get_property(np,
 			"qcom,mdss-dsi-panel-destination", NULL);
 	if (strlen(pdest) != 9) {
@@ -1994,7 +1993,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			rc = of_property_read_u32(np,
 				"qcom,mdss-dsi-bl-pmic-pwm-frequency", &tmp);
 			if (rc) {
-				pr_err("%s:%d, Error, panel pwm_period\n",		
+				pr_err("%s:%d, Error, panel pwm_period\n",
 					__func__, __LINE__);
 			return -EINVAL;
 			}
@@ -2024,7 +2023,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-interleave-mode", &tmp);
 	pinfo->mipi.interleave_mode = (!rc ? tmp : 0);
- 
+
 	pinfo->mipi.vsync_enable = of_property_read_bool(np,
 		"qcom,mdss-dsi-te-check-enable");
 	pinfo->mipi.hw_vsync_mode = of_property_read_bool(np,
@@ -2073,7 +2072,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-color-order", &tmp);
 	pinfo->mipi.rgb_swap = (!rc ? tmp : DSI_RGB_SWAP_RGB);
-	
+
 	rc = of_property_read_u32(np, "qcom,mdss-force-clk-lane-hs", &tmp);
 	pinfo->mipi.force_clk_lane_hs = (!rc ? tmp : 0);
 
@@ -2139,7 +2138,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	}
 	for (i = 0; i < len; i++)
 		pinfo->mipi.dsi_phy_db.timing[i] = data[i];
-		
+
 		pinfo->mipi.dsi_phy_db.timing[8] = 0x20;
 
 	mdss_dsi_parse_fbc_params(np, pinfo);
@@ -2148,29 +2147,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
 
- 
-        on_cmds_state = of_get_property(np, "qcom,mdss-dsi-on-command-state", NULL); 
- 
-        if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) { 
-            ctrl_pdata->dsi_on_state = DSI_LP_MODE; 
-        } else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) { 
-            ctrl_pdata->dsi_on_state = DSI_HS_MODE; 
-        } else { 
-             pr_debug("%s: ON cmds state not specified. Set Default\n", __func__); 
-             ctrl_pdata->dsi_on_state = DSI_LP_MODE; 
-        }
- 
-        off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL); 
- 
-        if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) { 
-            ctrl_pdata->dsi_off_state = DSI_LP_MODE; 
-        } else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) { 
-            ctrl_pdata->dsi_off_state = DSI_HS_MODE; 
-        } else { 
-            pr_debug("%s: ON cmds state not specified. Set Default\n", __func__); 
-            ctrl_pdata->dsi_off_state = DSI_LP_MODE; 
-        } 
-        pr_err("[ on state : %d, off state : %d\n",ctrl_pdata->dsi_on_state ,ctrl_pdata->dsi_off_state ); 
 	return 0;
 error:
 	return -EINVAL;
@@ -2197,7 +2173,7 @@ static ssize_t mipi_samsung_disp_acl_store(struct device *dev,
 	struct msm_fb_data_type *mfd;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_data *pdata = msd.mpd;
-	
+
 	mfd = msd.mfd;
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 							panel_data);
@@ -2275,14 +2251,14 @@ static ssize_t mdss_siop_enable_show(struct device *dev,
 static ssize_t mdss_siop_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
-	
+
 	if (sysfs_streq(buf, "1") && !msd.dstat.siop_status)
 		msd.dstat.siop_status = true;
 	else if (sysfs_streq(buf, "0") && msd.dstat.siop_status)
 		msd.dstat.siop_status = false;
 	else
 		pr_info("%s: Invalid argument!!", __func__);
-	
+
 	return size;
 
 }
@@ -2430,7 +2406,7 @@ void mdss_dsi_store_cabc(unsigned int cabc)
 	mutex_unlock(&bg_lock);
 	pr_info("%s :[MDSS_s6e8aa0a] CABC: %d\n", __func__,msd.dstat.siop_status);
 
-}	
+}
 
 #endif
 
@@ -2469,11 +2445,11 @@ static int __init detect_lcd_panel_vendor(char* read_id)
 		lcd_connected_status = 1;
 	else
 		lcd_connected_status = 0;
-	
+
 	pr_info("detect_lcd_panel_vendor lcd_id = %x & lcd_id3 = %x\n",lcd_id,lcd_id3);
 	pr_info("%s %s", __func__, lcd_connected_status == 1 ?
 				"lcd_attached" : "lcd_detached");
-	
+
 	return 1;
 }
 __setup("lcd_id=0x", detect_lcd_panel_vendor);
@@ -2565,32 +2541,32 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	mpd.gamma_update.cmd= samsung_panel_gamma_update_cmds;
 	mpd.gamma_update.size =  ARRAY_SIZE(samsung_panel_gamma_update_cmds);
-			
+
 	mpd.elvss_update.cmd= samsung_panel_elvss_update_cmds;
 	mpd.elvss_update.size= ARRAY_SIZE(samsung_panel_elvss_update_cmds);
-				 
+
 	mpd.elvss_update_4_8.cmd = samsung_panel_elvss_update_cmds_4_8;
 	mpd.elvss_update_4_8.size =	 ARRAY_SIZE(samsung_panel_elvss_update_cmds_4_8);
-				 
+
 	mpd.acl_on.cmd = samsung_panel_acl_on_cmds;
 	mpd.acl_on.size =	ARRAY_SIZE(samsung_panel_acl_on_cmds);
-					
+
 	mpd.acl_off.cmd = samsung_panel_acl_off_cmds;
 	mpd.acl_off.size =  ARRAY_SIZE(samsung_panel_acl_off_cmds);
-					
+
 	mpd.acl_update.cmd = samsung_panel_acl_update_cmds;
 	mpd.acl_update.size = ARRAY_SIZE(samsung_panel_acl_update_cmds);
-			
+
 	mpd.combined_ctrl.cmd = combined_ctrl;
 	mpd.combined_ctrl.size = ARRAY_SIZE(combined_ctrl);
-	
+
 	mpd.gamma_initial = gamma_cond_set_4_8;
 	mpd.gamma_smartdim_4_8 = gamma_cond_300cd_4_8;
 
 	mpd.lcd_current_cd_idx = -1;
 	mpd.lux_table = lux_tbl_acl;
 	mpd.lux_table_max_cnt = ARRAY_SIZE(lux_tbl_acl);
-		
+
 	mpd.set_acl = set_acl_on_level;
 	mpd.prepare_brightness_control_cmd_array = prepare_brightness_control_cmd_array;
 	msd.dstat.gamma_mode = GAMMA_SMART;
@@ -2612,7 +2588,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	if (rc) {
 		pr_info("sysfs create fail-%s\n",dev_attr_lcd_power.attr.name);
-	
+
 	}
 	rc = sysfs_create_file(&lcd_device->dev.kobj,
 					&dev_attr_lcd_type.attr);
@@ -2627,7 +2603,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("sysfs create fail-%s\n",
 				dev_attr_power_reduce.attr.name);
 	}
-	
+
 	rc= sysfs_create_file(&lcd_device->dev.kobj,
 					&dev_attr_siop_enable.attr);
 	if (rc) {
@@ -2650,7 +2626,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 	}
 
 
-	
+
 #endif
 #endif
 #if defined(CONFIG_MDNIE_LITE_TUNING)

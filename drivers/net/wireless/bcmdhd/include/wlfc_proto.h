@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 1999-2014, Broadcom Corporation
+* Copyright (C) 1999-2015, Broadcom Corporation
 * 
 *      Unless you and Broadcom execute a separate written software license
 * agreement governing use of this software, this software is licensed to you
@@ -18,7 +18,7 @@
 *      Notwithstanding the above, under no circumstances may you combine this
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
-* $Id: wlfc_proto.h 431159 2013-10-22 19:40:51Z $
+* $Id: wlfc_proto.h 587005 2015-09-17 11:26:26Z $
 *
 */
 #ifndef __wlfc_proto_definitions_h__
@@ -235,6 +235,8 @@
 #define WLFC_CTL_PKTFLAG_TOSSED_BYWLC	3
 /* Firmware tossed after retries */
 #define WLFC_CTL_PKTFLAG_DISCARD_NOACK	4
+/* Firmware wrongly reported suppressed previously,now fixing to acked */
+#define WLFC_CTL_PKTFLAG_SUPPRESS_ACKED	5
 
 #define WLFC_D11_STATUS_INTERPRET(txs)	\
 	(((txs)->status.suppr_ind !=  TX_STATUS_SUPR_NONE) ? \

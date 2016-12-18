@@ -65,6 +65,7 @@ static int touchkey_autocalibration(struct touchkey_i2c *tkey_i2c);
 #endif
 
 static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c);
+static bool is_same_module_class(struct touchkey_i2c *tkey_i2c);
 
 #ifdef TK_INFORM_CHARGER
 extern void touchkey_register_callback(void *cb);
@@ -272,6 +273,69 @@ out_i2c_write:
 	mutex_unlock(&tkey_i2c->i2c_lock);
 	return ret;
 }
+
+static void cypress_touchkey_interrupt_set_dual(struct touchkey_i2c *tkey_i2c)
+{
+	struct i2c_client *client = tkey_i2c->client;
+	int ret = 0;
+	int retry = 5;
+	u8 data[3] = {0, };
+
+	ret = is_same_module_class(tkey_i2c);
+	if (!ret) {
+		dev_err(&client->dev,
+			"%s: not support this module 0x%02x\n",
+			__func__, tkey_i2c->md_ver_ic);
+		return;
+	}
+
+	if (tkey_i2c->fw_ver_ic <= CYPRESS_RECENT_BACK_REPORT_FW_VER) {
+		dev_err(&client->dev,
+			"%s: not support this version 0x%02x\n",
+			__func__, tkey_i2c->fw_ver_ic);
+		return;
+	}
+	
+	while (retry--) {
+		data[0] = TK_CMD_DUAL_DETECTION;
+		data[1] = 0x00;
+		data[2] = TK_BIT_DETECTION_CONFIRM;
+
+		//ret = i2c_touchkey_write(tkey_i2c, CYPRESS_REG_DETECTION, &data[0], 3);
+		ret = i2c_smbus_write_i2c_block_data(client, 0x18, 3, &data[0]);
+		if (ret < 0) {
+			dev_err(&client->dev,
+				"%s: i2c write error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+		msleep(30);
+
+		data[0] = CYPRESS_REG_DETECTION_FLAG;
+		
+		//ret = i2c_touchkey_read(tkey_i2c, data[0], &data[1], 1);
+		ret = i2c_smbus_read_i2c_block_data(client, data[0], 1, &data[1]);
+		if (ret < 0) {
+			dev_err(&client->dev,
+				"%s: i2c read error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+
+		if (data[1] != 1) {
+			dev_err(&client->dev,
+				"%s: interrupt set: 0x%X, failed.\n",
+				__func__, data[1]);
+			continue;
+		}
+
+		dev_info(&client->dev,
+			"%s: interrupt set: 0x%X\n", __func__, data[1]);
+		break;
+	}
+
+}
+
 
 #if defined(TK_HAS_AUTOCAL)
 static int touchkey_autocalibration(struct touchkey_i2c *tkey_i2c)
@@ -618,6 +682,10 @@ void touchkey_flip_cover(int value)
 			tkey_i2c->pdata->power_on(1);
 			msleep(300);
 			printk(KERN_DEBUG"touchkey:%s, reset ic\n", __func__);
+
+			/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+			cypress_touchkey_interrupt_set_dual(tkey_i2c);
+
 		}
 	}
 
@@ -648,7 +716,7 @@ void touchkey_grip_mode_ctr(struct touchkey_i2c *tkey_i2c)
 
 	if (tkey_i2c->grip_mode) {
 		tkey_i2c->pdata->power_on(1);
-		msleep(50);
+		msleep(300); //50);
 		
 		/* set as grip mode */
 		/* to avoid i2c write lock */
@@ -660,7 +728,7 @@ void touchkey_grip_mode_ctr(struct touchkey_i2c *tkey_i2c)
 				tkey_i2c->pdata->power_on(0);
 				msleep(30);
 				tkey_i2c->pdata->power_on(1);
-				msleep(50);
+				msleep(300); //50);
 				continue;
 			}
 			break;
@@ -670,6 +738,10 @@ void touchkey_grip_mode_ctr(struct touchkey_i2c *tkey_i2c)
 			goto out_grip_mode_ctr;
 		}
 		tkey_i2c->ic_mode = MODE_GRIP;
+
+		/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+		cypress_touchkey_interrupt_set_dual(tkey_i2c);
+
 	} else {
 		tkey_i2c->pdata->power_on(0);
 		tkey_i2c->ic_mode = MODE_NORMAL;
@@ -926,12 +998,12 @@ static void touchkey_set_dvfs_lock(struct touchkey_i2c *tkey_i2c,
 		}
 
 		schedule_delayed_work(&tkey_i2c->work_dvfs_off,
-			msecs_to_jiffies(TKEY_BOOSTER_CHG_TIME));
+			msecs_to_jiffies(TKEY_BOOSTER_OFF_TIME));
 
 	} else if (on == 1) {
 		cancel_delayed_work(&tkey_i2c->work_dvfs_off);
 		schedule_delayed_work(&tkey_i2c->work_dvfs_chg,
-			msecs_to_jiffies(TKEY_BOOSTER_OFF_TIME));
+			msecs_to_jiffies(TKEY_BOOSTER_CHG_TIME));
 
 	} else if (on == 2) {
 		if (tkey_i2c->dvfs_lock_status) {
@@ -1288,7 +1360,7 @@ static void touchkey_i2c_update_work(struct work_struct *work)
 		return ;
 	}
 #if defined(TK_HAS_AUTOCAL)
-	touchkey_autocalibration(tkey_i2c);
+	//touchkey_autocalibration(tkey_i2c);
 #endif
 	touchkey_enable_irq(tkey_i2c, true);
 }
@@ -1304,6 +1376,8 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	int keycode_type = 0;
 	int pressed = 0;
 	bool ic_mode;
+	int keycode_data[3];
+	int i;
 
 #if !defined(CONFIG_SEC_S_PROJECT)
 	int CurrMenuValue, CurrBackValue;
@@ -1313,69 +1387,110 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
-	ret = i2c_touchkey_read(tkey_i2c, KEYCODE_REG, data, 3);
-	if (ret < 0)
-		return IRQ_HANDLED;
-
-#if !defined(CONFIG_SEC_S_PROJECT)
-	if (tkey_i2c->fw_ver_ic >= 0x07) {
-	keycode_type = (data[0] & TK_BIT_KEYCODE);
-		if (keycode_type < 0 || keycode_type > touchkey_count) {
-			dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
-			return IRQ_HANDLED;
-		}
-
-    CurrMenuValue = (data[0] & 0x1);
-    CurrBackValue = (data[0] & 0x2) >> 1;
-
-    if (CurrMenuValue != PrevMenuValue) {
-        input_report_key(tkey_i2c->input_dev, KEY_MENU, CurrMenuValue);
-		keycode_type = 1;
-			pressed = CurrMenuValue;
-    }
-    if (CurrBackValue != PrevBackValue) {
-        input_report_key(tkey_i2c->input_dev, KEY_BACK, CurrBackValue);
-		keycode_type = 2;
-			pressed = CurrBackValue;
-    }
-
-    input_sync(tkey_i2c->input_dev);
-
-    /* Backup data*/
-    PrevMenuValue = CurrMenuValue;
-    PrevBackValue = CurrBackValue;
-	}
-	else 
-#endif		
-	{
-		keycode_type = (data[0] & TK_BIT_KEYCODE);
-		pressed = !(data[0] & TK_BIT_PRESS_EV);
-
-		if (keycode_type <= 0 || keycode_type >= touchkey_count) {
-			dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
-			return IRQ_HANDLED;
-		}
-
-		input_report_key(tkey_i2c->input_dev,
-				 touchkey_keycode[keycode_type], pressed);
-		input_sync(tkey_i2c->input_dev);
-	}
-#ifdef CONFIG_GLOVE_TOUCH
+	#ifdef CONFIG_GLOVE_TOUCH
 	ic_mode = tkey_i2c->ic_mode;
-#else
+	#else
 	ic_mode = 0;
-#endif
+	#endif
 
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	dev_info(&tkey_i2c->client->dev, "keycode:%d pressed:%d %d\n",
-		touchkey_keycode[keycode_type], pressed, ic_mode);
-#else
-	dev_info(&tkey_i2c->client->dev, "pressed:%d %d\n",
-		pressed, ic_mode);
-#endif
-#ifdef TOUCHKEY_BOOSTER
-	touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
-#endif
+	/* L OS support Screen Pinning feature.
+	  * "recent + back key" event is CombinationKey for exit Screen Pinning mode.
+	  * If touchkey firmware version is higher than CYPRESS_RECENT_BACK_REPORT_FW_VER,
+	  * touchkey can make interrupt "back key" and "recent key" in same time.
+	  * lower version firmware can make interrupt only one key event.
+	  */
+
+	if (tkey_i2c->fw_ver_ic >= CYPRESS_RECENT_BACK_REPORT_FW_VER) {
+		ret = i2c_touchkey_read(tkey_i2c, KEYCODE_REG, data, 1);
+		if (ret < 0){
+			dev_err(&tkey_i2c->client->dev, "%s: i2c read fail, ret:%d\n", __func__, ret);
+			return IRQ_HANDLED;
+		}
+
+		keycode_data[1] = data[0] & 0x3;
+		keycode_data[2] = (data[0] >> 2) & 0x3;
+
+		for (i = 1; i < 3; i++) {
+			if (keycode_data[i]) {
+				input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
+				#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+				dev_info(&tkey_i2c->client->dev, "keycode: %d %s %d\n", touchkey_keycode[i],
+					(keycode_data[i] % 2) ? "P" : "R", ic_mode);
+				#else
+				dev_info(&tkey_i2c->client->dev, " %s %d\n",
+					(keycode_data[i] % 2) ? "P" : "R", ic_mode);
+				#endif
+				if (keycode_data[i] % 2) pressed++;
+			}
+		}
+		input_sync(tkey_i2c->input_dev);
+
+		#ifdef TOUCHKEY_BOOSTER
+		touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
+		#endif
+
+	} else { /* old version. */
+		ret = i2c_touchkey_read(tkey_i2c, KEYCODE_REG, data, 3);
+		if (ret < 0){
+			dev_err(&tkey_i2c->client->dev, "%s: i2c read fail, ret:%d\n", __func__, ret);
+			return IRQ_HANDLED;
+		}
+
+		#if !defined(CONFIG_SEC_S_PROJECT)
+		if (tkey_i2c->fw_ver_ic >= 0x07) {
+			keycode_type = (data[0] & TK_BIT_KEYCODE);
+			if (keycode_type < 0 || keycode_type > touchkey_count) {
+				dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
+				return IRQ_HANDLED;
+			}
+
+		CurrMenuValue = (data[0] & 0x1);
+		CurrBackValue = (data[0] & 0x2) >> 1;
+
+		if (CurrMenuValue != PrevMenuValue) {
+			input_report_key(tkey_i2c->input_dev, KEY_MENU, CurrMenuValue);
+			keycode_type = 1;
+				pressed = CurrMenuValue;
+		}
+		if (CurrBackValue != PrevBackValue) {
+			input_report_key(tkey_i2c->input_dev, KEY_BACK, CurrBackValue);
+			keycode_type = 2;
+				pressed = CurrBackValue;
+		}
+
+		input_sync(tkey_i2c->input_dev);
+
+		/* Backup data*/
+		PrevMenuValue = CurrMenuValue;
+		PrevBackValue = CurrBackValue;
+		}
+		else
+		#endif
+		{
+			keycode_type = (data[0] & TK_BIT_KEYCODE);
+			pressed = !(data[0] & TK_BIT_PRESS_EV);
+
+			if (keycode_type <= 0 || keycode_type >= touchkey_count) {
+				dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
+				return IRQ_HANDLED;
+			}
+
+			input_report_key(tkey_i2c->input_dev,
+					 touchkey_keycode[keycode_type], pressed);
+			input_sync(tkey_i2c->input_dev);
+		}
+
+		#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		dev_info(&tkey_i2c->client->dev, "keycode:%d pressed:%d %d\n",
+			touchkey_keycode[keycode_type], pressed, ic_mode);
+		#else
+		dev_info(&tkey_i2c->client->dev, "pressed:%d %d\n",
+			pressed, ic_mode);
+		#endif
+		#ifdef TOUCHKEY_BOOSTER
+		touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
+		#endif
+	}
 	return IRQ_HANDLED;
 }
 
@@ -1462,14 +1577,17 @@ static int touchkey_start(struct touchkey_i2c *tkey_i2c)
 
 	/* enable ldo11 */
 	tkey_i2c->pdata->power_on(1);
-	msleep(50);
+	msleep(300); //50
+	
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c);
 
 #if !defined(TK_LED_DIRECT_CONTORL)
 	tkey_i2c->pdata->led_power_on(1);
 	tkey_i2c->enabled = true;
 
 #if defined(TK_HAS_AUTOCAL)
-	touchkey_autocalibration(tkey_i2c);
+	//touchkey_autocalibration(tkey_i2c);
 #endif
 
 	if (touchled_cmd_reversed) {
@@ -1486,7 +1604,7 @@ static int touchkey_start(struct touchkey_i2c *tkey_i2c)
 		dev_err(&tkey_i2c->client->dev, "%s: Turning LED is reserved\n", __func__);
 	}
 	#if defined(TK_HAS_AUTOCAL)
-	touchkey_autocalibration(tkey_i2c);
+	//touchkey_autocalibration(tkey_i2c);
 	#endif
 
 #endif
@@ -1540,6 +1658,12 @@ static int touchkey_input_open(struct input_dev *dev)
 {
 	struct touchkey_i2c *data = input_get_drvdata(dev);
 	int ret;
+
+	if (touchkey_probe != true) {
+		printk(KERN_ERR "%s, not yet init. \n", __func__);
+		return 0;
+	}
+
 #ifdef TK_USE_OPEN_DWORK
 	schedule_delayed_work(&data->open_work,
 					msecs_to_jiffies(TK_OPEN_DWORK_TIME));
@@ -1680,6 +1804,11 @@ static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c)
 
 	tkey_i2c->fw_ver_ic = data[1];
 	tkey_i2c->md_ver_ic = data[2];
+	dev_info(&tkey_i2c->client->dev, "%s: fw ver = 0x%02x, md ver = 0x%02x\n",
+		__func__, tkey_i2c->fw_ver_ic, tkey_i2c->md_ver_ic);
+
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c);
 
 	return ret;
 }
@@ -2694,9 +2823,18 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 #ifdef TKEY_GRIP_MODE
 	tkey_i2c->pwr_flag = true;
 #endif
-	msleep(50);
-
+	msleep(300);//50
 	tkey_i2c->enabled = true;
+
+	ret = touchkey_i2c_check(tkey_i2c);
+	if (ret < 0) {
+		dev_err(&client->dev, "i2c_check failed\n");
+#if defined(CONFIG_KEYBOARD_CYPRESS_TKEY_HL)
+		bforced = true;
+#else
+		goto err_i2c_check;
+#endif
+	}
 
 	/*sysfs*/
 	tkey_i2c->dev = device_create(sec_class, NULL, 0, NULL, "sec_touchkey");
@@ -2727,16 +2865,6 @@ static int i2c_touchkey_probe(struct i2c_client *client,
 		dev_err(&client->dev, "fail to create workqueue for fw_wq\n");
 		ret = -ENOMEM;
 		goto err_create_fw_wq;
-	}
-
-	ret = touchkey_i2c_check(tkey_i2c);
-	if (ret < 0) {
-		dev_err(&client->dev, "i2c_check failed\n");
-#if defined(CONFIG_KEYBOARD_CYPRESS_TKEY_HL)
-		bforced = true;
-#else
-		goto err_i2c_check;
-#endif
 	}
 
 #ifdef TOUCHKEY_BOOSTER
@@ -2804,9 +2932,6 @@ err_request_threaded_irq:
 #ifdef TOUCHKEY_BOOSTER
 	mutex_destroy(&tkey_i2c->dvfs_lock);
 #endif
-#if !defined(CONFIG_KEYBOARD_CYPRESS_TKEY_HL)
-err_i2c_check:
-#endif
 	destroy_workqueue(tkey_i2c->fw_wq);
 err_create_fw_wq:
 	sysfs_delete_link(&tkey_i2c->dev->kobj,
@@ -2816,6 +2941,9 @@ err_create_symlink:
 err_sysfs_init:
 	device_destroy(sec_class, (dev_t)NULL);
 err_device_create:
+#if !defined(CONFIG_KEYBOARD_CYPRESS_TKEY_HL)
+err_i2c_check:
+#endif	
 	tkey_i2c->pdata->power_on(0);
 	input_unregister_device(input_dev);
 	input_dev = NULL;

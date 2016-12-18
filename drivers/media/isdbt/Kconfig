@@ -30,3 +30,7 @@ config ISDBT_SPMI
 config ISDBT_ANT_DET
 	bool "isdbt antenna detection"
 	default n
+
+config ISDBT_F_TYPE_ANTENNA
+	bool "isdbt F type antenna"
+	default n

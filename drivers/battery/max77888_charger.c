@@ -97,11 +97,15 @@ static enum power_supply_property sec_charger_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+#if defined(CONFIG_BATTERY_SWELLING)
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+#endif
 };
 
 static void max77888_charger_initialize(struct max77888_charger_data *charger);
 static int max77888_get_vbus_state(struct max77888_charger_data *charger);
 static int max77888_get_charger_state(struct max77888_charger_data *charger);
+static u8 max77888_get_float_voltage_data(int float_voltage);
 static void max77888_dump_reg(struct max77888_charger_data *charger)
 {
 	u8 reg_data;
@@ -674,6 +678,14 @@ static int sec_chg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PRESENT:
 		val->intval = max77888_get_battery_present(charger);
 		break;
+#if defined(CONFIG_BATTERY_SWELLING)
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		max77888_read_reg(charger->max77888->i2c,
+				MAX77888_CHG_REG_CHG_CNFG_04, &reg_data);
+		val->intval = reg_data;
+		pr_info("%s: battery cv voltage 0x%x\n", __func__, val->intval);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -692,6 +704,9 @@ static int sec_chg_set_property(struct power_supply *psy,
 	const int usb_charging_current = charger->pdata->charging_current[
 		POWER_SUPPLY_TYPE_USB].fast_charging_current;
 	u8 chg_cnfg_00 = 0;
+#if defined(CONFIG_BATTERY_SWELLING)
+	u8 reg_data;
+#endif
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
@@ -826,6 +841,18 @@ static int sec_chg_set_property(struct power_supply *psy,
 			max77888_set_charge_current(charger, current_now);
 		}
 		break;
+#if defined(CONFIG_BATTERY_SWELLING)
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		pr_info("%s: float voltage(%d)\n", __func__, val->intval);
+		reg_data = max77888_get_float_voltage_data(val->intval);
+		max77888_update_reg(charger->max77888->i2c, MAX77888_CHG_REG_CHG_CNFG_04,
+				(reg_data << CHG_CNFG_04_CHG_CV_PRM_SHIFT),
+				CHG_CNFG_04_CHG_CV_PRM_MASK);
+		max77888_read_reg(charger->max77888->i2c,
+				MAX77888_CHG_REG_CHG_CNFG_04, &reg_data);
+		pr_info("%s: battery cv voltage set to 0x%x\n", __func__, reg_data);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -836,18 +863,13 @@ static int sec_chg_set_property(struct power_supply *psy,
 static u8 max77888_get_float_voltage_data(
 					int float_voltage)
 {
-	u8 data = 0x19;
+	u8 data = 0x13;
 
-	if (float_voltage >= 4400)
-		data = 0x1b;
-	else if (float_voltage >= 4375)
-		data = 0x1a;
-	else if (float_voltage >= 4350)
-		data = 0x19;
-	else if (float_voltage >= 4325)
-		data = 0x18;
+	if (float_voltage == 4224)
+		data = 0x14;
 	else
-		data = (float_voltage - 3650) / 25;
+		data = (float_voltage - 3725) / 25;
+
 	return data;
 }
 

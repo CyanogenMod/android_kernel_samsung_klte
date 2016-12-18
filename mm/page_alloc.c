@@ -65,21 +65,9 @@
 #include <asm/div64.h>
 #include "internal.h"
 
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-#include <linux/highmem.h>
-#define PER_USER_RANGE 100000
-#define SENSITIVITY_UNKNOWN 0
-#define SENSITIVE 1
-#define NOT_SENSITIVE 2
-#endif
-
 #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
 DEFINE_PER_CPU(int, numa_node);
 EXPORT_PER_CPU_SYMBOL(numa_node);
-#endif
-
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-extern int dek_is_sdp_uid(uid_t uid);
 #endif
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -124,6 +112,18 @@ unsigned long total_unmovable_pages __read_mostly;
 #endif
 int percpu_pagelist_fraction;
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
+
+static unsigned int boot_mode = 0;
+static int __init setup_bootmode(char *str)
+{
+	if (get_option(&str, &boot_mode)) {
+		printk("%s: boot_mode is %u\n", __func__, boot_mode);
+		return 0;
+	}
+
+	return -EINVAL;
+}
+early_param("androidboot.boot_recovery", setup_bootmode);
 
 #ifdef CONFIG_PM_SLEEP
 /*
@@ -731,17 +731,6 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 {
 	int i;
 	int bad = 0;
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-	if (PageSensitive(page)) {
-		void *kaddr;
-		ClearPageSensitive(page);
-		kaddr = kmap_atomic(page);
-		if (kaddr)
-			clear_page(kaddr);
-		kunmap_atomic(kaddr);
-		flush_dcache_page(page);
-	}
-#endif
 
 	trace_mm_page_free(page, order);
 	kmemcheck_free_shadow(page, order);
@@ -1099,6 +1088,8 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 			if (!is_migrate_cma(migratetype) &&
 			    (unlikely(current_order >= pageblock_order / 2) ||
 			     start_migratetype == MIGRATE_RECLAIMABLE ||
+			     start_migratetype == MIGRATE_UNMOVABLE ||
+			     start_migratetype == MIGRATE_MOVABLE ||
 			     page_group_by_mobility_disabled)) {
 				int pages;
 				pages = move_freepages_block(zone, page,
@@ -1106,6 +1097,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 
 				/* Claim the whole block if over half of it is free */
 				if (pages >= (1 << (pageblock_order-1)) ||
+						start_migratetype == MIGRATE_MOVABLE ||
 						page_group_by_mobility_disabled)
 					set_pageblock_migratetype(page,
 								start_migratetype);
@@ -1402,13 +1394,14 @@ void free_hot_cold_page(struct page *page, int cold)
 	int wasMlocked = __TestClearPageMlocked(page);
 
 #ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
-#if 1
-	{
-		extern u64 scfs_lowerpage_reclaim_count;
-		if (PageScfslower(page) || PageNocache(page))
-			scfs_lowerpage_reclaim_count++;
-	}
-#endif
+	/*
+	   struct scfs_sb_info *sbi;
+
+	   if (PageScfslower(page) || PageNocache(page)) {
+	   sbi = SCFS_S(page->mapping->host->i_sb);
+	   sbi->scfs_lowerpage_reclaim_count++;
+	   }
+	 */
 #endif
 
 	if (!free_pages_prepare(page, 0))
@@ -2603,9 +2596,10 @@ rebalance:
 	 * running out of options and have to consider going OOM
 	 */
 #ifdef CONFIG_SEC_OOM_KILLER
-#define SHOULD_CONSIDER_OOM !did_some_progress || time_after(jiffies, oom_invoke_timeout)
+#define SHOULD_CONSIDER_OOM (!did_some_progress \
+		|| time_after(jiffies, oom_invoke_timeout)) && boot_mode != 1
 #else
-#define SHOULD_CONSIDER_OOM !did_some_progress
+#define SHOULD_CONSIDER_OOM !did_some_progress && boot_mode != 1
 #endif
 	if (SHOULD_CONSIDER_OOM) {
 		if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {
@@ -2768,32 +2762,7 @@ out:
 	if (unlikely(!put_mems_allowed(cpuset_mems_cookie) && !page))
 		goto retry_cpuset;
 
-#ifdef CONFIG_SDP_CACHE_CLEANUP
-	if(page) {
-		uid_t uid = task_uid(current);
-		if (((uid/PER_USER_RANGE) <= 199)  && ((uid/PER_USER_RANGE) >= 100)) {
-			if (dek_is_sdp_uid(uid)) {
-				switch (current->sensitive) {
-				case SENSITIVITY_UNKNOWN:
-					if ((0 == strcmp(current->comm, "m.android.email")) ||
-						(0 == strcmp(current->comm, "ndroid.exchange"))) {
-						SetPageSensitive(page);
-						current->sensitive = SENSITIVE;
-					} else {
-						current->sensitive = NOT_SENSITIVE;
-					}
-					break;
-				case SENSITIVE:
-						SetPageSensitive(page);
-					break;
-				case NOT_SENSITIVE:
-				default:
-					break;
-				}
-			}
-		}
-	}
-#endif
+
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_nodemask);
@@ -6283,8 +6252,10 @@ static struct trace_print_flags pageflag_names[] = {
 	{1UL << PG_hwpoison,		"hwpoison"	},
 #endif
 	{1UL << PG_readahead,           "PG_readahead"  },
-#ifdef CONFIG_SDP
-	{1UL << PG_sensitive,	"sensitive"	},
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+	{1UL << PG_scfslower, "scfslower"},
+	{1UL << PG_nocache,"nocache"},
 #endif
 };
 

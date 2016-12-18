@@ -15,6 +15,7 @@
 #include <linux/selinux.h>
 
 #include "security.h"
+#include "avc.h"
 
 bool selinux_is_enabled(void)
 {
@@ -25,3 +26,13 @@ bool selinux_is_enabled(void)
 #endif
 }
 EXPORT_SYMBOL_GPL(selinux_is_enabled);
+
+bool selinux_is_enforcing(void)
+{
+#ifdef CONFIG_ALWAYS_ENFORCE
+	return true;
+#else
+	return selinux_enforcing;
+#endif
+}
+EXPORT_SYMBOL_GPL(selinux_is_enforcing);

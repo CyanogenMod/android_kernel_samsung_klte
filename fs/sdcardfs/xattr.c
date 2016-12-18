@@ -39,10 +39,8 @@ sdcardfs_getxattr_lower(struct dentry *lower_dentry, const char *name, void *val
 		rc = -EOPNOTSUPP;
 		goto out;
 	}
-	mutex_lock(&lower_dentry->d_inode->i_mutex);
 	rc = lower_dentry->d_inode->i_op->getxattr(lower_dentry, name, value,
 						   size);
-	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 out:
 	return rc;
 }
@@ -67,9 +65,7 @@ sdcardfs_listxattr(struct dentry *dentry, char *list, size_t size)
 		rc = -EOPNOTSUPP;
 		goto out;
 	}
-	mutex_lock(&lower_dentry->d_inode->i_mutex);
 	rc = lower_dentry->d_inode->i_op->listxattr(lower_dentry, list, size);
-	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 out:
 	return rc;
 }

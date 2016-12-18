@@ -97,6 +97,9 @@ static struct msm_gpiomux_config gpio_slte_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(52),
 	GPIOMUX_SET_NC(89),
 	GPIOMUX_SET_NC(145),
+	GPIOMUX_SET_NC(104),
+	GPIOMUX_SET_NC(112),
+	GPIOMUX_SET_NC(124),
 };
 
 static struct msm_gpiomux_config gpio_slte_rev00_nc_configs[] __initdata = {
@@ -105,6 +108,9 @@ static struct msm_gpiomux_config gpio_slte_rev00_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(51),
 	GPIOMUX_SET_NC(89),
 	GPIOMUX_SET_NC(145),
+	GPIOMUX_SET_NC(104),
+	GPIOMUX_SET_NC(112),
+	GPIOMUX_SET_NC(124),
 };
 #endif
 

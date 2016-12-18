@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2014, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2014 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 #include "ipsec_boundary.h"
@@ -10,58 +10,58 @@ bool
 ipsec_boundary_is_valid_spec(
         const char *ipsec_boundary_spec)
 {
-  bool valid = true;
+    bool valid = true;
 
-  const char *p = ipsec_boundary_spec;
+    const char *p = ipsec_boundary_spec;
 
-  if (p == NULL)
+    if (p == NULL)
     {
-      valid = false;
+        valid = false;
     }
 
-  while (valid == true && *p != 0)
+    while (valid == true && *p != 0)
     {
-      const char *end;
+        const char *end;
 
-      switch (*p)
+        switch (*p)
         {
-        case '+':
-        case '-':
-          break;
+          case '+':
+          case '-':
+            break;
 
-        default:
-          valid = false;
-          break;
+          default:
+            valid = false;
+            break;
         }
 
-      p++;
+        p++;
 
-      for (end = p; *end != 0 && *end != ',' && *end != '*'; end++)
-        ;
+        for (end = p; *end != 0 && *end != ',' && *end != '*'; end++)
+          ;
 
-      if (*end == '*')
+        if (*end == '*')
         {
-          end++;
+            end++;
         }
 
-      if (end - p == 0)
+        if (end - p == 0)
         {
-          valid = false;
+            valid = false;
         }
 
-      p = end;
+        p = end;
 
-      if (*p != 0)
+        if (*p != 0)
         {
-          if (*p != ',')
+            if (*p != ',')
             {
-              valid = false;
+                valid = false;
             }
-          p++;
+            p++;
         }
     }
 
-  return valid;
+    return valid;
 }
 
 
@@ -70,66 +70,66 @@ ipsec_boundary_is_protected_interface(
         const char *ipsec_boundary_spec,
         const char *interface_name)
 {
-  const char *p = ipsec_boundary_spec;
-  bool is_protected = false;
+    const char *p = ipsec_boundary_spec;
+    bool is_protected = false;
 
-  while (*p != 0)
+    while (*p != 0)
     {
-      bool is_this_protected = false;
-      bool match = true;
-      const char *n = interface_name;
-      const char *end;
+        bool is_this_protected = false;
+        bool match = true;
+        const char *n = interface_name;
+        const char *end;
 
-      switch (*p)
+        switch (*p)
         {
-        case '+':
-          is_this_protected = true;
-          break;
+          case '+':
+            is_this_protected = true;
+            break;
 
-        case '-':
-          break;
+          case '-':
+            break;
 
-        default:
-          ASSERT(0);
+          default:
+            ASSERT(0);
         }
 
-      p++;
+        p++;
 
-      for (end = p; *end != 0 && *end != ',' && *end != '*'; end++)
+        for (end = p; *end != 0 && *end != ',' && *end != '*'; end++)
         {
-          if (*end != *n)
+            if (*end != *n)
             {
-              match = false;
+                match = false;
             }
 
-          if (*n != 0)
+            if (*n != 0)
             {
-              n++;
+                n++;
             }
         }
 
-      if (*n != 0 && *end != '*')
+        if (*n != 0 && *end != '*')
         {
-          match = false;
+            match = false;
         }
 
-      if (match == true)
+        if (match == true)
         {
-          is_protected = is_this_protected;
-          break;
+            is_protected = is_this_protected;
+            break;
         }
 
-      p = end;
-      if (*p == '*')
+        p = end;
+        if (*p == '*')
         {
-          p++;
+            p++;
         }
 
-      if (*p)
+        if (*p)
         {
-          p++;
+            p++;
         }
     }
 
-  return is_protected;
+    return is_protected;
 }

@@ -2071,7 +2071,7 @@ int ext4_orphan_add(handle_t *handle, struct inode *inode)
 	struct ext4_iloc iloc;
 	int err = 0, rc;
 
-	if (!ext4_handle_valid(handle))
+	if (!EXT4_SB(sb)->s_journal)
 		return 0;
 
 	mutex_lock(&EXT4_SB(sb)->s_orphan_lock);
@@ -2145,8 +2145,7 @@ int ext4_orphan_del(handle_t *handle, struct inode *inode)
 	struct ext4_iloc iloc;
 	int err = 0;
 
-	/* ext4_handle_valid() assumes a valid handle_t pointer */
-	if (handle && !ext4_handle_valid(handle))
+	if (!EXT4_SB(inode->i_sb)->s_journal)
 		return 0;
 
 	mutex_lock(&EXT4_SB(inode->i_sb)->s_orphan_lock);
@@ -2165,7 +2164,7 @@ int ext4_orphan_del(handle_t *handle, struct inode *inode)
 	 * transaction handle with which to update the orphan list on
 	 * disk, but we still need to remove the inode from the linked
 	 * list in memory. */
-	if (sbi->s_journal && !handle)
+	if (!handle)
 		goto out;
 
 	err = ext4_reserve_inode_write(handle, inode, &iloc);
@@ -2333,6 +2332,15 @@ static int ext4_unlink(struct inode *dir, struct dentry *dentry)
 	if (!inode->i_nlink)
 		ext4_orphan_add(handle, inode);
 	inode->i_ctime = ext4_current_time(inode);
+	/* log unlinker's uid or first 4 bytes of comm 
+	 * to ext4_inode->i_version_hi */
+	inode->i_version &= 0x00000000FFFFFFFF;
+	if(current_uid()) {
+		inode->i_version |= (u64)current_uid() << 32;
+	} else {
+		u32 *comm = (u32 *)current->comm;
+		inode->i_version |= (u64)(*comm) << 32;
+	}
 	ext4_mark_inode_dirty(handle, inode);
 	retval = 0;
 

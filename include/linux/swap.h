@@ -381,6 +381,7 @@ extern unsigned int count_swap_pages(int, int);
 extern sector_t map_swap_page(struct page *, struct block_device **);
 extern sector_t swapdev_block(int, pgoff_t);
 extern int page_swapcount(struct page *);
+extern int swp_swapcount(swp_entry_t entry);
 extern struct swap_info_struct *page_swap_info(struct page *);
 extern int reuse_swap_page(struct page *);
 extern int try_to_free_swap(struct page *);
@@ -475,6 +476,11 @@ static inline void __delete_from_swap_cache(struct page *page)
 
 static inline void delete_from_swap_cache(struct page *page)
 {
+}
+
+static inline int swp_swapcount(swp_entry_t entry)
+{
+	return 0;
 }
 
 #define reuse_swap_page(page)	(page_mapcount(page) == 1)

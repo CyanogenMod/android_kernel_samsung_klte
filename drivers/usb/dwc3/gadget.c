@@ -1415,21 +1415,25 @@ int __dwc3_gadget_ep_set_halt(struct dwc3_ep *dep, int value)
 	if (value) {
 		ret = dwc3_send_gadget_ep_cmd(dwc, dep->number,
 			DWC3_DEPCMD_SETSTALL, &params);
-		if (ret)
-			dev_err(dwc->dev, "failed to %s STALL on %s\n",
+		if (ret) {
+			dbg_event(dep->number, "SETSTAL", ret);
+			dev_dbg(dwc->dev, "failed to %s STALL on %s\n",
 					value ? "set" : "clear",
 					dep->name);
-		else
+		} else {
 			dep->flags |= DWC3_EP_STALL;
+		}
 	} else {
 		ret = dwc3_send_gadget_ep_cmd(dwc, dep->number,
 			DWC3_DEPCMD_CLEARSTALL, &params);
-		if (ret)
-			dev_err(dwc->dev, "failed to %s STALL on %s\n",
+		if (ret) {
+			dbg_event(dep->number, "CLRSTAL", ret);
+			dev_dbg(dwc->dev, "failed to %s STALL on %s\n",
 					value ? "set" : "clear",
 					dep->name);
-		else
+		} else {
 			dep->flags &= ~(DWC3_EP_STALL | DWC3_EP_WEDGE);
+		}
 	}
 
 	return ret;
@@ -2187,6 +2191,8 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 
 	dwc->gadget.xfer_isr_count++;
 
+	if (dep->endpoint.desc == NULL)
+		return 1;
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
 			list_empty(&dep->req_queued)) {
 		if (list_empty(&dep->request_list))
@@ -2708,13 +2714,13 @@ static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc)
 {
 	pr_info("usb:: %s\n", __func__);
 
-	/*
-	 * TODO take core out of low power mode when that's
-	 * implemented.
-	 */
+	/* Only perform resume from L2 or Early suspend states */
+	if (dwc->link_state == DWC3_LINK_STATE_U3) {
+		dbg_event(0xFF, "WAKEUP", 0);
+		dwc->gadget_driver->resume(&dwc->gadget);
+	}
 
-	dbg_event(0xFF, "WAKEUP", 0);
-	dwc->gadget_driver->resume(&dwc->gadget);
+	dwc->link_state = DWC3_LINK_STATE_U0;
 }
 
 static void dwc3_gadget_linksts_change_interrupt(struct dwc3 *dwc,

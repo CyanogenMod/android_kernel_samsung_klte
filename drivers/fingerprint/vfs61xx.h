@@ -62,6 +62,8 @@
 #define DRDY_ACTIVE_STATUS      0
 #define BITS_PER_WORD           16
 #define DRDY_IRQ_FLAG           IRQF_TRIGGER_FALLING
+#define VENDOR		"SYNAPTICS"
+#define CHIP_ID		"RAPTOR"
 
 /* Timeout value for polling DRDY signal assertion */
 #define DRDY_TIMEOUT_MS      40

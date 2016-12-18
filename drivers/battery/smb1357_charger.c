@@ -59,8 +59,12 @@
 #define ENABLE_SHUTDOWN_MODE
 #endif
 
-#define REDUCE_TMM_CHG
+#if !defined(CONFIG_MACH_CHAGALL_KDI)
 #define ENABLE_CHG_THERM_LIMIT
+#endif
+
+#define REDUCE_TMM_CHG
+//#define ENABLE_CHG_THERM_LIMIT
 //#define ENABLE_DCIN_5VOR9V
 //#define ENABLE_SYSON_TRIGGER
 //#define ENABLE_SMBCHG_BATT_DET
@@ -112,6 +116,7 @@ struct smb1357_charger_data{
 	struct regulator *chg_vf_1p8v;
 	struct wake_lock chg_wake_lock;
 	struct wake_lock chgisr_wake_lock;
+	struct mutex mutex;
 	u8 revision;
 	u8 hvdcp_det_count;
 	u8 pogo_det_count;
@@ -371,8 +376,9 @@ static void smb1357_write_enable(struct i2c_client * client, u8 enable)
 
 static void smb1357_set_APSD(struct i2c_client *client, u8 enable)
 {
+	msleep(20);
 	smb1357_charger_masked_write_reg(client, CFG_11_REG,
-			AUTO_DET_SRC_EN_BIT, enable);
+			AUTO_DET_SRC_EN_BIT, AUTO_DET_SRC_EN_BIT);
 
 	if (enable) {
 		smb1357_charger_masked_write_reg(client, CMD_INPUT_LIMIT,
@@ -964,6 +970,7 @@ static void smb1357_set_input_current_limit(
 	smb1357_charger_masked_write_reg(client, CFG_A_REG,
 		DCIN_INPUT_MASK, data);
 
+	msleep(50);
 	/* enable AICL */
 	smb1357_charger_masked_write_reg(client, CFG_D_REG,
 		USBIN_AICL_BIT, USBIN_AICL_BIT);
@@ -1096,7 +1103,7 @@ static void smb1357_set_default_data(struct i2c_client *client)
 	smb1357_set_auto_recharge(client, false);
 
 	/* usb mode */
-	smb1357_usb_current_limit(client, USB2_VAL, USB_500_VAL);
+	smb1357_usb_current_limit(client, USB3_VAL, USB_500_VAL);
 
 	/* AICL */
 	data = 0x04;
@@ -1177,7 +1184,6 @@ static int smb1357_get_charging_health(struct i2c_client *client)
 	u8 irq_e;
 	u8 chg_en;
 	u8 chg_cur;
-	int temp;
 	u8 gpio = false;
 
 	smb1357_charger_i2c_read(client, STATUS_1_REG, &status_1);
@@ -1226,9 +1232,10 @@ static int smb1357_get_charging_health(struct i2c_client *client)
 			((charger->cable_type == POWER_SUPPLY_TYPE_MAINS) ||
 			(charger->cable_type == POWER_SUPPLY_TYPE_HV_MAINS) ||
 			(charger->cable_type == POWER_SUPPLY_TYPE_POGODOCK))) {
-
-			temp = smb1357_get_therm_temp(client);
 #if defined(ENABLE_CHG_THERM_LIMIT)
+			int temp = 0;
+			temp = smb1357_get_therm_temp(client);
+
 			if (smb1357data->chg_limit == false) {
 				if (smb1357data->chg_high_temp < temp){
 					smb1357data->chg_limit = true;
@@ -1419,23 +1426,23 @@ static void smb1357_charger_function_control(
         *                      High-Current Mode(1)
         */
 		switch (charger->cable_type) {
-		case POWER_SUPPLY_TYPE_UNKNOWN:
-		case POWER_SUPPLY_TYPE_MAINS:
-		case POWER_SUPPLY_TYPE_HV_MAINS:
-		case POWER_SUPPLY_TYPE_POGODOCK:
 		case POWER_SUPPLY_TYPE_USB_CDP:
 		case POWER_SUPPLY_TYPE_MISC:
 		case POWER_SUPPLY_TYPE_WIRELESS:
 		case POWER_SUPPLY_TYPE_CARDOCK:
 		case POWER_SUPPLY_TYPE_UARTOFF:
-		case POWER_SUPPLY_TYPE_LAN_HUB:
 		case POWER_SUPPLY_TYPE_MHL_900:
 		case POWER_SUPPLY_TYPE_MHL_1500:
+		case POWER_SUPPLY_TYPE_LAN_HUB:
 		case POWER_SUPPLY_TYPE_SMART_NOTG:
 			/* High-current mode */
 			usb_type = USB3_VAL;
 			usb_mode = USB_AC_VAL;
 			break;
+		case POWER_SUPPLY_TYPE_UNKNOWN:
+		case POWER_SUPPLY_TYPE_MAINS:
+		case POWER_SUPPLY_TYPE_HV_MAINS:
+		case POWER_SUPPLY_TYPE_POGODOCK:
 		case POWER_SUPPLY_TYPE_UPS:
 		case POWER_SUPPLY_TYPE_USB:
 		case POWER_SUPPLY_TYPE_USB_DCP:
@@ -1561,6 +1568,7 @@ static void smb1357_charger_function_control(
 			smb1357_charger_masked_write_reg(client, CFG_D_REG,
 				USBIN_AICL_BIT, 0x00);
 
+			msleep(50);
 			/* enable AICL */
 			smb1357_charger_masked_write_reg(client, CFG_D_REG,
 				USBIN_AICL_BIT, USBIN_AICL_BIT);
@@ -1581,14 +1589,29 @@ static void smb1357_charger_function_control(
 		 /* Sometimes It didn't detected TA_HV.
 		  * Don't move below code to other point.
 		  */
+			u8 hvdcp_type = 0;
+			smb1357_charger_masked_write_reg(client, CFG_E_REG,
+				HVDCP_ADAPTER_MASK|HVDCP_ENABLE_BIT,
+				HVDCP_ADAPTER_9V|HVDCP_ENABLE_BIT);
+
 			msleep(100);
-			/* USBIN ADAPTER : 9V only */
-			smb1357_charger_masked_write_reg(client, CFG_C_REG,
-				USBIN_ADAPTER_MASK, 0x60);
+
+			smb1357_charger_i2c_read(client, STATUS_7_REG, &hvdcp_type);
+			if (hvdcp_type == 0x00) {
+				/* USBIN ADAPTER : 9V only */
+				smb1357_charger_masked_write_reg(client, CFG_C_REG,
+					USBIN_ADAPTER_MASK, 0x60);
+			}
 		}
 
-		msleep(20);
-		smb1357_set_APSD(client, true);
+		if ((charger->cable_type == POWER_SUPPLY_TYPE_MAINS) ||
+			(charger->cable_type == POWER_SUPPLY_TYPE_HV_MAINS) ||
+			(charger->cable_type == POWER_SUPPLY_TYPE_POGODOCK)) {
+			smb1357_set_APSD(client, true);
+		}
+		else {
+			smb1357_set_APSD(client, false);
+		}
 
 		/* USBIN ADAPTER : 5V or 9V */
 		smb1357_charger_masked_write_reg(client, CFG_C_REG,
@@ -1633,7 +1656,10 @@ static void smb1357_charger_function_control(
 		 * Volatile write permission(bit 6) - allowed(1)
 		 * Charging Enable(bit 1) - Enabled(1)
 		*/
-		smb1357_enable_charging(client, true);
+		if (charger->charging_current > 0)
+			smb1357_enable_charging(client, true);
+		else
+			smb1357_enable_charging(client, false);
 
 		/* Start HVDCP Detect WorkQueue */
 		if (charger->cable_type == POWER_SUPPLY_TYPE_MAINS){
@@ -1648,6 +1674,7 @@ static void smb1357_charger_function_control(
 				DCIN_AICL_BIT, DCIN_AICL_BIT);
 		}
 		else {
+			cancel_delayed_work(&smb1357data->hvdcp_det_work);
 			/* DCIN enable AICL */
 			smb1357_charger_masked_write_reg(client, CFG_B_REG,
 				DCIN_AICL_BIT, 0x00);
@@ -1687,7 +1714,7 @@ static void smb1357_charger_otg_control(
 				OTG_CURRENT_LIMIT_MASK, 0x00);
 
 			/* OTG Under Voltage */
-			smb1357_usb_current_limit(client, USB3_VAL, USB_AC_VAL);
+			smb1357_usb_current_limit(client, USB3_VAL, USB_500_VAL);
 
 			/* OTG Over Current IRQ */
 			smb1357_enable_irq(client, IRQ_CFG_REG,
@@ -1742,19 +1769,9 @@ static void smb1357_charger_otg_control(
 void smb1357_charger_shutdown(struct i2c_client *client)
 {
 	pr_info("%s: smb1357 Charging Disabled\n", __func__);
-	smb1357_set_input_current_limit(client, 0x00);
-	smb1357_enable_charging(client, false);
-	smb1357_enable_otg(client, false);
-
-	/* USBIN ADAPTER : 9V */
-	smb1357_charger_masked_write_reg(client, CFG_C_REG,
-		USBIN_ADAPTER_MASK, 0x60);
-#if !defined(ENABLE_EXTERNAL_APSD)
-	smb1357_set_default_data(client);
-#endif
-
-	smb1357_charger_masked_write_reg(client, CMD_I2C_REG,
-		COMMAND_RELOAD_BIT, COMMAND_RELOAD_BIT);
+	
+	smb1357_charger_masked_write_reg(client, CFG_E_REG,
+		HVDCP_ADAPTER_MASK, HVDCP_ADAPTER_5V);
 	return;
 }
 
@@ -1847,17 +1864,29 @@ bool smb1357_hal_chg_get_property(struct i2c_client *client,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
-		port = smb1357_get_charger_type(charger->client);
-		switch(port){
-			case HVDCP_A:
-			case HVDCP_12V:
-			case HVDCP_9V:
-			case HVDCP_5V:
-				val->intval = POWER_SUPPLY_TYPE_HV_MAINS;
-				break;
-			default:
-				val->intval = charger->cable_type;
-				break;
+		val->intval = charger->cable_type;
+		if ((charger->cable_type == POWER_SUPPLY_TYPE_MAINS) ||
+			(charger->cable_type == POWER_SUPPLY_TYPE_HV_MAINS)) {
+			port = smb1357_get_charger_type(charger->client);
+			switch(port){
+				case HVDCP_A:
+				case HVDCP_12V:
+				case HVDCP_9V:
+				case HVDCP_5V:
+					val->intval = POWER_SUPPLY_TYPE_HV_MAINS;
+					break;
+				default:
+					break;
+			}
+		}
+		else if (charger->cable_type == POWER_SUPPLY_TYPE_BATTERY) {
+			u8 data_f;
+			smb1357_charger_i2c_read(client, IRQ_F_REG, &data_f);
+			if ((data_f & IRQ_F_POWER_OK_BIT) == IRQ_F_POWER_OK_BIT) {
+				val->intval = POWER_SUPPLY_TYPE_MAINS;
+			}
+			dev_info(&client->dev,
+			"%s:data_f 0x%x, val = %d!\n", __func__, data_f, val->intval);
 		}
 		break;
 
@@ -1903,6 +1932,9 @@ bool smb1357_hal_chg_set_property(struct i2c_client *client,
 {
 	struct smb1357_charger_data *smb1357data = i2c_get_clientdata(client);
 	struct sec_charger_info *charger = smb1357data->charger;
+	bool ret = true;
+
+	mutex_lock(&smb1357data->mutex);
 
 	switch (psp) {
 	/* val->intval : type */
@@ -1937,9 +1969,12 @@ bool smb1357_hal_chg_set_property(struct i2c_client *client,
 		smb1357_set_charging_current(client, val->intval);
 		break;
 	default:
-		return false;
+		ret = false;
+		break;
 	}
-	return true;
+
+	mutex_unlock(&smb1357data->mutex);
+	return ret;
 }
 
 ssize_t smb1357_hal_chg_show_attrs(struct device *dev,
@@ -2203,16 +2238,17 @@ static int smb1357_chg_set_property(struct power_supply *psy,
 #if defined(REDUCE_TMM_CHG)
 			if (smb1357data->siop_level == TMM_SIOP_LVL) {
 				/* enforce only 5V charging */
-				smb1357_charger_masked_write_reg(charger->client,
-					CFG_E_REG, BIT(5)|BIT(4), 0x00);
+				smb1357_charger_masked_write_reg(charger->client, CFG_E_REG,
+					HVDCP_ADAPTER_MASK, HVDCP_ADAPTER_5V);
+
 				/* no change of input limit current
 				 * set charging current */
 				charging_value.intval = TMM_CHG_CURRENT;
 			}
 			else {
 				/* enable 9V charging */
-				smb1357_charger_masked_write_reg(charger->client,
-					CFG_E_REG, BIT(5)|BIT(4), BIT(4));
+				smb1357_charger_masked_write_reg(charger->client, CFG_E_REG,
+					HVDCP_ADAPTER_MASK, HVDCP_ADAPTER_9V);
 
 				if (smb1357data->siop_level < 100) {
 					input_value.intval = SIOP_INPUT_LIMIT_CURRENT;
@@ -3031,21 +3067,23 @@ static void smb1357_charger_init_work(struct work_struct *work)
 	int ret = 0;
 	smb1357data->psy_bat = power_supply_get_by_name("battery");
 
-	battery =
+	if (smb1357data->psy_bat != NULL) {
+		battery =
 		container_of(smb1357data->psy_bat, struct sec_battery_info, psy_bat);
 
-	smb1357data->psy_pogo.name = "pogo",
-	smb1357data->psy_pogo.type = POWER_SUPPLY_TYPE_POGODOCK,
-	smb1357data->psy_pogo.supplied_to = pogo_supply_list,
-	smb1357data->psy_pogo.num_supplicants = ARRAY_SIZE(pogo_supply_list);
-	smb1357data->psy_pogo.properties = pogo_power_props,
-	smb1357data->psy_pogo.num_properties = ARRAY_SIZE(pogo_power_props),
-	smb1357data->psy_pogo.get_property = sec_pogo_get_property;
+		smb1357data->psy_pogo.name = "pogo",
+		smb1357data->psy_pogo.type = POWER_SUPPLY_TYPE_POGODOCK,
+		smb1357data->psy_pogo.supplied_to = pogo_supply_list,
+		smb1357data->psy_pogo.num_supplicants = ARRAY_SIZE(pogo_supply_list);
+		smb1357data->psy_pogo.properties = pogo_power_props,
+		smb1357data->psy_pogo.num_properties = ARRAY_SIZE(pogo_power_props),
+		smb1357data->psy_pogo.get_property = sec_pogo_get_property;
 
-	ret = power_supply_register(battery->dev, &smb1357data->psy_pogo);
-	if (ret) {
-		dev_err(battery->dev,
-			"%s: Failed to Register psy_pogo\n", __func__);
+		ret = power_supply_register(battery->dev, &smb1357data->psy_pogo);
+		if (ret) {
+			dev_err(battery->dev,
+				"%s: Failed to Register psy_pogo\n", __func__);
+		}
 	}
 
 	smb1357_dcin_config_hv_lv(client, false);
@@ -3141,7 +3179,6 @@ extern void smb1357_charger_external_apsd(u8 enable)
 		smb1357_charger_masked_write_reg(client, CFG_C_REG,
 			USBIN_ADAPTER_MASK, 0x60);
 
-		msleep(20);
 		smb1357_set_APSD(client, true);
 
 		/* USBIN ADAPTER : 5V or 9V */
@@ -3187,6 +3224,7 @@ static int smb1357_charger_probe(
 	smb1357data->pogo_status = DCIN_NONE;
 	smb1357data->usbin_cable_type = POWER_SUPPLY_TYPE_BATTERY;
 	smb1357data->charger->cable_type = POWER_SUPPLY_TYPE_BATTERY;
+	mutex_init(&smb1357data->mutex);
 
 	chg_temp_table_size =
 		sizeof(chg_temp_table)/sizeof(sec_bat_adc_table_data_t);
@@ -3307,6 +3345,7 @@ err_supply_unreg:
 err_free:
 	kfree(charger->pdata);
 err_free1:
+	mutex_destroy(&smb1357data->mutex);
 	kfree(smb1357data);
 err_free2:
 	kfree(charger);

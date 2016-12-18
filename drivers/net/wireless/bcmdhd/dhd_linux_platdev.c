@@ -1,7 +1,7 @@
 /*
  * Linux platform device for DHD WLAN adapter
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -41,13 +41,20 @@
 #endif
 
 #if !defined(CONFIG_WIFI_CONTROL_FUNC)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+#define WLAN_PLAT_NODFS_FLAG    0x01
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58) */
 struct wifi_platform_data {
 	int (*set_power)(int val);
 	int (*set_reset)(int val);
 	int (*set_carddetect)(int val);
 	void *(*mem_prealloc)(int section, unsigned long size);
 	int (*get_mac_addr)(unsigned char *buf);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+	void *(*get_country_code)(char *ccode, u32 flags);
+#else
 	void *(*get_country_code)(char *ccode);
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58) */
 };
 #endif /* CONFIG_WIFI_CONTROL_FUNC */
 
@@ -77,7 +84,6 @@ extern void* wl_cfg80211_get_dhdp(void);
 extern int bcm_bt_lock(int cookie);
 extern void bcm_bt_unlock(int cookie);
 static int lock_cookie_wifi = 'W' | 'i'<<8 | 'F'<<16 | 'i'<<24;	/* cookie is "WiFi" */
-static bool is4335_revb0 = true;
 #endif /* ENABLE_4335BT_WAR */
 
 wifi_adapter_info_t* dhd_wifi_platform_get_adapter(uint32 bus_type, uint32 bus_num, uint32 slot_num)
@@ -164,11 +170,7 @@ int wifi_platform_set_power(wifi_adapter_info_t *adapter, bool on, unsigned long
 		}
 #endif /* ENABLE_4335BT_WAR */
 
-#ifdef ENABLE_4335BT_WAR
-		err = plat_data->set_power(on,is4335_revb0);
-#else
 		err = plat_data->set_power(on);
-#endif
 	}
 
 	if (msec && !err)
@@ -225,7 +227,11 @@ void *wifi_platform_get_country_code(wifi_adapter_info_t *adapter, char *ccode)
 
 	DHD_TRACE(("%s\n", __FUNCTION__));
 	if (plat_data->get_country_code) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58))
+		return plat_data->get_country_code(ccode, WLAN_PLAT_NODFS_FLAG);
+#else
 		return plat_data->get_country_code(ccode);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 58)) */
 	}
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) */
 
@@ -561,6 +567,7 @@ static int dhd_wifi_platform_load_sdio(void)
 			}
 			err = wifi_platform_set_power(adapter, TRUE, WIFI_TURNON_DELAY);
 			if (err) {
+				dhd_bus_unreg_sdio_notify();
 				/* WL_REG_ON state unknown, Power off forcely */
 				wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
 				continue;

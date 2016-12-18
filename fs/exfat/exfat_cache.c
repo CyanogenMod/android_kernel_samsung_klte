@@ -261,7 +261,7 @@ static INT32 __FAT_write(struct super_block *sb, UINT32 loc, UINT32 content)
 		if (!fat_sector)
 			return -1;
 
-		if (loc & 1) { 
+		if (loc & 1) {
 
 			content <<= 4;
 
@@ -332,7 +332,7 @@ static INT32 __FAT_write(struct super_block *sb, UINT32 loc, UINT32 content)
 		SET32_A(fat_entry, content);
 	}
 
-	else { 
+	else {
 
 		sec = p_fs->FAT1_start_sector + (loc >> (p_bd->sector_size_bits-2));
 		off = (loc << 2) & p_bd->sector_size_mask;
@@ -348,7 +348,7 @@ static INT32 __FAT_write(struct super_block *sb, UINT32 loc, UINT32 content)
 
 	FAT_modify(sb, sec);
 	return 0;
-} 
+}
 
 UINT8 *FAT_getblk(struct super_block *sb, UINT32 sec)
 {
@@ -506,7 +506,7 @@ UINT8 *buf_getblk(struct super_block *sb, UINT32 sec)
 	sm_V(&b_sem);
 
 	return(buf);
-} 
+}
 
 static UINT8 *__buf_getblk(struct super_block *sb, UINT32 sec)
 {
@@ -558,7 +558,7 @@ void buf_modify(struct super_block *sb, UINT32 sec)
 	WARN(!bp, "[EXFAT] failed to find buffer_cache(sector:%u).\n", sec);
 
 	sm_V(&b_sem);
-} 
+}
 
 void buf_lock(struct super_block *sb, UINT32 sec)
 {
@@ -723,7 +723,7 @@ static void push_to_lru(BUF_CACHE_T *bp, BUF_CACHE_T *list)
 	bp->next = list;
 	list->prev->next = bp;
 	list->prev = bp;
-} 
+}
 
 static void move_to_mru(BUF_CACHE_T *bp, BUF_CACHE_T *list)
 {

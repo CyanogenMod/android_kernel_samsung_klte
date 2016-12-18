@@ -23,12 +23,15 @@ struct isdbt_platform_data {
 	int gpio_int;
 	int gpio_i2c_sda;
 	int gpio_i2c_scl;
+#ifdef CONFIG_ISDBT_F_TYPE_ANTENNA
+	int gpio_tmm_sw;
+#endif
 #if defined(CONFIG_ISDBT_FC8300_SPI) || defined(CONFIG_ISDBT_FC8150_SPI)
 	int gpio_spi_do;
 	int gpio_spi_di;
 	int gpio_spi_cs;
 	int gpio_spi_clk;
-#endif	
+#endif
 };
 #endif
 #endif

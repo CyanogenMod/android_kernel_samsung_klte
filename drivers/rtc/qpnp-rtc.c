@@ -37,6 +37,7 @@ extern int poweroff_charging;
 /* for alarm mode */
 #define ALARM_MODE_NOMAL			(0x6A)
 #define ALARM_MODE_BOOT_RTC		(0x7B)
+#define SAPA_BOOTING_TIME		(60*3)
 #endif
 #endif
 
@@ -132,7 +133,7 @@ static int						sapa_dev_suspend;
 
 static void print_time(char* str, struct rtc_time *time, unsigned long sec)
 {
-	pr_info("%s: %4d-%02d-%02d %02d:%02d:%02d [%ld]\n", str,
+	pr_info("%s: %4d-%02d-%02d %02d:%02d:%02d [%lu]\n", str,
 		time->tm_year, time->tm_mon, time->tm_mday,
 		time->tm_hour, time->tm_min, time->tm_sec, sec);
 }
@@ -402,14 +403,19 @@ qpnp_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 		print_time("[SAPA] sapa", &sapa_saved_time.time, secs_pwron);
 		print_time("[SAPA] alrm", &alarm->time, secs);
 
+		if ( secs_pwron <= secs_rtc && secs_rtc <= secs_pwron+SAPA_BOOTING_TIME ) {
+			if ( poweroff_charging ) {
+				wake_lock(&sapa_wakelock);
+				rtc_dd->alarm_irq_flag = true;
+				pr_info("%s [SAPA] Restart(alarm)\n",__func__);
+				queue_delayed_work(sapa_workq, &sapa_reboot_work, (1*HZ));
+				return -EINVAL;
+			}
+		}
 		if ( secs_rtc < secs_pwron && secs_pwron < secs ) {
 			pr_info("[SAPA] override with SAPA\n");
 			memcpy(alarm, &sapa_saved_time, sizeof(struct rtc_wkalrm));
 			secs = secs_pwron;
-		}
-		if (  secs_pwron < secs_rtc ) {
-			pr_info("[SAPA] clear\n");
-			sapa_saved_time.enabled = 0;
 		}
 	}
 #endif
@@ -632,7 +638,7 @@ sapa_check_alarm(struct work_struct *work)
 	if ( poweroff_charging && sapa_saved_time.enabled) {
 		struct rtc_time now;
 		struct rtc_wkalrm alarm;
-		unsigned long curr_time, alarm_time, pwron_time, time_delta;
+		unsigned long curr_time, alarm_time, pwron_time;
 
 		/* To wake up rtc device */
 		wake_lock_timeout(&sapa_wakelock, HZ/2 );
@@ -649,8 +655,7 @@ sapa_check_alarm(struct work_struct *work)
 		pr_info("%s [SAPA] pmic_time: %lu\n",__func__, alarm_time);
 		pr_info("%s [SAPA] pwrontime: %lu [%d]\n",__func__, pwron_time, sapa_saved_time.enabled);
 
-		time_delta = curr_time - pwron_time;
-		if ( abs(time_delta) <= 60 )  {
+		if ( pwron_time <= curr_time && curr_time <= pwron_time+SAPA_BOOTING_TIME )  {
 			wake_lock(&sapa_wakelock);
 			rtc_dd->alarm_irq_flag = true;
 			pr_info("%s [SAPA] Restart since RTC \n",__func__);
@@ -673,8 +678,8 @@ sapa_rtc_getalarm(struct device *dev, struct rtc_wkalrm *alarm)
 	struct rtc_time b;
 	int ret = 0;
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(dev);
-	unsigned long secs_alrm, secs_rtc, time_delta;
-	
+	unsigned long secs_alrm, secs_rtc;
+
 	/* read rtc time */
 	if ( qpnp_rtc_read_time(dev, &b) ) {
 		pr_err("%s [SAPA] : read time failed.\n", __func__);
@@ -694,15 +699,13 @@ sapa_rtc_getalarm(struct device *dev, struct rtc_wkalrm *alarm)
 		rtc_tm_to_time(&b, &secs_rtc);
 		rtc_tm_to_time(&alarm->time, &secs_alrm);
 
-		time_delta = secs_alrm - secs_rtc;
-		if(abs(time_delta) < 60)
+		if ( secs_alrm <= secs_rtc && secs_rtc <= secs_alrm+SAPA_BOOTING_TIME )
 		{
 			rtc_dd->alarm_irq_flag = true;
 			pr_info("%s [SAPA] : it will be reboot \n",__func__);
 		}
-			
 	}
-	
+
 	if ( !ret ) {
 		pr_info("[SAPA] %s: [ALRM] %d-%d-%d %d:%d:%d \n", __func__,
 			alarm->time.tm_year, alarm->time.tm_mon, alarm->time.tm_mday,
@@ -796,7 +799,19 @@ sapa_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alarm)
 		}
 
 		rtc_tm_to_time(&rtc_tm, &secs_rtc);
-		if (secs < secs_rtc) {
+		if ( secs <= secs_rtc && secs_rtc <= secs+SAPA_BOOTING_TIME ) {
+			if ( poweroff_charging ) {
+				wake_lock(&sapa_wakelock);
+				rtc_dd->alarm_irq_flag = true;
+				pr_info("%s [SAPA] Restart(alarm)\n",__func__);
+				queue_delayed_work(sapa_workq, &sapa_reboot_work, (10*HZ));
+			}
+			else if (shutdown_loaded) {
+				pr_info("[SAPA] adjust to rtc+20s\n");
+				secs = secs_rtc + 10;
+			}
+		}
+		else if ( secs+SAPA_BOOTING_TIME < secs_rtc ) {
 			pr_err("[SAPA] Trying to set alarm in the past\n");
 			sapa_saved_time.enabled = 0;  // disable pwr on alarm to prevent retrying
 			sapa_store_kparam(alarm);
@@ -808,9 +823,9 @@ sapa_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alarm)
 		value[2] = (secs >> 16) & 0xFF;
 		value[3] = (secs >> 24) & 0xFF;
 
-	//spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
+	    //spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
 
-	rc = qpnp_write_wrapper(rtc_dd, value,
+	    rc = qpnp_write_wrapper(rtc_dd, value,
 				rtc_dd->alarm_base + REG_OFFSET_ALARM_RW,
 								NUM_8_BIT_RTC_REGS);
 		if (rc < 0) {
@@ -818,17 +833,17 @@ sapa_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alarm)
 			goto rtc_rw_fail;
 		}
 
-	ctrl_reg = (alarm->enabled) ?
+	    ctrl_reg = (alarm->enabled) ?
 			(rtc_dd->alarm_ctrl_reg1 | BIT_RTC_ALARM_ENABLE) :
 			(rtc_dd->alarm_ctrl_reg1 & ~BIT_RTC_ALARM_ENABLE);
 
-	rc = qpnp_write_wrapper(rtc_dd, &ctrl_reg,rtc_dd->alarm_base + REG_OFFSET_ALARM_CTRL1, 1);
-	if (rc) {
-		dev_err(dev, "Write to ALARM cntrol reg failed\n");
-			goto rtc_rw_fail;
-		}
+		rc = qpnp_write_wrapper(rtc_dd, &ctrl_reg,rtc_dd->alarm_base + REG_OFFSET_ALARM_CTRL1, 1);
+		if (rc) {
+			dev_err(dev, "Write to ALARM cntrol reg failed\n");
+				goto rtc_rw_fail;
+			}
 
-	rtc_dd->alarm_ctrl_reg1 = ctrl_reg;
+		rtc_dd->alarm_ctrl_reg1 = ctrl_reg;
 
 		if ( alarm != &sapa_saved_time ) {
 			memcpy(&sapa_saved_time, alarm, sizeof(struct rtc_wkalrm));
@@ -879,13 +894,6 @@ static irqreturn_t qpnp_alarm_trigger(int irq, void *dev_id)
 	int rc;
 	unsigned long irq_flags;
 
-#ifdef CONFIG_RTC_AUTO_PWRON
-	int time_delta;
-	pr_info("##############################\n"); 
-	pr_info("%s [SAPA] ALARM TRIGGER\n",__func__);
-	pr_info("##############################\n"); 
-#endif
-
 	rtc_update_irq(rtc_dd->rtc, 1, RTC_IRQF | RTC_AF);
 
 	spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
@@ -915,8 +923,9 @@ static irqreturn_t qpnp_alarm_trigger(int irq, void *dev_id)
 				"Write to ALARM control reg failed\n");
 
 #ifdef CONFIG_RTC_AUTO_PWRON
-	pr_info("%s [SAPA] : irq(%d), lpm_mode:(%d)\n", __func__, irq, rtc_dd->lpm_mode);
-	
+	if ( poweroff_charging )
+		pr_info("%s [SAPA] : irq(%d), lpm_mode\n", __func__, irq);
+
 	if ( poweroff_charging && sapa_saved_time.enabled) {
 		struct rtc_time now;
 		struct rtc_wkalrm alarm;
@@ -937,8 +946,7 @@ static irqreturn_t qpnp_alarm_trigger(int irq, void *dev_id)
 		pr_info("%s [SAPA] pmic_time: %lu\n",__func__, alarm_time);
 		pr_info("%s [SAPA] pwrontime: %lu [%d]\n",__func__, pwron_time, sapa_saved_time.enabled);
 
-		time_delta = curr_time - pwron_time;
-		if ( abs(time_delta) <= 60 )  {
+		if ( pwron_time <= curr_time && curr_time <= pwron_time+SAPA_BOOTING_TIME )  {
 			wake_lock(&sapa_wakelock);
 			rtc_dd->alarm_irq_flag = true;
 			pr_info("%s [SAPA] Restart since RTC \n",__func__);
@@ -1045,6 +1053,11 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 	struct qpnp_rtc *rtc_dd;
 	struct resource *resource;
 	struct spmi_resource *spmi_resource;
+#ifdef CONFIG_RTC_AUTO_PWRON_PARAM
+	u8 alarm_reg=0;
+	u8 value[4];
+	unsigned long rtc_secs, pmic_secs;
+#endif
 
 	rtc_dd = devm_kzalloc(&spmi->dev, sizeof(*rtc_dd), GFP_KERNEL);
 	if (rtc_dd == NULL) {
@@ -1153,6 +1166,9 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 			"Read from  Alarm control reg failed\n");
 		goto fail_rtc_enable;
 	}
+#ifdef CONFIG_RTC_AUTO_PWRON_PARAM
+	alarm_reg = rtc_dd->alarm_ctrl_reg1;
+#endif
 	/* Enable abort enable feature */
 	rtc_dd->alarm_ctrl_reg1 |= BIT_RTC_ABORT_ENABLE;
 	rc = qpnp_write_wrapper(rtc_dd, &rtc_dd->alarm_ctrl_reg1,
@@ -1161,6 +1177,19 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "SPMI write failed!\n");
 		goto fail_rtc_enable;
 	}
+#ifdef CONFIG_RTC_AUTO_PWRON_PARAM
+	rc = qpnp_read_wrapper(rtc_dd, value,
+			rtc_dd->rtc_base + REG_OFFSET_RTC_READ,	NUM_8_BIT_RTC_REGS);
+	if (rc) pr_err("Read from RTC reg failed\n");
+	rtc_secs = TO_SECS(value);
+
+	rc = qpnp_read_wrapper(rtc_dd, value,
+			rtc_dd->alarm_base + REG_OFFSET_ALARM_RW, NUM_8_BIT_RTC_REGS);
+	if (rc) pr_err("Read from ALARM reg failed\n");
+	pmic_secs = TO_SECS(value);
+
+	pr_info("[SAPA] alarm_reg=%02x, rtc=%lu pmic=%lu\n", alarm_reg, rtc_secs, pmic_secs);
+#endif
 
 #if defined(CONFIG_PM8926_BATTERY_CHECK_INTERRUPT)
 	reg = 0xFF;

@@ -79,6 +79,7 @@ obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
 obj-$(CONFIG_QSEECOM)  += tzic.o
 obj-$(CONFIG_TI_DRV2667) += ti_drv2667.o
 obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
+obj-$(CONFIG_UID_CPUTIME) 	+= uid_cputime.o
 obj-$(CONFIG_BCM2079X_NFC_I2C)	+= bcm2079x-i2c.o
 obj-$(CONFIG_NFC_PN547)	+= pn547.o
 ifneq ($(CONFIG_SEC_NFC_SENN3AB),y)
@@ -99,4 +100,4 @@ obj-$(CONFIG_TIMA_LOG)		+= tima_debug_log.o
 obj-$(CONFIG_CHECK_SIMSLOT_COUNT) += sim_slot.o
 obj-$(CONFIG_SEC_MODEM) += modem_if/
 
-obj-y += dualwave/
+obj-$(CONFIG_DUALWAVE) += dualwave/

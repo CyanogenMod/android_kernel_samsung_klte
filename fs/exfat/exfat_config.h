@@ -31,7 +31,7 @@ extern "C" {
 #define FFS_CONFIG_LITTLE_ENDIAN        1
 #define FFS_CONFIG_LEGACY_32BIT_API     0
 #define FFS_CONFIG_LEGACY_32BIT_API     0
-#define FFS_CONFIG_SUPPORT_CP1250       1 
+#define FFS_CONFIG_SUPPORT_CP1250       1
 #define FFS_CONFIG_SUPPORT_CP1251       1
 #define FFS_CONFIG_SUPPORT_CP1252       1
 #define FFS_CONFIG_SUPPORT_CP1253       1
@@ -54,4 +54,4 @@ extern "C" {
 }
 #endif
 
-#endif 
+#endif

@@ -30,12 +30,12 @@
 #include <sound/tlv.h>
 #include <sound/asound.h>
 #include <sound/pcm_params.h>
+#include <sound/q6core.h>
 #include <linux/slab.h>
 
 #include "msm-pcm-routing-v2.h"
 #include "msm-dolby-dap-config.h"
 #include "q6voice.h"
-#include "q6core.h"
 
 extern u32 score;
 struct msm_pcm_routing_bdai_data {
@@ -256,12 +256,12 @@ static struct msm_pcm_routing_bdai_data msm_bedais[MSM_BACKEND_DAI_MAX] = {
 	{ SLIMBUS_EXTPROC_RX, 0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_QUATERNARY_MI2S_RX, 0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_QUATERNARY_MI2S_TX, 0, 0, 0, 0, 0},
+	{ AFE_PORT_ID_TERTIARY_MI2S_RX,   0, 0, 0, 0, 0},
+	{ AFE_PORT_ID_TERTIARY_MI2S_TX,   0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_SECONDARY_MI2S_RX,  0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_SECONDARY_MI2S_TX,  0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_PRIMARY_MI2S_RX,    0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_PRIMARY_MI2S_TX,    0, 0, 0, 0, 0},
-	{ AFE_PORT_ID_TERTIARY_MI2S_RX,   0, 0, 0, 0, 0},
-	{ AFE_PORT_ID_TERTIARY_MI2S_TX,   0, 0, 0, 0, 0},
 	{ AUDIO_PORT_ID_I2S_RX,           0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_SECONDARY_PCM_RX,	  0, 0, 0, 0, 0},
 	{ AFE_PORT_ID_SECONDARY_PCM_TX,   0, 0, 0, 0, 0},
@@ -1457,6 +1457,12 @@ static int msm_sec_lrsm_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_sec_msp_get(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
 static int msm_sec_sa_put(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
 {
@@ -1516,6 +1522,18 @@ static int msm_sec_sa_ep_put(struct snd_kcontrol *kcontrol,
 	ret = q6asm_set_sa_ep(ac,(int*)ucontrol->value.integer.value);
 	mutex_unlock(&routing_lock);	
 	return ret;	
+}
+
+static int msm_sec_msp_put(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	struct audio_client *ac;
+	mutex_lock(&routing_lock);
+	ac = q6asm_get_audio_client(fe_dai_map[3][SESSION_TYPE_RX].strm_id);
+	ret = q6asm_set_msp(ac, (long*)ucontrol->value.integer.value);
+	mutex_unlock(&routing_lock);	
+	return ret;
 }
 
 static int msm_routing_ec_ref_rx_get(struct snd_kcontrol *kcontrol,
@@ -2216,11 +2234,11 @@ static const struct snd_kcontrol_new mmul2_mixer_controls[] = {
 	SOC_SINGLE_EXT("MI2S_TX", MSM_BACKEND_DAI_MI2S_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
-#ifdef CONFIG_SND_SOC_MAX98505
+#ifdef CONFIG_TERT_MI2S_ENABLE
 	SOC_SINGLE_EXT("TERT_MI2S_TX", MSM_BACKEND_DAI_TERTIARY_MI2S_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
-#elif defined(CONFIG_SND_SOC_MAX98504)	
+#elif defined(CONFIG_SND_SOC_MAX98504) || defined(CONFIG_SND_SOC_MAX98506)
 	SOC_SINGLE_EXT("SEC_MI2S_TX", MSM_BACKEND_DAI_SECONDARY_MI2S_TX,
 	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
 	msm_routing_put_audio_mixer),
@@ -3443,6 +3461,8 @@ static const struct snd_kcontrol_new ss_solution_mixer_controls[] = {
 				msm_sec_lrsm_get, msm_sec_lrsm_put),
 	SOC_SINGLE_MULTI_EXT("SA_EP data", SND_SOC_NOPM, 0, 65535, 0, 2,
 				msm_sec_sa_ep_get, msm_sec_sa_ep_put),
+	SOC_SINGLE_MULTI_EXT("MSP data", SND_SOC_NOPM, 0, 65535, 0, 1,
+				msm_sec_msp_get, msm_sec_msp_put),
 };
 
 static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
@@ -3971,9 +3991,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MultiMedia1 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
 	{"MultiMedia1 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
 	{"MultiMedia6 Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
-#ifdef CONFIG_SND_SOC_MAX98505
+#ifdef CONFIG_TERT_MI2S_ENABLE
 	{"MultiMedia2 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-#elif defined(CONFIG_SND_SOC_MAX98504)		
+#elif defined(CONFIG_SND_SOC_MAX98504) || defined(CONFIG_SND_SOC_MAX98506)
 	{"MultiMedia2 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
 #endif
 

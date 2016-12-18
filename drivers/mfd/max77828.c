@@ -153,7 +153,7 @@ static int of_max77828_dt(struct device *dev, struct max77828_platform_data *pda
 	pr_info("%s: irq-base: %u \n", __func__, pdata->irq_base);
 	pr_info("%s: wc-irq-gpio: %u \n", __func__, pdata->wc_irq_gpio);
 
-#ifdef CONFIG_VIBETONZ
+#ifdef CONFIG_SS_VIBRATOR
 	if (!of_property_read_u32(np, "haptic,mode", &haptic_data->mode))
 		haptic_data->mode = 0;
 

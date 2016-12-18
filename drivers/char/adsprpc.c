@@ -381,10 +381,10 @@ static int context_alloc(struct fastrpc_apps *me, uint32_t kernel,
 		goto bail;
 
 	INIT_HLIST_NODE(&ctx->hn);
-	ctx->pra = (remote_arg_t*)(&ctx[1]);
-	ctx->fds = invokefd->fds == 0 ? 0 : (int*)(&ctx->pra[bufs]);
-	ctx->handles = invokefd->fds == 0 ? 0 : (struct ion_handle**)(&ctx->fds[bufs]);
-
+	hlist_add_fake(&ctx->hn);
+	ctx->pra = (remote_arg_t *)(&ctx[1]);
+	ctx->fds = invokefd->fds == 0 ? 0 : (int *)(&ctx->pra[bufs]);
+	ctx->handles = invokefd->fds == 0 ? 0 :(struct ion_handle **)(&ctx->fds[bufs]);
 	if (!kernel) {
 		VERIFY(err, 0 == copy_from_user(ctx->pra, invoke->pra,
 					bufs * sizeof(*ctx->pra)));

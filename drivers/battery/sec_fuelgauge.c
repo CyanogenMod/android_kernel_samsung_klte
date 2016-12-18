@@ -33,6 +33,7 @@ static enum power_supply_property sec_fuelgauge_props[] = {
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT,
 	POWER_SUPPLY_PROP_ENERGY_FULL,
+	POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN,
 };
 
 /* capacity is  0.1% unit */
@@ -168,6 +169,9 @@ static int sec_fg_get_property(struct power_supply *psy,
 			val->intval = 1;
 		}
 		break;
+	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
+		val->intval = fuelgauge->capacity_max;
+		break;
 	case POWER_SUPPLY_PROP_STATUS:
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
 		return -ENODATA;
@@ -264,6 +268,13 @@ static int sec_fg_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TEMP_AMBIENT:
 		if (!sec_hal_fg_set_property(fuelgauge->client, psp, val))
 			return -EINVAL;
+		break;
+	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
+		dev_info(&fuelgauge->client->dev,
+				"%s: capacity_max changed, %d -> %d\n",
+				__func__, fuelgauge->capacity_max, val->intval);
+		fuelgauge->capacity_max = val->intval;
+		fuelgauge->initial_update_of_soc = true;
 		break;
 	default:
 		return -EINVAL;

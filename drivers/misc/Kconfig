@@ -444,6 +444,28 @@ config SAMSUNG_JACK
 	 To samsung jack is reviewed and supported in all the
 	 samsung devices.
 
+config SAMSUNG_JACK_VOICE_BTN
+	bool "3.5 PI Jack Voice button"
+	depends on INPUT
+	default n
+	help
+	 This is Voice command button.
+	 it is work with SAMSUNG JACK.
+
+	 To samsung jack is reviewed and supported in all the
+	 samsung devices.
+
+config SAMSUNG_JACK_READ_BTN_ADC
+	bool "3.5 PI Jack READ ADC"
+	depends on INPUT
+	default n
+	help
+	 This is e\read adc function.
+	 it is work with SAMSUNG JACK.
+
+	 To samsung jack is reviewed and supported in all the
+	 samsung devices.
+
 config EARJACK_ADC_SYSFS
 	bool "EarJack & BTN adc sysfs"
 	depends on SAMSUNG_JACK
@@ -593,6 +615,13 @@ config SM5502_MUIC
 	default n
 	help
 	  This option enables SILICON MITUS MUIC.
+
+config ID_BYPASS_SBL
+	bool "MUIC Bypass ID value check in QCOM-SBL"
+	depends on SM5502_MUIC
+	default n
+	help
+	 This option will disable ID check in SBL so that EDL check is bypassed.
 
 config TORCH_FIX
 	bool "Torch Fix for Factory Test"
@@ -1048,6 +1077,12 @@ config TI_DRV2667
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
 
+config UID_CPUTIME
+	tristate "Per-UID cpu time statistics"
+	depends on PROFILING
+	help
+	  Per UID based cpu time statistics exported to /proc/uid_cputime
+
 config RT8973_JIG_WAKEUP
         bool "enable JIG wakeup when send Jig command"
         default n
@@ -1078,4 +1113,5 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/modem_if/Kconfig"
+source "drivers/misc/dualwave/Kconfig"
 endmenu

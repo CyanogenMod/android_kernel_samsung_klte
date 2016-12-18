@@ -1,7 +1,7 @@
 /*
  * Linux OS Independent Layer
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.h 432719 2013-10-29 12:04:59Z $
+ * $Id: linux_osl.h 546957 2015-04-07 04:51:13Z $
  */
 
 #ifndef _linux_osl_h_
@@ -342,6 +342,11 @@ extern int osl_error(int bcmerror);
 #define PKTID(skb)              ({BCM_REFERENCE(skb); 0;})
 #define PKTSETID(skb, id)       ({BCM_REFERENCE(skb); BCM_REFERENCE(id);})
 #define PKTSHRINK(osh, m)		({BCM_REFERENCE(osh); m;})
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+#define PKTORPHAN(skb)          skb_orphan(skb)
+#else
+#define PKTORPHAN(skb)          ({BCM_REFERENCE(skb); 0;})
+#endif /* LINUX VERSION >= 3.6 */
 
 
 #ifdef CTFPOOL

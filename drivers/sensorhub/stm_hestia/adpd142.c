@@ -521,7 +521,7 @@ adpd142_read_config_file(struct adpd142_data *pst_adpd)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	fpt_adpd = filp_open("/data/misc/adpd142_config.dcfg", O_RDONLY, 0666);
+	fpt_adpd = filp_open("/data/misc/adpd142_config.dcfg", O_RDONLY, 0);
 	if (IS_ERR(fpt_adpd)) {
 		ADPD142_dbg("unable to find de file %ld\n", PTR_ERR(fpt_adpd));
 		set_fs(old_fs);
@@ -1129,7 +1129,7 @@ static int osc_trim_efs_register_open(struct adpd142_data *pst_adpd)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	osc_filp = filp_open(OSCILLATOR_TRIM_FILE_PATH, O_RDONLY, 0666);
+	osc_filp = filp_open(OSCILLATOR_TRIM_FILE_PATH, O_RDONLY, 0);
 	if (IS_ERR(osc_filp)) {
 		err = PTR_ERR(osc_filp);
 		if (err != -ENOENT)
@@ -1174,7 +1174,7 @@ static int osc_trim_efs_register_save(struct adpd142_data *pst_adpd)
 	set_fs(KERNEL_DS);
 
 	osc_filp = filp_open(OSCILLATOR_TRIM_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY, 0666);
+			O_CREAT | O_TRUNC | O_WRONLY, 0660);
 	if (IS_ERR(osc_filp)) {
 		pr_err("adpd142_%s: Can't open oscillator trim file\n", __func__);
 		set_fs(old_fs);

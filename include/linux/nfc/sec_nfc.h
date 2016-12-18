@@ -50,9 +50,11 @@ struct sec_nfc_platform_data {
 //	unsigned int irq;
 	unsigned int ven;
 	unsigned int firm;
+	unsigned int tvdd;
 	void	(*cfg_gpio)(void);
 	u32 pon_gpio_flags;
 	u32 rfs_gpio_flags;
+	u32 tvdd_gpio_flags;
 };
 
 #define STATE_FIRM_HIGH	1

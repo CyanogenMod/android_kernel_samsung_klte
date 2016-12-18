@@ -90,6 +90,8 @@ u32 LED_B_CURRENT = 0x28;
 u32 led_default_cur = 0x28;
 u32 led_lowpower_cur = 0x05;
 
+u32 led_offset[MAX_NUM_LEDS] = {0,};
+
 static struct an30259_led_conf led_conf[] = {
 	{
 		.name = "led_r",
@@ -284,6 +286,9 @@ static void leds_on(enum an30259a_led_enum led, bool on, bool slopemode,
 			u8 ledcc)
 {
 	struct an30259a_data *data = i2c_get_clientdata(b_client);
+
+	if (ledcc > 0)
+		ledcc += led_offset[led];
 
 	if (on)
 		data->shadow_reg[AN30259A_REG_LEDON] |= LED_ON << led;
@@ -572,16 +577,10 @@ static ssize_t store_led_r(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct an30259a_data *data = dev_get_drvdata(dev);
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;
@@ -602,16 +601,10 @@ static ssize_t store_led_g(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct an30259a_data *data = dev_get_drvdata(dev);
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;
@@ -632,16 +625,10 @@ static ssize_t store_led_b(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
 	struct an30259a_data *data = dev_get_drvdata(dev);
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	u8 brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtou8(buff, 0, &brightness);
+	ret = kstrtou8(buf, 0, &brightness);
 	if (ret != 0) {
 		dev_err(&data->client->dev, "fail to get brightness.\n");
 		goto out;
@@ -787,23 +774,39 @@ static struct attribute_group sec_led_attr_group = {
 static int an30259a_parse_dt(struct device *dev) {
 	struct device_node *np = dev->of_node;
 	int ret;
+	u32 read_dt_property;
 
 	ret = of_property_read_u32(np,
 			"an30259a,default_current", &led_default_cur);
 	if (ret < 0) {
 		led_default_cur = 0x28;
-		pr_warning("%s warning dt parse[%d]\n", __func__, ret);
+		pr_warning("%s warning default dt parse[%d]\n", __func__, ret);
 	}
 
 	ret = of_property_read_u32(np,
 			"an30259a,lowpower_current", &led_lowpower_cur);
 	if (ret < 0) {
 		led_lowpower_cur = 0x05;
-		pr_warning("%s warning dt parse[%d]\n", __func__, ret);
+		pr_warning("%s warning lowpower dt parse[%d]\n", __func__, ret);
 	}
 
-	pr_info("%s default %d, lowpower %d\n",
-			__func__, led_default_cur, led_lowpower_cur);
+	ret = of_property_read_u32(np,
+			"an30259a,offset_current", &read_dt_property);
+	if (ret < 0) {
+		led_offset[LED_R] = 0;
+		led_offset[LED_G] = 0;
+		led_offset[LED_B] = 0;
+		pr_warning("%s warning offset dt parse[%d]\n", __func__, ret);
+	} else {
+		led_offset[LED_R] = ((read_dt_property >> LED_R_SHIFT) & 0xff);
+		led_offset[LED_G] = ((read_dt_property >> LED_G_SHIFT) & 0xff);
+		led_offset[LED_B] = (read_dt_property & 0xff);
+	}
+
+	pr_info("%s LED default 0x%x, lowpower 0x%x\n", __func__,
+			led_default_cur, led_lowpower_cur);
+	pr_info("%s LED R_off[0x%x] G_off[0x%x] B_off[0x%x]\n", __func__,
+			led_offset[LED_R], led_offset[LED_G], led_offset[LED_B]);
 	return 0;
 }
 #endif

@@ -137,6 +137,7 @@ Eoverflow:
 	m->op->stop(m, p);
 #ifdef CONFIG_LOW_ORDER_SEQ_MALLOC
 	is_vmalloc_addr(m->buf) ? vfree(m->buf) : kfree(m->buf);
+	m->count = 0;
 	m->size <<= 1;
 	if (m->size <= (2* PAGE_SIZE))
 		m->buf = kmalloc(m->size, GFP_KERNEL);
@@ -144,6 +145,7 @@ Eoverflow:
 		m->buf = vmalloc(m->size);
 #else
 	kfree(m->buf);
+	m->count = 0;
 	m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
 #endif
 	return !m->buf ? -ENOMEM : -EAGAIN;
@@ -242,6 +244,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 		m->op->stop(m, p);
 #ifdef CONFIG_LOW_ORDER_SEQ_MALLOC
 		is_vmalloc_addr(m->buf) ? vfree(m->buf) : kfree(m->buf);
+		m->count = 0;
 		m->size <<= 1;
 		if (m->size <= (2* PAGE_SIZE))
 			m->buf = kmalloc(m->size, GFP_KERNEL);
@@ -249,11 +252,11 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 			m->buf = vmalloc(m->size);
 #else
 		kfree(m->buf);
+		m->count = 0;
 		m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
 #endif
 		if (!m->buf)
 			goto Enomem;
-		m->count = 0;
 		m->version = 0;
 		pos = m->index;
 		p = m->op->start(m, &pos);
@@ -346,6 +349,8 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 					m->read_pos = offset;
 					retval = file->f_pos = offset;
 				}
+			} else {
+				file->f_pos = offset;
 			}
 	}
 	file->f_version = m->version;

@@ -2484,6 +2484,12 @@ config MACH_KLIMT_VZW
 	help
 	  Support for Samsung KLIMT_VZW device.
 
+config MACH_KLIMT_LTE_DCM
+	default n
+	bool "Samsung model KLIMT_DCM"
+	help
+	  Support for Samsung KLIMT_DCM device.
+
 config SEC_PICASSO_PROJECT
 	default n
 	bool "Samsung PICASSO project"
@@ -2736,6 +2742,13 @@ config MACH_KACTIVELTE_SKT
 	select SEC_KACTIVE_PROJECT
 	help
 	  Support for Samsung KACTIVELTE_SKT device.
+
+config MACH_KACTIVELTE_KOR
+	default n
+	bool "Samsung model KACTIVELTE_KOR"
+	select SEC_KACTIVE_PROJECT
+	help
+	  Support for Samsung KACTIVELTE_KOR device.
 
 config MACH_KACTIVELTE_DCM
 	default n
@@ -4443,6 +4456,20 @@ config MSM_RTB_SEPARATE_CPUS
 	  separately. This will guarantee that the last acesses for each cpu
 	  will be logged but there will be fewer entries per cpu
 
+config MSM_RTB_TIMESTAMP
+	bool "Add timestamp to rtb logging"
+	depends on MSM_RTB
+	depends on SMP
+        default n
+	help
+	  RTB logging currently doesn't log the time
+ 	  at which the logging was done. This can be
+	  useful to compare with dmesg during debug.
+	  The bytes for timestamp are taken by reducing
+	  the sentinel array size to three from eleven
+	  thus giving the extra 8 bytes to store time.
+	  This maintains the size of the layout at 32.
+
 config MSM_EBI_ERP
 	bool "External Bus Interface (EBI) error reporting"
 	help
@@ -4884,9 +4911,23 @@ config MUIC_RESET_PIN_ENABLE
                 This request is from H/W team
 		In case of mUIC voltage drop, mUIC will be reset
 
+config TERT_MI2S_ENABLE
+	bool "3rd mi2s devices"
+	default n
+	help
+	 This is TERT_MI2S_ENABLE driver for maxim devies.
+
 config SEC_SMART_MGR_RUNQUEUE_AVG
 	default n
 	bool "Samsung added for read current run queue"
 	help
 	  Support for Smart MGR function.
 endif
+
+config KERNEL_TEXT_MPU_PROT
+        bool "Enable xpu protection of kernel r/o sections"
+        help
+          Enables xpu protection of kernel code and read-only data
+          sections early in boot. Read access is permitted to
+          all masters; Write access is only permited to the
+          secure world.

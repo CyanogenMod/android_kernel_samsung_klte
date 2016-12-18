@@ -121,12 +121,12 @@
 				29 01 00 00 00 00 03 F0 A5 A5		/* TEST KEY Disable */
 				29 01 00 00 00 00 03 FC A5 A5		/* TEST KEY Disable */
 			];
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-display-off-seq = [
 				05 01 00 00 0A 00 02 28 00			/* wait 10ms(0x0A) */
 				05 01 00 00 78 00 02 10 00			/* wait 120ms(0x78) */
 			];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 		/*used for only evt1 panel and over*/
 		qcom,panel-hsync-on-seq = [

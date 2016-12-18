@@ -438,16 +438,10 @@ static ssize_t max77828_led_r(struct device *dev,
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 	struct max77828_led_data *led_data = container_of(led_cdev, struct max77828_led_data, led);
 
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	int brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtoint(buff, 0, &brightness);
+	ret = kstrtoint(buf, 0, &brightness);
 	if (ret != 0){
 			printk("fail to get brightness.\n");
 			goto out;
@@ -465,16 +459,10 @@ static ssize_t max77828_led_g(struct device *dev,
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 	struct max77828_led_data *led_data = container_of(led_cdev, struct max77828_led_data, led);
 
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	int brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtoint(buff, 0, &brightness);
+	ret = kstrtoint(buf, 0, &brightness);
 	if (ret != 0){
 			printk("fail to get brightness.\n");
 			goto out;
@@ -492,16 +480,10 @@ static ssize_t max77828_led_b(struct device *dev,
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 	struct max77828_led_data *led_data = container_of(led_cdev, struct max77828_led_data, led);
 
-	char buff[10] = {0,};
-	int cnt, ret;
+	int ret;
 	int brightness;
 
-	cnt = count;
-	cnt = (buf[cnt-1] == '\n') ? cnt-1 : cnt;
-	memcpy(buff, buf, cnt);
-	buff[cnt] = '\0';
-
-	ret = kstrtoint(buff, 0, &brightness);
+	ret = kstrtoint(buf, 0, &brightness);
 	if (ret != 0){
 			printk("fail to get brightness.\n");
 			goto out;

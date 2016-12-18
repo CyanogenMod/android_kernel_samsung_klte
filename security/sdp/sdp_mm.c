@@ -1,7 +1,20 @@
-/* Sensitive Data Protection Memory Manager (SDP_MM)virtual driver
+/*
+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
  *
- * Copyright (c) 2014, Samsung Research America. All rights reserved.
+ * Sensitive Data Protection
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #define pr_fmt(fmt) "SDP_MM: %s: " fmt, __func__
@@ -19,9 +32,9 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sdp_mm.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
+#include <sdp/sdp_mm.h>
 
 #define SDP_MM_DEV	"sdp_mm"
 

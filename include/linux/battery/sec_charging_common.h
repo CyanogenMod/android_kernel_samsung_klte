@@ -444,11 +444,17 @@ struct sec_battery_platform_data {
 	/* battery swelling */
 	unsigned int swelling_high_temp_block;
 	unsigned int swelling_high_temp_recov;
-	unsigned int swelling_low_temp_blck;
+	unsigned int swelling_low_temp_block;
 	unsigned int swelling_low_temp_recov;
-	unsigned int swelling_float_voltage;
-	unsigned int swelling_rechg_voltage;
-	unsigned int swelling_block_time;
+
+	unsigned int swelling_chg_current;
+	unsigned int swelling_high_chg_current;
+	unsigned int swelling_low_chg_current;
+
+	unsigned int swelling_normal_float_voltage;
+	unsigned int swelling_drop_float_voltage;
+	unsigned int swelling_high_rechg_voltage;
+	unsigned int swelling_low_rechg_voltage;
 
 	/* Monitor setting */
 	sec_battery_monitor_polling_t polling_type;

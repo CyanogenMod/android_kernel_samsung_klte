@@ -137,10 +137,10 @@ void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *c
 	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
-	
-		
+
+
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
-	
+
 }
 
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
@@ -224,7 +224,7 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
-#if defined (CONFIG_LCD_CLASS_DEVICE) 
+#if defined (CONFIG_LCD_CLASS_DEVICE)
 static char lcd_cabc[2] = {0x55, 0x0};	/* CABC COMMAND : default disabled */
 static struct dsi_cmd_desc cabc_cmd= {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(lcd_cabc)},
@@ -238,7 +238,7 @@ static struct dsi_cmd_desc cabc_jdi_brightness_cmd= {
 };
 static void mdss_dsi_panel_cabc_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int siop_status)
 {
-	
+
 	struct dcs_cmd_req cmdreq;
 
 	pr_debug("%s: cabc=%d\n", __func__, siop_status);
@@ -261,12 +261,12 @@ static void mdss_dsi_panel_cabc_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int siop_s
 
 #if defined(CONFIG_LCD_CONNECTION_CHECK)
 	if (!(is_sharp_panel) ) {
-		if(lcd_cabc[1]  != 0) 
+		if(lcd_cabc[1]  != 0)
 			lcd_cabc_jdi_brightness[1] = 0x0B;
-		else  
+		else
 		lcd_cabc_jdi_brightness[1] = 0x00;
 		cmdreq.cmds = &cabc_jdi_brightness_cmd;
-		mdss_dsi_cmdlist_put(ctrl, &cmdreq);		
+		mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 	}
 #endif
 }
@@ -364,7 +364,7 @@ void mdss_dsi_sharp_panel_reset(struct mdss_panel_data *pdata, int enable)
 		if (rc)
 		pr_err("enabling disp_en_gpio_n failed, rc=%d\n",rc);
 		gpio_set_value(ctrl_pdata->disp_en_gpio_n, 1);
-		
+
 		rc = gpio_tlmm_config(GPIO_CFG(ctrl_pdata->rst_gpio, 0,
 					GPIO_CFG_OUTPUT,GPIO_CFG_PULL_UP,GPIO_CFG_8MA),
 					GPIO_CFG_ENABLE);
@@ -381,7 +381,7 @@ void mdss_dsi_sharp_panel_reset(struct mdss_panel_data *pdata, int enable)
 					GPIO_CFG_OUTPUT,GPIO_CFG_NO_PULL,GPIO_CFG_8MA),
 					GPIO_CFG_ENABLE);
 		if (rc)
-		pr_err("enabling bl_on_gpio failed, rc=%d\n",rc);		
+		pr_err("enabling bl_on_gpio failed, rc=%d\n",rc);
 		gpio_set_value(ctrl_pdata->bl_on_gpio, 1);
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
 			pr_debug("%s: Panel Not properly turned OFF\n",
@@ -441,7 +441,7 @@ void mdss_dsi_sharp_panel_reset(struct mdss_panel_data *pdata, int enable)
 #endif
 	} else {
 #if defined(CONFIG_LCD_CONNECTION_CHECK)
-	if (is_sharp_panel) {		
+	if (is_sharp_panel) {
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 		rc = gpio_tlmm_config(GPIO_CFG(ctrl_pdata->disp_en_gpio_p, 0,
@@ -652,7 +652,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	msd.mpd = pdata;
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	
+
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (ctrl->on_cmds.cmd_cnt)
@@ -781,7 +781,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 
 	return 0;
 }
-int mdss_panel_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format)
 {
 	int rc = 0;
@@ -910,7 +910,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
-	static const char *on_cmds_state, *off_cmds_state;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -956,7 +955,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mipi.mode = DSI_CMD_MODE;
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-pixel-packing", &tmp);
 	tmp = (!rc ? tmp : 0);
-	rc = mdss_panel_get_dst_fmt(pinfo->bpp,
+	rc = mdss_panel_dt_get_dst_fmt(pinfo->bpp,
 		pinfo->mipi.mode, pinfo->mipi.pixel_packing,
 		&(pinfo->mipi.dst_format));
 	if (rc) {
@@ -965,7 +964,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mipi.dst_format =
 			DSI_VIDEO_DST_FORMAT_RGB888;
 	}
-	
+
 	pdest = of_get_property(np,
 			"qcom,mdss-dsi-panel-destination", NULL);
 	if (strlen(pdest) != 9) {
@@ -981,7 +980,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 							__func__);
 		pinfo->pdest = DISPLAY_1;
 	}
-	
+
 #if defined(CONFIG_LCD_CONNECTION_CHECK)
 	if(is_sharp_panel == 0) {
 		rc = of_property_read_u32(np, "qcom,mdss-dsi-h-front-porch-jdi", &tmp);
@@ -1031,7 +1030,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			rc = of_property_read_u32(np,
 				"qcom,mdss-dsi-bl-pmic-pwm-frequency", &tmp);
 			if (rc) {
-				pr_err("%s:%d, Error, panel pwm_period\n",		
+				pr_err("%s:%d, Error, panel pwm_period\n",
 					__func__, __LINE__);
 			return -EINVAL;
 			}
@@ -1061,7 +1060,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-interleave-mode", &tmp);
 	pinfo->mipi.interleave_mode = (!rc ? tmp : 0);
- 
+
 	pinfo->mipi.vsync_enable = of_property_read_bool(np,
 		"qcom,mdss-dsi-te-check-enable");
 	pinfo->mipi.hw_vsync_mode = of_property_read_bool(np,
@@ -1110,7 +1109,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-color-order", &tmp);
 	pinfo->mipi.rgb_swap = (!rc ? tmp : DSI_RGB_SWAP_RGB);
-	
+
 	rc = of_property_read_u32(np, "qcom,mdss-force-clk-lane-hs", &tmp);
 	pinfo->mipi.force_clk_lane_hs = (!rc ? tmp : 0);
 
@@ -1183,43 +1182,20 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
 			"qcom,mdss-dsi-sharp-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
-		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");		
+		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
 	 } else {
 		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
 			"qcom,mdss-dsi-jdi-on-command", "qcom,mdss-dsi-on-command-state");
 		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 			"qcom,mdss-dsi-jdi-off-command", "qcom,mdss-dsi-off-command-state");
 	 }
-	// changes made as QCom suggestion 
-	on_cmds_state = of_get_property(np, "qcom,mdss-dsi-on-command-state", NULL);
- 
-        if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
-            ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-        } else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
-            ctrl_pdata->dsi_on_state = DSI_HS_MODE;
-        } else {
-             pr_debug("%s: ON cmds state not specified. Set Default\n", __func__); 
-             ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-        }
- 
-        off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL); 
- 
-        if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
-            ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-        } else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
-            ctrl_pdata->dsi_off_state = DSI_HS_MODE;
-       } else {
-            pr_debug("%s: ON cmds state not specified. Set Default\n", __func__); 
-           ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-       }
-        pr_err("[ on state : %d, off state : %d\n",ctrl_pdata->dsi_on_state ,ctrl_pdata->dsi_off_state );
 #else
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
 		"qcom,mdss-dsi-sharp-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
 #endif
-	return 0;	
+	return 0;
 error:
 	return -EINVAL;
 }
@@ -1263,14 +1239,14 @@ static ssize_t mdss_siop_enable_show(struct device *dev,
 static ssize_t mdss_siop_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
-	
+
 	if (sysfs_streq(buf, "1") && !msd.dstat.siop_status)
 		msd.dstat.siop_status = true;
 	else if (sysfs_streq(buf, "0") && msd.dstat.siop_status)
 		msd.dstat.siop_status = false;
 	else
 		pr_info("%s: Invalid argument!!", __func__);
-	
+
 	return size;
 
 }
@@ -1829,7 +1805,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	if (rc) {
 		pr_info("sysfs create fail-%s\n",dev_attr_lcd_power.attr.name);
-	
+
 	}
 	rc = sysfs_create_file(&lcd_device->dev.kobj,
 					&dev_attr_lcd_type.attr);
@@ -1838,7 +1814,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 				dev_attr_lcd_type.attr.name);
 	}
 
-	
+
 	rc= sysfs_create_file(&lcd_device->dev.kobj,
 					&dev_attr_siop_enable.attr);
 	if (rc) {
@@ -1861,7 +1837,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 	}
 
 
-	
+
 #endif
 #endif
 #if defined(DDI_VIDEO_ENHANCE_TUNING)
@@ -1913,7 +1889,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 			__func__, disp_esd_gpio, rc);
 	}
 
-	rc = request_threaded_irq(err_fg_gpio, NULL, err_fg_irq_handler, 
+	rc = request_threaded_irq(err_fg_gpio, NULL, err_fg_irq_handler,
 		IRQF_TRIGGER_HIGH | IRQF_ONESHOT, "esd_detect", NULL);
 	if (rc) {
 		pr_err("%s : Failed to request_irq. :ret=%d", __func__, rc);

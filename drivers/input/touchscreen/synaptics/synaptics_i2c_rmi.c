@@ -341,14 +341,31 @@ static int synaptics_parse_dt(struct device *dev,
 		dt_data->sub_project = "0";
 	}
 
-	if (dt_data->extra_config[2] > 0)
-		pr_err("%s: OCTA ID = %d\n", __func__, gpio_get_value(dt_data->extra_config[2]));
+	if (dt_data->extra_config[2] > 0) {
+		pr_err("%s: OCTA ID = %d\n", __func__,
+				gpio_get_value(dt_data->extra_config[2]));
 
-	pr_err("%s: power= %d, tsp_int= %d, X= %d, Y= %d, project= %s, config[%d][%d][%d][%d], tablet = %d reset= %d\n",
+		if (strncmp(dt_data->project, "PSLTE", 5) == 0)
+			gpio_tlmm_config(GPIO_CFG(dt_data->extra_config[2], 0,
+					GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN,
+					GPIO_CFG_2MA), 1);
+
+		if ((strncmp(dt_data->project, "K", 1) == 0) &&
+				(strncmp(dt_data->sub_project, "active", 6) == 0))
+			gpio_tlmm_config(GPIO_CFG(dt_data->extra_config[2], 0,
+					GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN,
+					GPIO_CFG_2MA), 1);
+	}
+
+	dt_data->surface_only = of_property_read_bool(np, "synaptics,surface-only");
+
+	pr_err("%s: power= %d, tsp_int= %d, X= %d, Y= %d, project= %s, "
+		"config[%d][%d][%d][%d], tablet = %d reset= %d surface-only= %d\n",
 		__func__, dt_data->external_ldo, dt_data->irq_gpio,
 			dt_data->coords[0], dt_data->coords[1], dt_data->project,
 			dt_data->extra_config[0], dt_data->extra_config[1], dt_data->extra_config[2],
-			dt_data->extra_config[3], dt_data->tablet, dt_data->reset_gpio);
+			dt_data->extra_config[3], dt_data->tablet, dt_data->reset_gpio,
+			dt_data->surface_only);
 
 	return 0;
 }
@@ -2014,7 +2031,6 @@ static int synaptics_rmi4_f51_detection_flag(struct synaptics_rmi4_data *rmi4_da
 		struct synaptics_rmi4_fn *fhandler)
 {
 	struct synaptics_rmi4_f51_data *data;
-	int x, y, z;
 	int retval;
 
 	data = (struct synaptics_rmi4_f51_data *)fhandler->data;
@@ -2070,53 +2086,55 @@ static int synaptics_rmi4_f51_detection_flag(struct synaptics_rmi4_data *rmi4_da
 	}
 #endif
 
-	if (data->proximity_data[0] == HOVER_UN_DETECTED) {
-		if (rmi4_data->f51_finger_is_hover) {
-			dev_info (&rmi4_data->i2c_client->dev,
-				"%s: Hover finger[OUT]\n", __func__);
-			rmi4_data->f51_finger_is_hover = false;
+	if (!rmi4_data->dt_data->surface_only) {
+		if (data->proximity_data[0] == HOVER_UN_DETECTED) {
+			if (rmi4_data->f51_finger_is_hover) {
+				dev_info (&rmi4_data->i2c_client->dev,
+					"%s: Hover finger[OUT]\n", __func__);
+				rmi4_data->f51_finger_is_hover = false;
+			}
+			return retval;
 		}
-		return retval;
-	}
+		if ((data->finger_hover_det & HOVER_DETECTED) && (data->hover_finger_z > 0)) {
+			int x, y, z;
+			x = (data->hover_finger_x_4__11 << 4) |
+				(data->hover_finger_xy_0__3 & 0x0f);
+			y = (data->hover_finger_y_4__11 << 4) |
+				(data->hover_finger_xy_0__3 >> 4);
+			z = HOVER_Z_MAX - data->hover_finger_z;
 
-	if ((data->finger_hover_det & HOVER_DETECTED) && (data->hover_finger_z > 0)) {
-		x = (data->hover_finger_x_4__11 << 4) |
-			(data->hover_finger_xy_0__3 & 0x0f);
-		y = (data->hover_finger_y_4__11 << 4) |
-			(data->hover_finger_xy_0__3 >> 4);
-		z = HOVER_Z_MAX - data->hover_finger_z;
+			input_mt_slot(rmi4_data->input_dev, 0);
+			input_mt_report_slot_state(rmi4_data->input_dev,
+					MT_TOOL_FINGER, 1);
 
-		input_mt_slot(rmi4_data->input_dev, 0);
-		input_mt_report_slot_state(rmi4_data->input_dev,
-				MT_TOOL_FINGER, 1);
+			input_report_key(rmi4_data->input_dev,
+					BTN_TOUCH, 0);
+			input_report_key(rmi4_data->input_dev,
+					BTN_TOOL_FINGER, 1);
+			input_report_abs(rmi4_data->input_dev,
+					ABS_MT_POSITION_X, x);
+			input_report_abs(rmi4_data->input_dev,
+					ABS_MT_POSITION_Y, y);
+			input_report_abs(rmi4_data->input_dev,
+					ABS_MT_DISTANCE, z);
 
-		input_report_key(rmi4_data->input_dev,
-				BTN_TOUCH, 0);
-		input_report_key(rmi4_data->input_dev,
-				BTN_TOOL_FINGER, 1);
-		input_report_abs(rmi4_data->input_dev,
-				ABS_MT_POSITION_X, x);
-		input_report_abs(rmi4_data->input_dev,
-				ABS_MT_POSITION_Y, y);
-		input_report_abs(rmi4_data->input_dev,
-				ABS_MT_DISTANCE, z);
+			input_sync(rmi4_data->input_dev);
 
-		input_sync(rmi4_data->input_dev);
-
-		if (!rmi4_data->f51_finger_is_hover) {
+			if (!rmi4_data->f51_finger_is_hover) {
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-			dev_info(&rmi4_data->i2c_client->dev,
-				"Hover finger[IN]: x = %d, y = %d, z = %d\n", x, y, z);
+				dev_info(&rmi4_data->i2c_client->dev,
+					"Hover finger[IN]: x = %d, y = %d, z = %d\n", x, y, z);
 #else
-			dev_info(&rmi4_data->i2c_client->dev,
-				"Hover finger[IN]\n");
+				dev_info(&rmi4_data->i2c_client->dev,
+					"Hover finger[IN]\n");
 #endif
-			rmi4_data->f51_finger_is_hover = true;
-		}
+				rmi4_data->f51_finger_is_hover = true;
+			}
 
-		rmi4_data->f51_finger = true;
-		rmi4_data->fingers_on_2d = false;
-		synaptics_rmi4_f51_finger_timer((unsigned long)rmi4_data);
+			rmi4_data->f51_finger = true;
+			rmi4_data->fingers_on_2d = false;
+			synaptics_rmi4_f51_finger_timer((unsigned long)rmi4_data);
+		}
 	}
 
 	if (data->air_swipe_det || data->large_obj_det || data->hover_pinch_det || data->object_present)
@@ -3426,7 +3444,10 @@ static int synaptics_rmi4_f51_init(struct synaptics_rmi4_data *rmi4_data,
 			return -ENOMEM;
 	}
 
-	rmi4_data->f51_handle->proximity_enables = AIR_SWIPE_EN | SLEEP_PROXIMITY;
+	if (rmi4_data->dt_data->surface_only)
+		rmi4_data->f51_handle->proximity_enables = 0;
+	else
+		rmi4_data->f51_handle->proximity_enables = AIR_SWIPE_EN | SLEEP_PROXIMITY;
 
 	rmi4_data->f51_handle->general_control = F51_GENERAL_CONTROL;
 
@@ -3479,7 +3500,12 @@ static int synaptics_rmi4_f51_init(struct synaptics_rmi4_data *rmi4_data,
 	if (query.features & HAS_EDGE_SWIPE) {
 		rmi4_data->f51_handle->edge_swipe_data_addr = fhandler->full_addr.data_base + data_addr_offset;
 #ifndef USE_F51_OFFSET_CALCULATE
-		rmi4_data->f51_handle->edge_swipe_data_addr = fhandler->full_addr.data_base + EDGE_SWIPE_DATA_OFFSET;
+		if (strncmp(rmi4_data->dt_data->project, "PSLTE", 5) == 0)
+			rmi4_data->f51_handle->edge_swipe_data_addr =
+					fhandler->full_addr.data_base;
+		else
+			rmi4_data->f51_handle->edge_swipe_data_addr =
+					fhandler->full_addr.data_base + EDGE_SWIPE_DATA_OFFSET;
 #endif
 		rmi4_data->has_edge_swipe = true;
 		rmi4_data->f51_handle->general_control |= EDGE_SWIPE_EN;
@@ -3492,12 +3518,14 @@ static int synaptics_rmi4_f51_init(struct synaptics_rmi4_data *rmi4_data,
 	else
 		rmi4_data->has_side_buttons = false;
 
-	retval = synaptics_rmi4_f51_set_enables(rmi4_data);
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: f51_set_enables fail[%d]\n",
-				__func__, retval);
-		return retval;
+	if (!rmi4_data->dt_data->surface_only) {
+		retval = synaptics_rmi4_f51_set_enables(rmi4_data);
+		if (retval < 0) {
+			dev_err(&rmi4_data->i2c_client->dev,
+					"%s: f51_set_enables fail[%d]\n",
+					__func__, retval);
+			return retval;
+		}
 	}
 
 	dev_info(&rmi4_data->i2c_client->dev,
@@ -4434,11 +4462,14 @@ static int synaptics_rmi4_reinit_device(struct synaptics_rmi4_data *rmi4_data)
 				rmi4_data->f51_handle->general_control_addr,
 				&f51_general_control, sizeof(f51_general_control));
 #endif
-		retval = synaptics_rmi4_f51_set_enables(rmi4_data);
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev, "%s: f51_set_enables fail[%d]\n",
-						__func__, retval);
-			goto exit;
+
+		if (!rmi4_data->dt_data->surface_only) {
+			retval = synaptics_rmi4_f51_set_enables(rmi4_data);
+			if (retval < 0) {
+				dev_err(&rmi4_data->i2c_client->dev, "%s: f51_set_enables fail[%d]\n",
+							__func__, retval);
+				goto exit;
+			}
 		}
 	}
 #endif
@@ -4630,11 +4661,12 @@ static void synaptics_rmi4_f51_finger_timer(unsigned long data)
 		input_report_key(rmi4_data->input_dev,
 				BTN_TOOL_FINGER, 0);
 		input_sync(rmi4_data->input_dev);
-
-		if (rmi4_data->f51_finger_is_hover) {
-			dev_info(&rmi4_data->i2c_client->dev,
-				"%s: Hover finger[OUT]\n", __func__);
-			rmi4_data->f51_finger_is_hover = false;
+		if (!rmi4_data->dt_data->surface_only) {
+			if (rmi4_data->f51_finger_is_hover) {
+				dev_info(&rmi4_data->i2c_client->dev,
+					"%s: Hover finger[OUT]\n", __func__);
+				rmi4_data->f51_finger_is_hover = false;
+			}
 		}
 	}
 
@@ -4984,9 +5016,10 @@ static void synaptics_get_firmware_name(struct synaptics_rmi4_data *rmi4_data)
 				}
 			} else if (rmi4_data->ic_revision_of_ic == SYNAPTICS_IC_REVISION_A3) {
 				if (strncmp(rmi4_data->dt_data->sub_project, "0", 1) != 0) {
-					if ((strncmp(rmi4_data->dt_data->sub_project, "active", 6) == 0) ||
-						(strncmp(rmi4_data->dt_data->sub_project, "sports", 6) == 0))
-						rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_ACTIVE;
+					if ((strncmp(rmi4_data->dt_data->sub_project, "active", 6) == 0))
+							rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_ACTIVE;					
+					else if(strncmp(rmi4_data->dt_data->sub_project, "sports", 6) == 0)
+							rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_K_SPORTS;
 					else
 						rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
 				} else {
@@ -5004,6 +5037,8 @@ static void synaptics_get_firmware_name(struct synaptics_rmi4_data *rmi4_data)
 			}
 		} else if (strncmp(rmi4_data->dt_data->project, "HESTIA", 6) == 0) {
 			rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_HESTIA;
+		} else if (strncmp(rmi4_data->dt_data->project, "PSLTE", 5) == 0) {
+			rmi4_data->firmware_name = FW_IMAGE_NAME_S5100_PSLTE;
 		} else {
 			rmi4_data->firmware_name = FW_IMAGE_NAME_NONE;
 		}

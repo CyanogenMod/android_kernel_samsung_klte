@@ -1,7 +1,7 @@
 /*
  * Debug/trace/assert driver definitions for Dongle Host Driver.
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_dbg.h 424863 2013-09-19 20:06:14Z $
+ * $Id: dhd_dbg.h 605803 2015-12-11 14:44:32Z $
  */
 
 #ifndef _dhd_dbg_
@@ -34,9 +34,21 @@
 #endif
 
 #if defined(DHD_DEBUG)
-
+#ifdef DHD_LOG_DUMP
+extern void dhd_log_dump_print(const char *fmt, ...);
+extern char *dhd_log_dump_get_timestamp(void);
+#define DHD_ERROR(args)	\
+do {	\
+	if (dhd_msg_level & DHD_ERROR_VAL) {	\
+		printf args;	\
+		dhd_log_dump_print("[%s] %s: ", dhd_log_dump_get_timestamp(), __func__);	\
+		dhd_log_dump_print args;	\
+	}   \
+} while (0)
+#else
 #define DHD_ERROR(args)		do {if ((dhd_msg_level & DHD_ERROR_VAL) && USE_NET_RATELIMIT) \
 								printf args;} while (0)
+#endif /* DHD_LOG_DUMP */
 #define DHD_TRACE(args)		do {if (dhd_msg_level & DHD_TRACE_VAL) printf args;} while (0)
 #define DHD_INFO(args)		do {if (dhd_msg_level & DHD_INFO_VAL) printf args;} while (0)
 #define DHD_DATA(args)		do {if (dhd_msg_level & DHD_DATA_VAL) printf args;} while (0)
@@ -46,12 +58,35 @@
 #define DHD_BYTES(args)		do {if (dhd_msg_level & DHD_BYTES_VAL) printf args;} while (0)
 #define DHD_INTR(args)		do {if (dhd_msg_level & DHD_INTR_VAL) printf args;} while (0)
 #define DHD_GLOM(args)		do {if (dhd_msg_level & DHD_GLOM_VAL) printf args;} while (0)
+#ifdef DHD_LOG_DUMP
+#define DHD_EVENT(args)	\
+do {	\
+	if (dhd_msg_level & DHD_EVENT_VAL) {	\
+		printf args;	\
+		dhd_log_dump_print("[%s] %s: ", dhd_log_dump_get_timestamp(), __func__);	\
+		dhd_log_dump_print args;	\
+	}	\
+} while (0)
+#else
 #define DHD_EVENT(args)		do {if (dhd_msg_level & DHD_EVENT_VAL) printf args;} while (0)
+#endif /* DHD_LOG_DUMP */
 #define DHD_BTA(args)		do {if (dhd_msg_level & DHD_BTA_VAL) printf args;} while (0)
 #define DHD_ISCAN(args)		do {if (dhd_msg_level & DHD_ISCAN_VAL) printf args;} while (0)
 #define DHD_ARPOE(args)		do {if (dhd_msg_level & DHD_ARPOE_VAL) printf args;} while (0)
 #define DHD_REORDER(args)	do {if (dhd_msg_level & DHD_REORDER_VAL) printf args;} while (0)
 #define DHD_PNO(args)		do {if (dhd_msg_level & DHD_PNO_VAL) printf args;} while (0)
+
+#ifdef DHD_LOG_DUMP
+#define DHD_ERROR_EX(args)	\
+do {	\
+	if (dhd_msg_level & DHD_ERROR_VAL) {	\
+		dhd_log_dump_print("[%s] %s: ", dhd_log_dump_get_timestamp(), __func__);	\
+		dhd_log_dump_print args;	\
+	}	\
+} while (0)
+#else
+#define DHD_ERROR_EX(args) DHD_ERROR(args)
+#endif /* DHD_LOG_DUMP */
 
 #ifdef CUSTOMER_HW4
 #define DHD_TRACE_HW4	DHD_ERROR
@@ -95,6 +130,7 @@
 #define DHD_ARPOE(args)
 #define DHD_REORDER(args)
 #define DHD_PNO(args)
+#define DHD_ERROR_EX(args) DHD_ERROR(args)
 
 #ifdef CUSTOMER_HW4
 #define DHD_TRACE_HW4	DHD_ERROR

@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 #define MAX_DEVICE              2
-#define MAX_DRIVE               2
+#define MAX_DRIVE               4
 #define MAX_OPEN                20
 #define MAX_DENTRY              512
 #define FAT_CACHE_SIZE          128

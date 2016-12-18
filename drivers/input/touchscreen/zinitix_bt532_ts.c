@@ -64,8 +64,10 @@
 
 #if defined(CONFIG_SEC_MEGA23G_COMMON) || defined(CONFIG_SEC_MEGA2LTE_COMMON)
 #include "zinitix_touch_zxt_firmware_ZI012407.h"
+#elif defined(CONFIG_MACH_DEGASLTE_SBM)
+#include "zinitix_touch_zxt_firmware_ZI002516.h"
 #else
-#include "zinitix_touch_zxt_firmware_ZI002515.h"
+#include "zinitix_touch_zxt_firmware_ZI002517.h"
 #endif
 
 #ifdef TSP_BOOSTER
@@ -97,14 +99,14 @@ extern char *saved_command_line;
 #define MAX_SUPPORTED_BUTTON_NUM	2 /* max 8 */
 #define SUPPORTED_BUTTON_NUM		2
 #else
-#define MAX_SUPPORTED_BUTTON_NUM	6 /* max 8 */
-#define SUPPORTED_BUTTON_NUM		4
+#define MAX_SUPPORTED_BUTTON_NUM	2 /* max 8 */
+#define SUPPORTED_BUTTON_NUM		2
 #endif
 #endif
 #define TSP_HW_ID_INDEX_NULL	3
 
 /* Upgrade Method*/
-#define TOUCH_ONESHOT_UPGRADE		0
+#define TOUCH_ONESHOT_UPGRADE		1
 /* if you use isp mode, you must add i2c device :
 name = "zinitix_isp" , addr 0x50*/
 /* resolution offset */
@@ -1692,7 +1694,7 @@ static bool ts_hw_calibration(struct bt532_ts_info *info)
 		BT532_SAVE_CALIBRATION_CMD) != I2C_SUCCESS)
 		return false;
 
-	mdelay(1000);
+	mdelay(2000);
 	write_reg(client, 0xc003, 0x0000);
 	write_reg(client, 0xc104, 0x0000);
 	return true;
@@ -4373,6 +4375,11 @@ static int init_sec_factory(struct bt532_ts_info *info)
 	if (unlikely(ret)) {
 		dev_err(&info->client->dev, "Failed to create touchscreen sysfs group\n");
 		goto err_create_sysfs;
+	}
+
+	ret = sysfs_create_link(&factory_ts_dev->kobj, &info->input_dev->dev.kobj, "input");
+	if (ret < 0) {
+		dev_err(&info->client->dev, "Failed to create input symbolic link\n");
 	}
 
 #ifdef SUPPORTED_TOUCH_KEY

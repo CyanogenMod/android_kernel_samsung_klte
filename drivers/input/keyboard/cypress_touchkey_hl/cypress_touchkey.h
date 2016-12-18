@@ -32,6 +32,8 @@
 #define CYPRESS_REG_RAW		0X0E
 #define CYPRESS_REG_BASE	0X12
 #define CYPRESS_REG_CRC		0X16
+#define CYPRESS_REG_DETECTION		0x18
+#define CYPRESS_REG_DETECTION_FLAG	0x1B
 
 #define KEYCODE_REG			0x00
 
@@ -44,8 +46,12 @@
 #define TK_BIT_FW_ID_55		0x20
 #define TK_BIT_FW_ID_65		0x04
 
+#define TK_BIT_DETECTION_CONFIRM	0xEE
+
 #define TK_CMD_LED_ON		0x10
 #define TK_CMD_LED_OFF		0x20
+
+#define TK_CMD_DUAL_DETECTION	0x01
 
 #define I2C_M_WR 0		/* for i2c */
 
@@ -94,6 +100,14 @@
 #define TKEY_FW_PATH "/sdcard/cypress/fw.bin"
 
 #define  TOUCHKEY_FW_UPDATEABLE_HW_REV  11
+
+#if defined(CONFIG_SEC_S_PROJECT)
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0x0D
+#elif defined(CONFIG_SEC_FRESCO_PROJECT)
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0x0B
+#else
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0xFF
+#endif
 
 #ifdef TOUCHKEY_BOOSTER
 #include <linux/cpufreq.h>

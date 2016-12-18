@@ -51,6 +51,10 @@ extern struct class *sec_class;
 #define CYPRESS_55_IC_MASK	0x20
 #define CYPRESS_65_IC_MASK	0x04
 
+#define CYPRESS_DETECTION_FLAG		0x1B
+#define TK_CMD_INTERRUPT_SET_REG	0x18
+#define TK_CMD_DUAL_DETECTION		0x01
+#define TK_BIT_DETECTION_CONFIRM	0xEE
 #define NUM_OF_KEY		4
 
 #ifdef TK_INFORM_CHARGER

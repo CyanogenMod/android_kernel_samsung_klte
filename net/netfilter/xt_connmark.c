@@ -5,6 +5,7 @@
  *	by Henrik Nordstrom <hno@marasystems.com>
  *	Copyright © CC Computer Consultants GmbH, 2007 - 2008
  *	Jan Engelhardt <jengelh@medozas.de>
+ *      Copyright (c) 2015 Samsung Electronics Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +21,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ *  Changes:
+ *  KwnagHyun Kim <kh0304.kim@samsung.com> 2015/07/08
+ *  Baesung Park  <baesung.park@samsung.com> 2015/07/08
+ *  Vignesh Saravanaperumal <vignesh1.s@samsung.com> 2015/07/08
+ *    Add codes to share UID/PID information
+ *
+ */
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
@@ -30,11 +39,9 @@
 
 // ------------- START of KNOX_VPN ------------------//
 #include <linux/types.h>
-#include <linux/netfilter/xt_mark.h>
-#include <net/sock.h>
-#include <net/ip.h>
-#include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/ip.h>
+#include <net/ip.h>
 // ------------- END of KNOX_VPN -------------------//
 
 MODULE_AUTHOR("Henrik Nordstrom <hno@marasystems.com>");
@@ -45,6 +52,66 @@ MODULE_ALIAS("ip6t_CONNMARK");
 MODULE_ALIAS("ipt_connmark");
 MODULE_ALIAS("ip6t_connmark");
 
+// ------------- START of KNOX_VPN ------------------//
+
+/* KNOX framework uses mark value 100 to 500
+ * when the special meta data is added
+ * This will indicate to the kernel code that
+ * it needs to append meta data to the packets
+ */
+
+#define META_MARK_BASE_LOWER 100
+#define META_MARK_BASE_UPPER 500
+
+/* Structure to hold metadata values
+ * intended for VPN clients to make
+ * more intelligent decisions
+ * when the KNOX meta mark
+ * feature is enabled
+ */
+
+struct knox_meta_param {
+	uid_t uid;
+	pid_t pid;
+};
+
+static unsigned int knoxvpn_uidpid(struct sk_buff *skb, u_int32_t newmark)
+{
+	int szMetaData;
+	struct skb_shared_info *knox_shinfo = NULL;
+
+	szMetaData = sizeof(struct knox_meta_param);
+	if (skb != NULL) {
+		knox_shinfo = skb_shinfo(skb);
+	} else {
+		pr_err("KNOX: NULL SKB - no KNOX processing");
+		return -1;
+	}
+
+	if( skb->sk == NULL) {
+		pr_err("KNOX: skb->sk value is null");
+		return -1;
+	}
+
+	if( knox_shinfo == NULL) {
+		pr_err("KNOX: knox_shinfo is null");
+		return -1;
+	}
+
+	if (newmark < META_MARK_BASE_LOWER || newmark > META_MARK_BASE_UPPER) {
+		pr_err("KNOX: The mark is out of range");
+		return -1;
+	} else {
+		knox_shinfo->uid = skb->sk->knox_uid;
+		knox_shinfo->pid = skb->sk->knox_pid;
+		knox_shinfo->knox_mark = newmark;
+	}
+
+	return 0;
+}
+
+// ------------- END of KNOX_VPN -------------------//
+
 static unsigned int
 connmark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
@@ -52,16 +119,6 @@ connmark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
 	u_int32_t newmark;
-
-// ------------- START of KNOX_VPN ------------------//
-	unsigned int metabufspace;
-	unsigned char *temp_skb_partial = NULL;
-	struct skb_meta_param *uh;
-	struct iphdr iph;
-	struct iphdr *iphlocal;
-	uid_t localuid;
-	pid_t localpid;
-// ------------- END of KNOX_VPN -------------------//
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (ct == NULL)
@@ -87,93 +144,11 @@ connmark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 		newmark = (skb->mark & ~info->nfmask) ^
 		          (ct->mark & info->ctmask);
 		skb->mark = newmark;
-
-/* The KNOX framework marks packets intended to a VPN client for special processing differently.
- * The marked packets hit special IP table rules and are routed back to user space using the TUN driver
- * for policy based treatment by the VPN client.
- * Some VPN clients can make more intelligent decisions based on the UID/PID information.
- * For such clients, we mark packets to be in the range >= META_MARK_BASE_LOWER and < META_MARK_BASE_UPPER.
- * When such packets are seen, we update the IP headers to carry UID/PID information
- * in the IP options - all other packets are ignored.
- * Also, see the comments above the individual steps taken in the code for details
- */
-
-// ------------- START of KNOX_VPN ------------------//
-		if (newmark >= META_MARK_BASE_LOWER
-		    && newmark < META_MARK_BASE_UPPER) {
-			metabufspace = sizeof(struct skb_meta_param);
-			if (skb->sk != NULL) {
-				/* Obtain UID/PID of the source of the packet */
-				localuid = skb->sk->knox_uid;
-				localpid = skb->sk->knox_pid;
-				
-				/* Backup the IP header */
-				memcpy(&iph, skb->data,
-				       sizeof(struct iphdr));
-
-				/* Ensure IP options are not used already
-				 * Typically we would check for ">" 
-				 */
-				if (iph.ihl != sizeof(struct iphdr) / 4) {
-					pr_err
-					    ("KNOX %s: Seems like IP options are already in use - bailout - %d",
-					     __FUNCTION__, iph.ihl);
-					goto bailout;
-				}
-
-				/* Strip the IP header from the skb */
-				temp_skb_partial =
-				    skb_pull(skb, sizeof(struct iphdr));
-				if (NULL == temp_skb_partial) {
-					pr_err
-					    ("KNOX: Could not extract IP header from SKB - bailout");
-					goto bailout;
-				}
-				/* Push the meta data structure into the packet first
-				 * Once we stack the IP header on top of this,
-				 * metadata automatically becomes IP options
-				 */
-				uh = (struct skb_meta_param *)
-				    skb_push(skb, metabufspace);
-
-				/* Update the metadata with required information */
-				uh->uid = localuid;
-				uh->pid = localpid;
-
-				/* Update the IP header length to reflect the 
-				 * additional metadata (since it is part of the options)
-				 */
-				iph.ihl =
-				    (sizeof(struct iphdr) +
-				     metabufspace) / 4;
-				iph.tot_len += htons(metabufspace);
-				iph.check = 0;
-				ip_send_check (&iph);
-
-				/* Push an IP header back into the skb */
-				iphlocal =
-				    (struct iphdr *)skb_push(skb,
-							     sizeof
-							     (struct
-							      iphdr));
-
-				/* Update the IP header with the modified values */
-				memcpy(iphlocal, &iph,
-				       sizeof(struct iphdr));
-				skb_reset_network_header(skb);
-			} else {
-				pr_err
-			    	("KNOX: In %s - Socket structure skb->sk is NULL", __FUNCTION__);
-				goto bailout;
-			}
-
-		}
+// ------------- START of KNOX_VPN -----------------//
+		knoxvpn_uidpid(skb, newmark);
 // ------------- END of KNOX_VPN -------------------//
 		break;
 	}
-// ------------- START of KNOX_VPN ------------------//
-bailout:
-// ------------- END of KNOX_VPN -------------------//
 	return XT_CONTINUE;
 }
 

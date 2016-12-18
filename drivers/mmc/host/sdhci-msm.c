@@ -182,6 +182,8 @@ enum sdc_mpm_pin_state {
 
 #define sdhci_is_valid_mpm_wakeup_int(_h) ((_h)->pdata->mpm_sdiowakeup_int >= 0)
 #define sdhci_is_valid_gpio_wakeup_int(_h) ((_h)->pdata->sdiowakeup_irq >= 0)
+#define NUM_TUNING_PHASES		16
+#define MAX_DRV_TYPES_SUPPORTED_HS200	3
 
 static const u32 tuning_block_64[] = {
 	0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
@@ -829,11 +831,40 @@ out:
 	return ret;
 }
 
+static void sdhci_msm_set_mmc_drv_type(struct sdhci_host *host, u32 opcode,
+		u8 drv_type)
+{
+	struct mmc_command cmd = {0};
+	struct mmc_request mrq = {NULL};
+	struct mmc_host *mmc = host->mmc;
+	u8 val = ((drv_type << 4) | 2);
+
+	cmd.opcode = MMC_SWITCH;
+	cmd.arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
+		(EXT_CSD_HS_TIMING << 16) |
+		(val << 8) |
+		EXT_CSD_CMD_SET_NORMAL;
+	cmd.flags = MMC_CMD_AC | MMC_RSP_R1B;
+	/* 1 sec */
+	cmd.cmd_timeout_ms = 1000 * 1000;
+
+	memset(cmd.resp, 0, sizeof(cmd.resp));
+	cmd.retries = 3;
+
+	mrq.cmd = &cmd;
+	cmd.data = NULL;
+
+	mmc_wait_for_req(mmc, &mrq);
+	pr_debug("%s: %s: set card drive type to %d\n",
+			mmc_hostname(mmc), __func__,
+			drv_type);
+}
+
 int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
 {
 	unsigned long flags;
 	int tuning_seq_cnt = 3;
-	u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
+	u8 phase, *data_buf, tuned_phases[NUM_TUNING_PHASES], tuned_phase_cnt;
 	const u32 *tuning_block_pattern = tuning_block_64;
 	int size = sizeof(tuning_block_64); /* Tuning pattern size in bytes */
 	int rc;
@@ -841,6 +872,10 @@ int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
 	struct mmc_ios	ios = host->mmc->ios;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+	u8 drv_type = 0;
+	bool drv_type_changed = false;
+	struct mmc_card *card = host->mmc->card;
+	int sts_retry;
 
 	/*
 	 * Tuning is required for SDR104, HS200 and HS400 cards and
@@ -882,6 +917,8 @@ int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
 	}
 
 retry:
+	tuned_phase_cnt = 0;
+
 	/* first of all reset the tuning block */
 	rc = msm_init_cm_dll(host);
 	if (rc)
@@ -896,6 +933,7 @@ retry:
 			.data = &data
 		};
 		struct scatterlist sg;
+		struct mmc_command sts_cmd = {0};
 
 		/* set the phase in delay line hw block */
 		rc = msm_config_cm_dll_phase(host, phase);
@@ -916,22 +954,88 @@ retry:
 		memset(data_buf, 0, size);
 		mmc_wait_for_req(mmc, &mrq);
 
-		/*
-		 * wait for 146 MCLK cycles for the card to send out the data
-		 * and thus move to TRANS state. As the MCLK would be minimum
-		 * 200MHz when tuning is performed, we need maximum 0.73us
-		 * delay. To be on safer side 1ms delay is given.
-		 */
-		if (cmd.error)
-			usleep_range(1000, 1200);
+		if (card && (cmd.error || data.error)) {
+			sts_cmd.opcode = MMC_SEND_STATUS;
+			sts_cmd.arg = card->rca << 16;
+			sts_cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+			sts_retry = 5;
+			while (sts_retry) {
+				mmc_wait_for_cmd(mmc, &sts_cmd, 0);
+
+				if (sts_cmd.error ||
+				   (R1_CURRENT_STATE(sts_cmd.resp[0])
+				   != R1_STATE_TRAN)) {
+					sts_retry--;
+					/*
+					 * wait for at least 146 MCLK cycles for
+					 * the card to move to TRANS state. As
+					 * the MCLK would be min 200MHz for
+					 * tuning, we need max 0.73us delay. To
+					 * be on safer side 1ms delay is given.
+					 */
+					usleep_range(1000, 1200);
+					pr_debug("%s: phase %d sts cmd err %d resp 0x%x\n",
+						mmc_hostname(mmc), phase,
+						sts_cmd.error, sts_cmd.resp[0]);
+					continue;
+				}
+				break;
+			};
+		}
+
 		if (!cmd.error && !data.error &&
 			!memcmp(data_buf, tuning_block_pattern, size)) {
 			/* tuning is successful at this tuning point */
 			tuned_phases[tuned_phase_cnt++] = phase;
-			pr_debug("%s: %s: found good phase = %d\n",
+			pr_debug("%s: %s: found *** good *** phase = %d\n",
 				mmc_hostname(mmc), __func__, phase);
+		} else {
+			pr_debug("%s: %s: found ## bad ## phase = %d\n",
+				mmc_hostname(mmc), __func__, phase);
+			if (cmd.error)
+				pr_err("%s: %s: cmd error (%d) \n",
+					mmc_hostname(mmc), __func__, cmd.error);
+			else if (data.error)
+				pr_err("%s: %s: data error (%d) \n",
+					mmc_hostname(mmc), __func__, data.error);
+			else
+				pr_err("%s: %s: data buf != tuning_block_pattern \n",
+					mmc_hostname(mmc), __func__);
 		}
 	} while (++phase < 16);
+
+	if ((tuned_phase_cnt == NUM_TUNING_PHASES) &&
+			card && mmc_card_mmc(card)) {
+		/*
+		 * If all phases pass then its a problem. So change the card's
+		 * drive type to a different value, if supported and repeat
+		 * tuning until at least one phase fails. Then set the original
+		 * drive type back.
+		 *
+		 * If all the phases still pass after trying all possible
+		 * drive type, then one of those 16 phases will be picked.
+		 * This is no different from what was going on before the
+		 * modification to change drive type and retune.
+		 */
+		pr_debug("%s: tuned phases count: %d\n", mmc_hostname(mmc),
+				tuned_phase_cnt);
+
+		/* set drive type to other value. default setting is 0x0 */
+		while (++drv_type <= MAX_DRV_TYPES_SUPPORTED_HS200) {
+			if (card->ext_csd.raw_drive_strength &
+					(1 << drv_type)) {
+				sdhci_msm_set_mmc_drv_type(host, opcode,
+						drv_type);
+				if (!drv_type_changed)
+					drv_type_changed = true;
+				goto retry;
+			}
+		}
+	}
+
+	/* reset drive type to default (50 ohm) if changed */
+	if (drv_type_changed)
+		sdhci_msm_set_mmc_drv_type(host, opcode, 0);
 
 	if (tuned_phase_cnt) {
 		rc = msm_find_most_appropriate_phase(host, tuned_phases,

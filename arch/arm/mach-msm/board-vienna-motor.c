@@ -34,7 +34,7 @@
 //struct pwm_device	*motor_pwm;
 
 static u8 isa1400_init[] = {
-	ISA1400_REG_INIT, 41,
+	ISA1400_REG_INIT, 21,
 	ISA1400_REG_AMPGAIN1, 0x51,
 	ISA1400_REG_AMPGAIN2, 0x51,
 	ISA1400_REG_OVDRTYP, 0xca,
@@ -139,14 +139,11 @@ struct platform_device vib_device_i2c20 __initdata = {
 	.dev.platform_data = &gpio_i2c_data20,
 };*/
 
-const u8 actuators[] = {CH1};
 static struct isa1400_vibrator_platform_data isa1400_vibrator_pdata = {
 	.gpio_en = isa1400_vdd_en,
 	.clk_en = isa1400_clk_en,
 	.max_timeout = MOTOR_MAX_TIMEOUT,
 	.reg_data = isa1400_reg_data,
-	.actuator = actuators,
-	.actuactor_num = ARRAY_SIZE(actuators),
 };
 
 static struct i2c_board_info i2c_devs20_emul[] __initdata = {

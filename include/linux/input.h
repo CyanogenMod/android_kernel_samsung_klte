@@ -732,6 +732,9 @@ struct input_keymap_entry {
 
 #define KEY_PEN_PDCT		0x230 /* E-PEN PDCT flag*/
 #define KEY_FAKE_PWR		0x240 /* Fake Power off flag*/
+#if defined(CONFIG_SAMSUNG_JACK_VOICE_BTN)
+#define KEY_VOICECOMMAND		0x246 /* voice command*/
+#endif
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0

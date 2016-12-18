@@ -46,6 +46,8 @@
 #define MODEL_NAME	"SM-G900V"
 #elif defined(CONFIG_MACH_KLTE_DCM)
 #define MODEL_NAME	"SM-G900D"
+#elif defined(CONFIG_MACH_KACTIVELTE_DCM)
+#define MODEL_NAME	"SM-G870D"
 #elif defined(CONFIG_MACH_KLTE_KDI)
 #define MODEL_NAME	"SM-G900J"
 #elif defined(CONFIG_MACH_KLTE_SBM)

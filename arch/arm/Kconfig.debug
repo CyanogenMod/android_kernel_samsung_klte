@@ -544,6 +544,13 @@ config SEC_RESTRICT_ROOTING_LOG
 	   Say Y here if you want to see result of restricting SETUID or FORK. It will
 	   be displayed by kernel error log. Saying N will not be displayed anything.
 
+
+config RESTART_REASON_SEC_PARAM
+	bool "Save restart reason in SEC param partition"
+	default n
+	help
+	  Param partition can retain the values across reboot, hence this comes in handy backup, when restart reason saved in IMEM is lost.
+
 config RESTART_REASON_DDR
 	bool "Save restart reason in DDR reserved area"
 	default n

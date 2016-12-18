@@ -297,7 +297,7 @@ void nls_cstring_to_uniname(struct super_block *sb, UNI_NAME_T *p_uniname, UINT8
 	p_uniname->name_len = j;
 	p_uniname->name_hash = calc_checksum_2byte((void *) upname, j<<1, 0, CS_DEFAULT);
 
-	if (p_lossy != NULL) 
+	if (p_lossy != NULL)
 		*p_lossy = lossy;
 }
 

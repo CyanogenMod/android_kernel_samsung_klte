@@ -27,8 +27,9 @@
 #include <asm/mach-types.h>
 #include <mach/socinfo.h>
 #include <mach/subsystem_notif.h>
+#include <sound/q6core.h>
+
 #include <qdsp6v2/msm-pcm-routing-v2.h>
-#include "qdsp6v2/q6core.h"
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9306.h"
 
@@ -68,7 +69,7 @@
 #define LO_1_SPK_AMP   0x1
 #define LO_2_SPK_AMP   0x2
 
-#define ADSP_STATE_READY_TIMEOUT_MS 3000
+#define ADSP_STATE_READY_TIMEOUT_MS 50
 
 static void *adsp_state_notifier;
 
@@ -494,7 +495,7 @@ static const struct soc_enum msm_enum[] = {
 	SOC_ENUM_SINGLE_EXT(4, slim0_tx_ch_text),
 };
 
-static const char *const btsco_rate_text[] = {"8000", "16000"};
+static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ", "BTSCO_RATE_16KHZ"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };

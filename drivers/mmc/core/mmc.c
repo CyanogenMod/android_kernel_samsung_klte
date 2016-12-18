@@ -356,13 +356,12 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		}
 	}
 
+        /*
+	 * The EXT_CSD format is meant to be forward compatible. As long
+	 * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
+	 * are authorized, see JEDEC JESD84-B50 section B.8.
+	 */
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
-	if (card->ext_csd.rev > 7) {
-		pr_err("%s: unrecognised EXT_CSD revision %d\n",
-			mmc_hostname(card->host), card->ext_csd.rev);
-		err = -EINVAL;
-		goto out;
-	}
 
 	/* fixup device after ext_csd revision field is updated */
 	mmc_fixup_device(card, mmc_fixups);
@@ -1378,10 +1377,7 @@ static int mmc_reboot_notify(struct notifier_block *notify_block,
 	struct mmc_card *card = container_of(
 			notify_block, struct mmc_card, reboot_notify);
 
-	if (event != SYS_RESTART)
-		card->issue_long_pon = true;
-	else
-		card->issue_long_pon = false;
+	card->pon_type = (event != SYS_RESTART) ? MMC_LONG_PON : MMC_SHRT_PON;
 
 	return NOTIFY_OK;
 }
@@ -1494,6 +1490,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		card->rca = 1;
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
 		card->reboot_notify.notifier_call = mmc_reboot_notify;
+		host->card = card;
 	}
 
 	/*
@@ -1747,12 +1744,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
-	if (!oldcard)
-		host->card = card;
-
 	return 0;
 
 free_card:
+	host->card = NULL;
 	if (!oldcard)
 		mmc_remove_card(card);
 err:
@@ -1788,19 +1783,24 @@ static int mmc_poweroff_notify(struct mmc_card *card, unsigned int notify_type)
 	return err;
 }
 
-int mmc_send_long_pon(struct mmc_card *card)
+int mmc_send_pon(struct mmc_card *card)
 {
 	int err = 0;
 	struct mmc_host *host = card->host;
 
+	if (!mmc_can_poweroff_notify(card))
+		goto out;
+
 	mmc_claim_host(host);
-	if (card->issue_long_pon && mmc_can_poweroff_notify(card)) {
+	if (card->pon_type & MMC_LONG_PON)
 		err = mmc_poweroff_notify(host->card, EXT_CSD_POWER_OFF_LONG);
-		if (err)
-			pr_warning("%s: error %d sending Long PON",
-					mmc_hostname(host), err);
-	}
+	else if (card->pon_type & MMC_SHRT_PON)
+		err = mmc_poweroff_notify(host->card, EXT_CSD_POWER_OFF_SHORT);
+	if (err)
+		pr_warn("%s: error %d sending PON type %u",
+			mmc_hostname(host), err, card->pon_type);
 	mmc_release_host(host);
+out:
 	return err;
 }
 
@@ -1881,7 +1881,8 @@ static int mmc_suspend(struct mmc_host *host)
 	 * Disable clock scaling before suspend and enable it after resume so
 	 * as to avoid clock scaling decisions kicking in during this window.
 	 */
-	mmc_disable_clk_scaling(host);
+	if (mmc_can_scale_clk(host))
+		mmc_disable_clk_scaling(host);
 
 	mmc_claim_host(host);
 

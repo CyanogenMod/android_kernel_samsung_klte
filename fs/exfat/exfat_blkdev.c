@@ -83,7 +83,7 @@ INT32 bdev_read(struct super_block *sb, UINT32 secno, struct buffer_head **bh, U
 
 	if (*bh) return(FFS_SUCCESS);
 
-	WARN(!p_fs->dev_ejected, 
+	WARN(!p_fs->dev_ejected,
 		"[EXFAT] No bh, device seems wrong or to be ejected.\n");
 
 	return(FFS_MEDIAERR);
@@ -133,7 +133,7 @@ INT32 bdev_write(struct super_block *sb, UINT32 secno, struct buffer_head *bh, U
 	return(FFS_SUCCESS);
 
 no_bh:
-	WARN(!p_fs->dev_ejected, 
+	WARN(!p_fs->dev_ejected,
 		"[EXFAT] No bh, device seems wrong or to be ejected.\n");
 
 	return (FFS_MEDIAERR);

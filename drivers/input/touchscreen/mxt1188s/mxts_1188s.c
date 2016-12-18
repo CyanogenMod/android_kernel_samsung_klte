@@ -931,9 +931,11 @@ static void mxt_report_input_data(struct mxt_data *data)
 	int count = 0;
 	int report_count = 0;
 //20140319 multiply 1.2 for palm gesture 
-	u16 sumsize_dump = 0;
-	u16 component_dump = 0;
-
+/*	u16 sumsize_dump = 0;
+	u16 component_dump = 0; */
+#if TSP_USE_SHAPETOUCH
+	u16 touchMinor;
+#endif
 	data->palm = 0;//20140320_5
 	for (i = 0; i < MXT_MAX_FINGER; i++) { //20140320_4
 		if(data->fingers[i].palm == 1)
@@ -967,19 +969,15 @@ static void mxt_report_input_data(struct mxt_data *data)
 
 #if TSP_USE_SHAPETOUCH
 //20140320 for improving palm sweep.
-			if(data->palm == 0){ //20140320_4
-				component_dump = 1;
-				sumsize_dump = data->sumsize;
-			}else if(data->palm == 1){//20140320_4
-				component_dump = data->fingers[i].component;
-				if(component_dump < 3){
-					component_dump = 3;
-				}
-				sumsize_dump  = ((data->sumsize * 1332) >> 10);
-				if(sumsize_dump < 35){
-					sumsize_dump = 35;
-				}
+			if(data->palm == 0){
+				touchMinor = data->fingers[i].w-1;
+			}else {
+				touchMinor = data->fingers[i].w/2-1;
 			}
+			if(touchMinor == 0)
+				touchMinor = 1;
+			input_report_abs(data->input_dev, ABS_MT_TOUCH_MINOR,
+				touchMinor);
 #endif
 #if TSP_USE_PALM_FLAG
 #if 1//20140320_4
@@ -1190,10 +1188,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] Ignore menu R! by dummy key\n",
 								__func__);
-				} else if (data->ignore_menu_key_by_back) {
-					dev_info(&data->client->dev, 
-							"%s: [TSP_KEY] Ignore menu R! by back key\n",
-								 __func__);
 				} else {
 					input_report_key(data->input_dev, KEY_RECENT, KEY_RELEASE);
 						dev_info(&data->client->dev,
@@ -1210,10 +1204,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 				if (data->ignore_back_key) {
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] Ignore back R! by dummy key\n",
-								__func__);
-				} else if (data->ignore_back_key_by_menu) {
-					dev_info(&data->client->dev,
-							"%s: [TSP_KEY] Ignore back R! by menu key\n",
 								__func__);
 				} else {
 					input_report_key(data->input_dev, KEY_BACK, KEY_RELEASE);
@@ -1241,8 +1231,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 		"%s: [TSP_KEY] ignore_back_key Disable\n",
 		__func__);
 		}
-		data->ignore_back_key_by_menu = false;
-		data->ignore_menu_key_by_back = false;
 	}
 }
 
@@ -1289,26 +1277,11 @@ static void mxt_treat_T15_object(struct mxt_data *data,
 								"%s: [TSP_KEY] ignore_menu_key Disable\n",
 								__func__);
 					}
-				} else if (data->ignore_menu_key_by_back) {
-					dev_info(&data->client->dev,
-						"%s: [TSP_KEY] Ignore menu %s by back key\n",
-								 __func__, key_state != 0 ? "P" : "R");
 				} else {
 					input_report_key(data->input_dev, KEY_RECENT, key_state != 0 ? KEY_PRESS : KEY_RELEASE);
 					dev_info(&data->client->dev,
 						"%s: [TSP_KEY] menu %s\n",
 								__func__, key_state != 0 ? "P" : "R");
-					if (key_state != 0)
-							data->ignore_back_key_by_menu = true;
-					else {
-						if (input_message & TOUCH_KEY_D_MENU && !data->ignore_menu_key) {
-							data->ignore_menu_key = true;
-							dev_info(&data->client->dev,
-							"%s: [TSP_KEY] ignore_menu_key Enable\n",
-							__func__);
-						}
-						data->ignore_back_key_by_menu = false;
-					}
 #if MXT_TKEY_BOOSTER
 						mxt_tkey_set_dvfs_lock(data, !!key_state);
 #endif
@@ -1329,26 +1302,11 @@ static void mxt_treat_T15_object(struct mxt_data *data,
 								"%s: [TSP_KEY] ignore_back_key Disable\n",
 								__func__);
 					}
-				} else if (data->ignore_back_key_by_menu) {
-					dev_info(&data->client->dev,
-							"%s: [TSP_KEY] Ignore back %s by menu key\n",
-							 __func__, key_state != 0 ? "P" : "R");
 				} else {
 					input_report_key(data->input_dev, KEY_BACK, key_state != 0 ? KEY_PRESS : KEY_RELEASE);
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] back %s\n" ,
 							__func__, key_state != 0 ? "P" : "R");
-					if (key_state != 0)
-						data->ignore_menu_key_by_back = true;
-					else {
-						if (input_message & TOUCH_KEY_D_BACK && !data->ignore_back_key) {
-							data->ignore_back_key = true;
-							dev_info(&data->client->dev,
-							"%s: [TSP_KEY] ignore_back_key Enable\n",
-							__func__);
-						}
-						data->ignore_menu_key_by_back = false;
-					}
 #if MXT_TKEY_BOOSTER
 						mxt_tkey_set_dvfs_lock(data, !!key_state);
 #endif
@@ -2591,9 +2549,9 @@ static int mxt_flash_fw_on_probe(struct mxt_fw_info *fw_info)
 		goto out;
 	}
 
-	dev_info(dev, "Updating firmware from app-mode : IC:0x%x,0x%x =! FW:0x%x,0x%x\n",
+	dev_info(dev, "Updating firmware from app-mode : IC:0x%x,0x%x =! FW:0x%x,0x%x Varian Id:0x%x\n",
 			data->info.version, data->info.build,
-			fw_info->fw_ver, fw_info->build_ver);
+			fw_info->fw_ver, fw_info->build_ver,data->info.variant_id);
 
 	error = mxt_enter_bootloader(data);
 	if (error) {
@@ -2660,16 +2618,68 @@ out:
 #endif
 }
 
+#ifdef CHECK_IN_BOOTLOADER
+int mxt_check_chip_variant(struct mxt_data *data)
+{
+	struct i2c_client *client = data->client;
+	u8 buf[3];
+
+	if (i2c_master_recv(data->client_boot, buf, sizeof(buf)) != sizeof(buf)) {
+		dev_err(&client->dev, "%s: i2c recv failed\n", __func__);
+		return 0;
+	}
+	dev_err(&client->dev, "Bootloader ID:%d Version:%d", buf[1], buf[2]);
+
+	if(buf[1] == MXT_CHECK_1664S_BOOT_ID){
+		dev_err(&client->dev, "found 1664S bootloader\n");
+		data->info.variant_id = 0;
+		return 1;
+	}else if(buf[1] == MXT_CHECK_1188S1_BOOT_ID){
+		dev_err(&client->dev, "found 1188S1 bootloader\n");
+		data->info.variant_id = MXT_CHECK_1188S1_BOOT_ID;
+		return 1;
+	}
+
+	return 0;
+}
+#endif
+
 static int __devinit mxt_touch_init(struct mxt_data *data, bool nowait)
 {
 	struct i2c_client *client = data->client;
+	int ret = 0;
+#if defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+        const char *firmware_name;
+	ret = mxt_read_id_info(data);
+
+	if (ret) {
+#ifdef CHECK_IN_BOOTLOADER
+		if(mxt_check_chip_variant(data)){
+			dev_err(&client->dev, "IC is IC bootloader (normal x)\n");
+		}else
+#endif
+		{
+		dev_err(&client->dev, "Failed to read Variant Id\n");
+		goto out;
+	}
+	}
+#endif
 #if defined(CONFIG_MACH_LT03EUR) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
 	const char *firmware_name = data->pdata->firmware_name ?: MXT_N_PROJECT_FIRMWARE_NAME;
 #else
+#if !defined(CONFIG_SEC_MATISSEWIFI_COMMON)
 	const char *firmware_name = data->pdata->firmware_name ?: MXT_V_PROJECT_FIRMWARE_NAME;
+#else
+	if(data->info.variant_id != 0){
+		dev_err(&client->dev, "Not 1664S\n");
+	        firmware_name = data->pdata->firmware_name ?: MXT_V_PROJECT_FIRMWARE_NAME;
+	}else {
+		dev_err(&client->dev, "Is 1664S\n");
+	        firmware_name = data->pdata->firmware_name ?: MXT_V_1664S_PROJECT_FIRMWARE_NAME;
+        }
+#endif
 #endif
 
-	int ret = 0;
 
 #if TSP_INFORM_CHARGER
 	/* Register callbacks */
@@ -2912,6 +2922,8 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
 				0, pdata->max_y, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
+				0, MXT_AREA_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_MT_TOUCH_MINOR,
 				0, MXT_AREA_MAX, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE,
 				0, MXT_AMPLITUDE_MAX, 0, 0);

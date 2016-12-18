@@ -21,6 +21,7 @@
 #define SHORT_BATTERY_STANDARD	100
 #if defined(CONFIG_USB_SWITCH_FSA9485)
 extern int mhl_connection_state(void);
+extern void fsa9485_mmdock_vbus_check(bool vbus_status);
 #endif
 
 #if defined(CONFIG_EXTCON)
@@ -82,6 +83,16 @@ static struct battery_data_t samsung_battery_data[] = {
 		.RCOMP_charging = 0x80,
 		.temp_cohot = -700,
 		.temp_cocold = -4875,
+#elif defined(CONFIG_MACH_HLTECHNTWU)
+		.RCOMP0 = 0x6D,
+		.RCOMP_charging = 0x6D,
+		.temp_cohot = -900,
+		.temp_cocold = -3700,
+#elif defined(CONFIG_MACH_HLTE_CHN_CMCC) || defined(CONFIG_MACH_H3G_CHN_CMCC) || defined(CONFIG_MACH_H3G_CHN_OPEN)
+		.RCOMP0 = 0x73,
+		.RCOMP_charging = 0x8D,
+		.temp_cohot = -1000,
+		.temp_cocold = -4350,
 #elif defined(CONFIG_MACH_HLTEEUR)
 		.RCOMP0 = 0x62,
 		.RCOMP_charging = 0x7C,
@@ -92,6 +103,11 @@ static struct battery_data_t samsung_battery_data[] = {
 		.RCOMP_charging = 0x70,
 		.temp_cohot = -375,
 		.temp_cocold = -3975,
+#elif defined(CONFIG_MACH_KS01EUR)
+		.RCOMP0 = 0x73,
+		.RCOMP_charging = 0x79,
+		.temp_cohot = -850,
+		.temp_cocold = -4200,
 #elif defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01KTT) || \
 		defined(CONFIG_MACH_KS01LGT)
 		.RCOMP0 = 0x70,
@@ -134,6 +150,11 @@ static struct battery_data_t samsung_battery_data[] = {
 		.RCOMP_charging = 0x5D,
 		.temp_cohot = -175,
 		.temp_cocold = -5825,
+#elif defined(CONFIG_MACH_KACTIVELTE_KOR)
+		.RCOMP0 = 0x7E,
+		.RCOMP_charging = 0x7E,
+		.temp_cohot = -762,
+		.temp_cocold = -4787,
 #elif defined(CONFIG_SEC_KACTIVE_PROJECT)
 		.RCOMP0 = 0x5D,
 		.RCOMP_charging = 0x5D,
@@ -179,8 +200,15 @@ static struct battery_data_t samsung_battery_data[] = {
 	}
 };
 #endif
-
-#if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
+#if defined(CONFIG_MACH_KLTE_CTC)
+#define CAPACITY_MAX			980
+#define CAPACITY_MAX_MARGIN	50
+#define CAPACITY_MIN			-7
+#elif defined(CONFIG_MACH_KACTIVELTE_KOR)
+#define CAPACITY_MAX			990
+#define CAPACITY_MAX_MARGIN	70
+#define CAPACITY_MIN			0
+#elif defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT) || \
 	defined(CONFIG_SEC_KSPORTS_PROJECT)
 #define CAPACITY_MAX			990
 #define CAPACITY_MAX_MARGIN	50
@@ -798,6 +826,33 @@ static sec_bat_adc_table_data_t temp_table[] = {
 	{-300,  -350},
 	{-400,  -450},
 };
+/* only for G870F0 */
+#elif defined(CONFIG_MACH_KACTIVELTE_KOR)
+static sec_bat_adc_table_data_t temp_table[] = {
+	{25935, 900},
+	{26149, 850},
+	{26399, 800},
+	{26741, 750},
+	{27052, 700},
+	{27441, 650},
+	{27971, 600},
+	{28551, 550},
+	{29229, 500},
+	{30011, 450},
+	{30895, 400},
+	{31867, 350},
+	{32921, 300},
+	{34036, 250},
+	{35168, 200},
+	{36303, 150},
+	{37374, 100},
+	{38371, 50},
+	{39252, 0},
+	{40077, -50},
+	{40826, -100},
+	{41381, -150},
+	{41824, -200},
+};
 #else
 static sec_bat_adc_table_data_t temp_table[] = {
 	{25950, 900},
@@ -850,9 +905,34 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_HIGHLIMIT_RECOVERY_LPM			750
 #endif
 
-#if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_ATT) || \
-	defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_SPR) || \
-	defined(CONFIG_MACH_KLTE_MTR) || defined(CONFIG_MACH_KACTIVELTE_SKT)
+#if defined(CONFIG_MACH_KLTE_EUR)
+#define TEMP_HIGH_THRESHOLD_EVENT	550
+#define TEMP_HIGH_RECOVERY_EVENT		500
+#define TEMP_LOW_THRESHOLD_EVENT		-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	550
+#define TEMP_HIGH_RECOVERY_NORMAL	500
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		550
+#define TEMP_HIGH_RECOVERY_LPM		500
+#define TEMP_LOW_THRESHOLD_LPM		-50
+#define TEMP_LOW_RECOVERY_LPM		0
+#elif defined(CONFIG_MACH_KLTE_ATT) || defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_MTR) || \
+	defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_SPR) || defined(CONFIG_MACH_KLTE_LRA)
+#define TEMP_HIGH_THRESHOLD_EVENT	550
+#define TEMP_HIGH_RECOVERY_EVENT		500
+#define TEMP_LOW_THRESHOLD_EVENT		-50
+#define TEMP_LOW_RECOVERY_EVENT		0
+#define TEMP_HIGH_THRESHOLD_NORMAL	550
+#define TEMP_HIGH_RECOVERY_NORMAL	500
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		550
+#define TEMP_HIGH_RECOVERY_LPM		500
+#define TEMP_LOW_THRESHOLD_LPM		-50
+#define TEMP_LOW_RECOVERY_LPM		-20
+#elif defined(CONFIG_MACH_KACTIVELTE_SKT)
 #define TEMP_HIGH_THRESHOLD_EVENT	600
 #define TEMP_HIGH_RECOVERY_EVENT		460
 #define TEMP_LOW_THRESHOLD_EVENT		-50
@@ -891,19 +971,6 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM		470
 #define TEMP_LOW_THRESHOLD_LPM		-10
 #define TEMP_LOW_RECOVERY_LPM		20
-#elif defined(CONFIG_MACH_KLTE_VZW) || defined(CONFIG_MACH_KLTE_LRA)
-#define TEMP_HIGH_THRESHOLD_EVENT	600
-#define TEMP_HIGH_RECOVERY_EVENT		460
-#define TEMP_LOW_THRESHOLD_EVENT		-50
-#define TEMP_LOW_RECOVERY_EVENT		0
-#define TEMP_HIGH_THRESHOLD_NORMAL	560
-#define TEMP_HIGH_RECOVERY_NORMAL	460
-#define TEMP_LOW_THRESHOLD_NORMAL	-50
-#define TEMP_LOW_RECOVERY_NORMAL	0
-#define TEMP_HIGH_THRESHOLD_LPM		540
-#define TEMP_HIGH_RECOVERY_LPM		500
-#define TEMP_LOW_THRESHOLD_LPM		-50
-#define TEMP_LOW_RECOVERY_LPM		-20
 #elif defined (CONFIG_MACH_KLTE_ACG)
 #define TEMP_HIGH_THRESHOLD_EVENT	540
 #define TEMP_HIGH_RECOVERY_EVENT		460
@@ -1095,6 +1162,21 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_LOW_THRESHOLD_LPM      -50
 #define TEMP_LOW_RECOVERY_LPM         0
 
+#elif defined(CONFIG_MACH_H3G_CHN_CMCC)
+#define TEMP_HIGH_THRESHOLD_EVENT	600
+#define TEMP_HIGH_RECOVERY_EVENT	460
+#define TEMP_LOW_THRESHOLD_EVENT	-45
+#define TEMP_LOW_RECOVERY_EVENT	0
+#define TEMP_HIGH_THRESHOLD_NORMAL	600
+#define TEMP_HIGH_RECOVERY_NORMAL	460
+#define TEMP_LOW_THRESHOLD_NORMAL	-45
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		600
+#define TEMP_HIGH_RECOVERY_LPM		460
+#define TEMP_LOW_THRESHOLD_LPM		-45
+#define TEMP_LOW_RECOVERY_LPM		0
+
+
 #elif defined(CONFIG_MACH_HLTEEUR)
 #define TEMP_HIGH_THRESHOLD_EVENT	600
 #define TEMP_HIGH_RECOVERY_EVENT	400
@@ -1108,6 +1190,7 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_HIGH_RECOVERY_LPM		400
 #define TEMP_LOW_THRESHOLD_LPM		-45
 #define TEMP_LOW_RECOVERY_LPM		0
+
 
 /* H Project*/
 #elif defined(CONFIG_SEC_H_PROJECT)
@@ -1153,7 +1236,20 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		0
 #elif defined(CONFIG_SEC_KS01_PROJECT)
-#if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01LGT)
+#if defined(CONFIG_MACH_KS01EUR)
+#define TEMP_HIGH_THRESHOLD_EVENT   600
+#define TEMP_HIGH_RECOVERY_EVENT	460
+#define TEMP_LOW_THRESHOLD_EVENT	-50
+#define TEMP_LOW_RECOVERY_EVENT	0
+#define TEMP_HIGH_THRESHOLD_NORMAL	600
+#define TEMP_HIGH_RECOVERY_NORMAL	460
+#define TEMP_LOW_THRESHOLD_NORMAL	-50
+#define TEMP_LOW_RECOVERY_NORMAL	0
+#define TEMP_HIGH_THRESHOLD_LPM		600
+#define TEMP_HIGH_RECOVERY_LPM		460
+#define TEMP_LOW_THRESHOLD_LPM		-50
+#define TEMP_LOW_RECOVERY_LPM		0
+#elif defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01LGT)
 #define TEMP_HIGH_THRESHOLD_EVENT	670
 #define TEMP_HIGH_RECOVERY_EVENT	420
 #define TEMP_LOW_THRESHOLD_EVENT	-45
@@ -1352,6 +1448,41 @@ static sec_bat_adc_table_data_t chg_temp_table[] = {
 #define TEMP_LOW_THRESHOLD_LPM		-50
 #define TEMP_LOW_RECOVERY_LPM		0
 #endif
+
+#if defined(CONFIG_BATTERY_SWELLING)
+#if defined(CONFIG_MACH_KACTIVELTE_KOR)
+#define BATT_SWELLING_HIGH_TEMP_BLOCK			450
+#define BATT_SWELLING_HIGH_TEMP_RECOV			400
+#define BATT_SWELLING_LOW_TEMP_BLOCK			100
+#define BATT_SWELLING_LOW_TEMP_RECOV			150
+#define BATT_SWELLING_HIGH_CHG_CURRENT			1400
+#define BATT_SWELLING_LOW_CHG_CURRENT			1000
+#define BATT_SWELLING_DROP_FLOAT_VOLTAGE		4200
+#define BATT_SWELLING_HIGH_RECHG_VOLTAGE		4150
+#define BATT_SWELLING_LOW_RECHG_VOLTAGE			4050
+#elif defined(CONFIG_SEC_K_PROJECT)
+#define BATT_SWELLING_HIGH_TEMP_BLOCK			450
+#define BATT_SWELLING_HIGH_TEMP_RECOV			400
+#define BATT_SWELLING_LOW_TEMP_BLOCK			100
+#define BATT_SWELLING_LOW_TEMP_RECOV			150
+#define BATT_SWELLING_HIGH_CHG_CURRENT			0
+#define BATT_SWELLING_LOW_CHG_CURRENT			1300
+#define BATT_SWELLING_DROP_FLOAT_VOLTAGE		4200
+#define BATT_SWELLING_HIGH_RECHG_VOLTAGE		4150
+#define BATT_SWELLING_LOW_RECHG_VOLTAGE			4050
+#else
+#define BATT_SWELLING_HIGH_TEMP_BLOCK			450
+#define BATT_SWELLING_HIGH_TEMP_RECOV			400
+#define BATT_SWELLING_LOW_TEMP_BLOCK			100
+#define BATT_SWELLING_LOW_TEMP_RECOV			150
+#define BATT_SWELLING_HIGH_CHG_CURRENT			0
+#define BATT_SWELLING_LOW_CHG_CURRENT			0
+#define BATT_SWELLING_DROP_FLOAT_VOLTAGE		4200
+#define BATT_SWELLING_HIGH_RECHG_VOLTAGE		4150
+#define BATT_SWELLING_LOW_RECHG_VOLTAGE			4050
+#endif
+#endif //CONFIG_BATTERY_SWELLING
+
 #endif //CONFIG_BATTERY_SAMSUNG_DATA
 
 #if defined(CONFIG_MACH_MONDRIAN)
@@ -1821,6 +1952,12 @@ int sec_bat_check_cable_callback(struct sec_battery_info *battery)
 {
 	union power_supply_propval value;
 
+#ifdef CONFIG_USB_SWITCH_FSA9485
+	bool ta_status;
+	ta_status = gpio_get_value_cansleep(battery->pdata->ta_irq_gpio) ? false : true;
+	fsa9485_mmdock_vbus_check(ta_status);
+#endif
+
 	if (battery->pdata->ta_irq_gpio == 0) {
 		pr_err("%s: ta_int_gpio is 0 or not assigned yet(cable_type(%d))\n",
 			__func__, current_cable_type);
@@ -1912,10 +2049,13 @@ void board_battery_init(struct platform_device *pdev, struct sec_battery_info *b
 #if defined(CONFIG_BATTERY_SWELLING)
 	battery->pdata->swelling_high_temp_block = BATT_SWELLING_HIGH_TEMP_BLOCK;
 	battery->pdata->swelling_high_temp_recov = BATT_SWELLING_HIGH_TEMP_RECOV;
-	battery->pdata->swelling_low_temp_blck = BATT_SWELLING_LOW_TEMP_BLOCK;
+	battery->pdata->swelling_low_temp_block = BATT_SWELLING_LOW_TEMP_BLOCK;
 	battery->pdata->swelling_low_temp_recov = BATT_SWELLING_LOW_TEMP_RECOV;
-	battery->pdata->swelling_rechg_voltage = BATT_SWELLING_RECHG_VOLTAGE;
-	battery->pdata->swelling_block_time = BATT_SWELLING_BLOCK_TIME;
+	battery->pdata->swelling_high_chg_current = BATT_SWELLING_HIGH_CHG_CURRENT;
+	battery->pdata->swelling_low_chg_current = BATT_SWELLING_LOW_CHG_CURRENT;
+	battery->pdata->swelling_drop_float_voltage = BATT_SWELLING_DROP_FLOAT_VOLTAGE;
+	battery->pdata->swelling_high_rechg_voltage = BATT_SWELLING_HIGH_RECHG_VOLTAGE;
+	battery->pdata->swelling_low_rechg_voltage = BATT_SWELLING_LOW_RECHG_VOLTAGE;
 #endif
 
 	adc_init_type(pdev, battery);

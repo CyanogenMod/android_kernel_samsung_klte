@@ -66,11 +66,10 @@ int new_dentry_private_data(struct dentry *dentry)
 
 static int sdcardfs_inode_test(struct inode *inode, void *candidate_lower_inode)
 {
-	struct inode *current_lower_inode = sdcardfs_lower_inode(inode);
-	if (current_lower_inode == (struct inode *)candidate_lower_inode)
-		return 1; /* found a match */
-	else
-		return 0; /* no match */
+	/* if a lower_inode should have many upper inodes, (like obb)
+	   sdcardfs_iget() will offer many inodes
+	   because test func always will return fail although they have same hash */
+	return 0;
 }
 
 static int sdcardfs_inode_set(struct inode *inode, void *lower_inode)
@@ -283,8 +282,11 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 	/* instatiate a new negative dentry */
 	this.name = name;
 	this.len = strlen(name);
-	this.hash = full_name_hash(this.name, this.len);
-	lower_dentry = d_lookup(lower_dir_dentry, &this);
+	lower_dentry = d_hash_and_lookup(lower_dir_dentry, &this);
+	if (unlikely(IS_ERR(lower_dentry))) {
+		err =  PTR_ERR(lower_dentry);
+		goto out;
+	}
 	if (lower_dentry)
 		goto setup_lower;
 
@@ -332,19 +334,17 @@ struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct dentry *ret = NULL, *parent;
 	struct path lower_parent_path;
 	int err = 0;
-	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 	const struct cred *saved_cred = NULL;
 
 	parent = dget_parent(dentry);
 
-	if(!check_caller_access_to_name(parent->d_inode, dentry->d_name.name,
-						sbi->options.derive, 0, 0)) {
+	if(!check_caller_access_to_name(parent->d_inode, dentry->d_name.name)) {
 		ret = ERR_PTR(-EACCES);
 		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n" 
                          "	dentry: %s, task:%s\n",
 						 __func__, dentry->d_name.name, current->comm);
 		goto out_err;
-        }
+	}
 	
 	/* save current_cred and override it */
 	OVERRIDE_CRED_PTR(SDCARDFS_SB(dir->i_sb), saved_cred);

@@ -9,6 +9,9 @@
  */
 
 #include <linux/host_notify.h>
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include <linux/usb_notify_sysfs.h>
+#endif
 #include <linux/of_gpio.h>
 
 #if defined (CONFIG_CHARGER_BQ24260) || defined (CONFIG_CHARGER_SMB358)
@@ -442,17 +445,33 @@ static void sec_cable_event_worker(struct work_struct *work)
 {
 	struct sec_cable *cable =
 			    container_of(work, struct sec_cable, work);
+#ifdef CONFIG_USB_HOST_NOTIFY
+	int usb_block_mode;
+#endif
 
 	pr_info("sec otg: %s is %s\n",
 		extcon_cable_name[cable->cable_type],
 		cable->cable_state ? "attached" : "detached");
+
+#ifdef CONFIG_USB_HOST_NOTIFY
+	usb_block_mode = check_usb_block_type();
+#endif
 
 	switch (cable->cable_type) {
 	case EXTCON_USB:
 	case EXTCON_SMARTDOCK_USB:
 	case EXTCON_JIG_USBON:
 	case EXTCON_CHARGE_DOWNSTREAM:
-		sec_usb_work(cable->cable_state);
+#ifdef CONFIG_USB_HOST_NOTIFY
+		if (usb_block_mode == NOTIFY_BLOCK_TYPE_NONE || usb_block_mode == NOTIFY_BLOCK_TYPE_HOST)
+#endif
+			sec_usb_work(cable->cable_state);
+#ifdef CONFIG_USB_HOST_NOTIFY
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_VBUS);
+		else
+			sec_otg_notify(HNOTIFY_NONE);
+#endif
 		break;
 #ifdef CONFIG_USB_HOST_NOTIFY
 	case EXTCON_USB_HOST:

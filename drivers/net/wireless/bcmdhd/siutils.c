@@ -2,7 +2,7 @@
  * Misc utility routines for accessing chip-specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2014, Broadcom Corporation
+ * Copyright (C) 1999-2015, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils.c 506459 2014-10-06 08:12:35Z $
+ * $Id: siutils.c 531050 2015-02-02 07:21:19Z $
  */
 
 #include <bcm_cfg.h>
@@ -283,7 +283,8 @@ si_buscore_setup(si_info_t *sii, chipcregs_t *cc, uint bustype, uint32 savewin,
 			/* for SDIO but downloaded on PCIE dev */
 			if (cid == PCIE2_CORE_ID) {
 				if ((CHIPID(sii->pub.chip) == BCM43602_CHIP_ID) ||
-					((CHIPID(sii->pub.chip) == BCM4345_CHIP_ID) &&
+					((CHIPID(sii->pub.chip) == BCM4345_CHIP_ID ||
+					CHIPID(sii->pub.chip) == BCM43454_CHIP_ID) &&
 					CST4345_CHIPMODE_PCIE(sii->pub.chipst))) {
 					pcieidx = i;
 					pcierev = crev;
@@ -1282,6 +1283,7 @@ si_chip_hostif(si_t *sih)
 		break;
 
 	case BCM4345_CHIP_ID:
+	case BCM43454_CHIP_ID:
 		if (CST4345_CHIPMODE_USB20D(sih->chipst) || CST4345_CHIPMODE_HSIC(sih->chipst))
 			hosti = CHIP_HOSTIF_USBMODE;
 		else if (CST4345_CHIPMODE_SDIOD(sih->chipst))
@@ -1850,6 +1852,42 @@ socram_banksize(si_info_t *sii, sbsocramregs_t *regs, uint8 idx, uint8 mem_type)
 	return banksize;
 }
 
+void si_socram_set_bankpda(si_t *sih, uint32 bankidx, uint32 bankpda)
+{
+	si_info_t *sii = SI_INFO(sih);
+	si_cores_info_t *cores_info = (si_cores_info_t *)sii->cores_info;
+	uint origidx;
+	uint intr_val = 0;
+	sbsocramregs_t *regs;
+	bool wasup;
+	uint corerev;
+
+	/* Block ints and save current core */
+	INTR_OFF(sii, intr_val);
+	origidx = si_coreidx(sih);
+
+	/* Switch to SOCRAM core */
+	if (!(regs = si_setcore(sih, SOCRAM_CORE_ID, 0)))
+		goto done;
+
+	if (!(wasup = si_iscoreup(sih)))
+		si_core_reset(sih, 0, 0);
+
+	corerev = si_corerev(sih);
+	if (corerev >= 16) {
+		W_REG(sii->osh, &regs->bankidx, bankidx);
+		W_REG(sii->osh, &regs->bankpda, bankpda);
+	}
+
+	/* Return to previous state and core */
+	if (!wasup)
+		si_core_disable(sih, 0);
+	si_setcoreidx(sih, origidx);
+
+done:
+	INTR_RESTORE(sii, intr_val);
+}
+
 void
 si_socdevram(si_t *sih, bool set, uint8 *enable, uint8 *protect, uint8 *remap)
 {
@@ -2255,6 +2293,10 @@ si_socram_srmem_size(si_t *sih)
 
 	if ((CHIPID(sih->chip) == BCM4334_CHIP_ID) && (CHIPREV(sih->chiprev) < 2)) {
 		return (32 * 1024);
+	}
+
+	if (CHIPID(sih->chip) == BCM43430_CHIP_ID) {
+		return (64 * 1024);
 	}
 
 	/* Block ints and save current core */
@@ -2673,6 +2715,7 @@ si_is_sprom_available(si_t *sih)
 			!(sih->chipst & CST4324_SFLASH_MASK));
 	case BCM4335_CHIP_ID:
 	case BCM4345_CHIP_ID:
+	case BCM43454_CHIP_ID:
 		return ((sih->chipst & CST4335_SPROM_MASK) &&
 			!(sih->chipst & CST4335_SFLASH_MASK));
 	case BCM4350_CHIP_ID:
