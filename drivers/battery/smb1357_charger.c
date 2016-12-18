@@ -1920,6 +1920,13 @@ bool smb1357_hal_chg_get_property(struct i2c_client *client,
 			"%s : set-current(%dmA), current now(%dmA)\n",
 			__func__, charger->charging_current, val->intval);
 		break;
+#if defined(CONFIG_BATTERY_SWELLING)
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		smb1357_charger_i2c_read(client, VFLOAT_REG, &port);
+		val->intval = port;
+		pr_info("%s: Float voltage : 0x%x\n", __func__, val->intval);
+		break;
+#endif
 	default:
 		return false;
 	}
@@ -2077,6 +2084,9 @@ static enum power_supply_property smb1357_charger_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+#if defined(CONFIG_BATTERY_SWELLING)
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+#endif
 };
 
 static int smb1357_chg_get_property(struct power_supply *psy,
@@ -2090,6 +2100,9 @@ static int smb1357_chg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:	/* input current limit set */
 		val->intval = charger->charging_current_max;
 		break;
+#if defined(CONFIG_BATTERY_SWELLING)
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+#endif
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_ONLINE:
 	case POWER_SUPPLY_PROP_STATUS:
@@ -2122,6 +2135,9 @@ static int smb1357_chg_set_property(struct power_supply *psy,
 	int set_charging_current, set_charging_current_max;
 	const int usb_charging_current = charger->pdata->charging_current[
 		POWER_SUPPLY_TYPE_USB].fast_charging_current;
+#if defined(CONFIG_BATTERY_SWELLING)
+	u8 reg_data;
+#endif
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
@@ -2320,6 +2336,14 @@ static int smb1357_chg_set_property(struct power_supply *psy,
 		}
 		break;
 
+#if defined(CONFIG_BATTERY_SWELLING)
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		pr_info("%s: float voltage(%d)\n", __func__, val->intval);
+		smb1357_set_vfloat(charger->client, val->intval);
+		smb1357_charger_i2c_read(charger->client, VFLOAT_REG, &reg_data);
+		pr_info("%s: Float voltage set to : 0x%x\n", __func__, reg_data);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}

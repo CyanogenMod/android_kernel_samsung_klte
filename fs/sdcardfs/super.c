@@ -188,43 +188,47 @@ void sdcardfs_destroy_inode_cache(void)
 		kmem_cache_destroy(sdcardfs_inode_cachep);
 }
 
-long sdcardfs_propagate_unlink(struct inode *parent, char* pathname) {
+static long sdcardfs_propagate_lookup(struct super_block *sb, char* pathname) {
 	long ret = 0;
 	char *propagate_path = NULL;
 	struct sdcardfs_sb_info *sbi;
+	struct path sibling_path;
 	const struct cred *saved_cred = NULL;
-	/* old_fs is just temporary code to avoid the problem with memory address */
-	mm_segment_t old_fs;
 
-	sbi = SDCARDFS_SB(parent->i_sb);
+	sbi = SDCARDFS_SB(sb);
 	propagate_path = kmalloc(PATH_MAX, GFP_KERNEL);
 	OVERRIDE_ROOT_CRED(saved_cred);
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
 	if (sbi->options.type != TYPE_NONE && sbi->options.type != TYPE_DEFAULT) {
 		snprintf(propagate_path, PATH_MAX, "/mnt/runtime/default/%s%s",
 				sbi->options.label, pathname);
-		ret = do_unlinkat(AT_FDCWD, propagate_path, false);
+		ret = (long)kern_path(propagate_path, LOOKUP_FOLLOW, &sibling_path);
+		if (!ret)
+			path_put(&sibling_path);
 	}
 
 	if (sbi->options.type != TYPE_NONE && sbi->options.type != TYPE_READ) {
 		snprintf(propagate_path, PATH_MAX, "/mnt/runtime/read/%s%s",
 				sbi->options.label, pathname);
-		ret = do_unlinkat(AT_FDCWD, propagate_path, false);
+		ret = (long)kern_path(propagate_path, LOOKUP_FOLLOW, &sibling_path);
+		if (!ret)
+			path_put(&sibling_path);
 	}
 
 	if (sbi->options.type != TYPE_NONE && sbi->options.type != TYPE_WRITE) {
 		snprintf(propagate_path, PATH_MAX, "/mnt/runtime/write/%s%s",
 				sbi->options.label, pathname);
-		ret = do_unlinkat(AT_FDCWD, propagate_path, false);
+		ret = (long)kern_path(propagate_path, LOOKUP_FOLLOW, &sibling_path);
+		if (!ret)
+			path_put(&sibling_path);
 	}
 
 	if (sbi->options.type != TYPE_NONE) {
 		snprintf(propagate_path, PATH_MAX, "/storage/%s%s",
 				sbi->options.label, pathname);
-		ret = do_unlinkat(AT_FDCWD, propagate_path, false);
+		ret = (long)kern_path(propagate_path, LOOKUP_FOLLOW, &sibling_path);
+		if (!ret)
+			path_put(&sibling_path);
 	}
-	set_fs(old_fs);
 	REVERT_CRED(saved_cred);
 	kfree(propagate_path);
 	return ret;
@@ -276,5 +280,17 @@ const struct super_operations sdcardfs_sops = {
 	.alloc_inode	= sdcardfs_alloc_inode,
 	.destroy_inode	= sdcardfs_destroy_inode,
 	.drop_inode	= generic_delete_inode,
-	.unlink_callback = sdcardfs_propagate_unlink,
+};
+
+const struct super_operations sdcardfs_multimount_sops = {
+	.put_super	= sdcardfs_put_super,
+	.statfs		= sdcardfs_statfs,
+	.remount_fs	= sdcardfs_remount_fs,
+	.evict_inode	= sdcardfs_evict_inode,
+	.umount_begin	= sdcardfs_umount_begin,
+	.show_options	= sdcardfs_show_options,
+	.alloc_inode	= sdcardfs_alloc_inode,
+	.destroy_inode	= sdcardfs_destroy_inode,
+	.drop_inode	= generic_delete_inode,
+	.unlink_callback = sdcardfs_propagate_lookup,
 };

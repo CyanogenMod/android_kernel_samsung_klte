@@ -121,6 +121,18 @@ typedef enum {
 	PERM_ANDROID_OBB,
 	/* This node is "/Android/media" */
 	PERM_ANDROID_MEDIA,
+	/* knox folder */
+	PERM_ANDROID_KNOX,
+	/* knox user folder*/
+	PERM_ANDROID_KNOX_USER,
+	/* knox Android folder*/
+	PERM_ANDROID_KNOX_ANDROID,
+	/* knox shared folder */
+	PERM_ANDROID_KNOX_SHARED,
+	/* knox data folder */
+	PERM_ANDROID_KNOX_DATA,
+	/* knox package data folder */
+	PERM_ANDROID_KNOX_PACKAGE_DATA
 } perm_t;
 
 typedef enum {
@@ -150,6 +162,7 @@ extern const struct inode_operations sdcardfs_main_iops;
 extern const struct inode_operations sdcardfs_dir_iops;
 extern const struct inode_operations sdcardfs_symlink_iops;
 extern const struct super_operations sdcardfs_sops;
+extern const struct super_operations sdcardfs_multimount_sops;
 extern const struct dentry_operations sdcardfs_ci_dops;
 extern const struct address_space_operations sdcardfs_aops, sdcardfs_dummy_aops;
 extern const struct vm_operations_struct sdcardfs_vm_ops;
@@ -164,7 +177,6 @@ extern struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
 				    struct nameidata *nd);
 extern int sdcardfs_interpose(struct dentry *dentry, struct super_block *sb,
 			    struct path *lower_path);
-extern long sdcardfs_propagate_unlink(struct inode *parent, char* pathname);
 
 #ifdef SDCARD_FS_XATTR
 extern int sdcardfs_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags);

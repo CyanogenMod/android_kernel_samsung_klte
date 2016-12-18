@@ -241,6 +241,8 @@
 
 			samsung,panel-ddi-id-read-cmds = [ 06 01 00 00 00 00 01 d6 05 00];	/* read D6 1~5th */
 
+			samsung,panel-rddpm-read-cmds = [ 06 01 00 00 00 00 01 0A 01 00];	/* read 0A 1st */
+
 			samsung,panel-ldi-debug-read-cmds = [
 								06 01 00 00 00 00 01 0A 01 00
 								06 01 00 00 00 00 01 0E 01 00

@@ -96,7 +96,7 @@ struct p2p_info {
 	wlc_ssid_t ssid;
 };
 
-#define MAX_VNDR_IE_NUMBER	5
+#define MAX_VNDR_IE_NUMBER	10
 
 struct parsed_vndr_ie_info {
 	char *ie_ptr;
