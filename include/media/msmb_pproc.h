@@ -12,6 +12,8 @@
 
 #define MAX_NUM_CPP_STRIPS 8
 #define MSM_CPP_MAX_NUM_PLANES 3
+#define MSM_CPP_MIN_FRAME_LENGTH 13
+#define MSM_CPP_MAX_FRAME_LENGTH 2048
 
 enum msm_cpp_frame_type {
 	MSM_CPP_OFFLINE_FRAME,

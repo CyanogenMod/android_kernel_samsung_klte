@@ -378,7 +378,7 @@ static ssize_t mdss_debug_factor_read(struct file *file,
 {
 	struct mdss_fudge_factor *factor = file->private_data;
 	int len = 0;
-	char buf[32];
+	char buf[32] = {'\0'};
 
 	if (!factor)
 		return -ENODEV;
@@ -388,10 +388,10 @@ static ssize_t mdss_debug_factor_read(struct file *file,
 
 	len = snprintf(buf, sizeof(buf), "%d/%d\n",
 			factor->numer, factor->denom);
-	if (len < 0)
+	if (len < 0 || len >= sizeof(buf))
 		return 0;
 
-	if (copy_to_user(buff, buf, len))
+	if ((count < sizeof(buf)) || copy_to_user(buff, buf, len))
 		return -EFAULT;
 
 	*ppos += len;	/* increase offset */
@@ -485,7 +485,7 @@ int mdss_debugfs_init(struct mdss_data_type *mdata)
 			PTR_ERR(mdd->perf));
 		goto err;
  	}
- 
+
 	mdss_debugfs_perf_init(mdd, mdata);
 
 	if (mdss_create_xlog_debug(mdd))
@@ -597,7 +597,7 @@ static inline struct mdss_mdp_misr_map *mdss_misr_get_map(u32 block_id)
 {
 	struct mdss_mdp_misr_map *map;
 
-	if (block_id > DISPLAY_MISR_MDP) {
+	if (block_id > DISPLAY_MISR_HDMI && block_id != DISPLAY_MISR_MDP) {
 		pr_err("MISR Block id (%d) out of range\n", block_id);
 		return NULL;
 	}
@@ -620,6 +620,11 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 	u32 config = 0, val = 0;
 	u32 mixer_num = 0;
 	bool is_valid_wb_mixer = true;
+	if (!mdata || !req || !ctl) {
+		pr_err("Invalid input params: mdata = %p req = %p ctl = %p",
+			mdata, req, ctl);
+		return -EINVAL;
+	}
 	map = mdss_misr_get_map(req->block_id);
 	if (!map) {
 		pr_err("Invalid MISR Block=%d\n", req->block_id);

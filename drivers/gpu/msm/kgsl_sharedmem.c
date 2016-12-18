@@ -725,6 +725,9 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	memdesc->sglen = sglen;
 	memdesc->size = size;
 
+	if (sglen > 0)
+		sg_mark_end(&memdesc->sg[sglen - 1]);
+
 	/*
 	 * All memory that goes to the user has to be zeroed out before it gets
 	 * exposed to userspace. This means that the memory has to be mapped in

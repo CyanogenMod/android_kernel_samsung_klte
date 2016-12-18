@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014,2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -339,7 +339,6 @@ kgsl_mem_entry_track_gpuaddr(struct kgsl_process_private *process,
 			ret = -EINVAL;
 			goto done;
 		}
-
 		ret = kgsl_mmu_get_gpuaddr(process->pagetable, &entry->memdesc);
 	}
 
@@ -367,7 +366,7 @@ kgsl_mem_entry_untrack_gpuaddr(struct kgsl_process_private *process,
 }
 
 static void kgsl_mem_entry_commit_mem_list(struct kgsl_process_private *process,
-				struct kgsl_mem_entry *entry)
+		struct kgsl_mem_entry *entry)
 {
 	struct rb_node **node;
 	struct rb_node *parent = NULL;
@@ -394,7 +393,7 @@ static void kgsl_mem_entry_commit_mem_list(struct kgsl_process_private *process,
 }
 
 static void kgsl_mem_entry_commit_process(struct kgsl_process_private *process,
-				struct kgsl_mem_entry *entry)
+		struct kgsl_mem_entry *entry)
 {
 	if (!entry)
 		return;

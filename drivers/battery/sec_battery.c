@@ -814,7 +814,7 @@ check_recharge_check_count:
 static bool sec_bat_voltage_check(struct sec_battery_info *battery)
 {
 	union power_supply_propval value;
-	int recharge_condition_vcell;
+	int recharge_condition_vcell = battery->pdata->recharge_condition_vcell;
 
 	if (battery->status == POWER_SUPPLY_STATUS_DISCHARGING) {
 		dev_dbg(battery->dev,
@@ -1081,21 +1081,14 @@ static void sec_bat_swelling_check(struct sec_battery_info *battery, int tempera
 
 			/* reduce charging current */
 			if ((temperature <= battery->pdata->swelling_low_temp_block) &&
-				(battery->pdata->swelling_chg_current > 0)) {
-				pr_info("%s: swelling mode reduce charging current(temp:%d)\n",
-					__func__, temperature);
-				val.intval = battery->pdata->swelling_chg_current;
-				psy_do_property(battery->pdata->charger_name, set,
-						POWER_SUPPLY_PROP_CURRENT_AVG, val);
-			} else if ((temperature <= battery->pdata->swelling_low_temp_block) &&
-				   (battery->pdata->swelling_low_chg_current > 0)) {
+				(battery->pdata->swelling_low_chg_current > 0)) {
 				pr_info("%s : swelling mode reduce charging current(temp : %d)\n",
 					__func__, temperature);
 				val.intval = battery->pdata->swelling_low_chg_current;
 				psy_do_property(battery->pdata->charger_name, set,
 						POWER_SUPPLY_PROP_CURRENT_AVG, val);
 			} else if ((temperature >= battery->pdata->swelling_high_temp_block) &&
-				   (battery->pdata->swelling_high_chg_current > 0)) {
+					(battery->pdata->swelling_high_chg_current > 0)) {
 				pr_info("%s : swelling mode reduce charging current(temp : %d)\n",
 					__func__, temperature);
 				val.intval = battery->pdata->swelling_high_chg_current;
@@ -4562,11 +4555,10 @@ static int __devinit sec_battery_probe(struct platform_device *pdev)
 #if defined(CONFIG_BATTERY_SWELLING)
 	pr_info("%s : SWELLING_HIGH_TEMP(%d) SWELLING_HIGH_TEMP_RECOVERY(%d)\n"
 	"SWELLING_LOW_TEMP(%d) SWELLING_LOW_TEMP_RECOVERY(%d)\n"
-	"SWELLING_CHG_CURRENT(%d) SWELLING_HIGH_CHG_CURRENT(%d) SWELLING_LOW_CHG_CURRENT(%d)\n",
+	"SWELLING_HIGH_CHG_CURRENT(%d) SWELLING_LOW_CHG_CURRENT(%d)\n",
 	__func__, battery->pdata->swelling_high_temp_block, battery->pdata->swelling_high_temp_recov,
 	battery->pdata->swelling_low_temp_block, battery->pdata->swelling_low_temp_recov,
-	battery->pdata->swelling_chg_current, battery->pdata->swelling_high_chg_current,
-	battery->pdata->swelling_low_chg_current);
+	battery->pdata->swelling_high_chg_current, battery->pdata->swelling_low_chg_current);
 #endif
 #else
 	for (i = 0; i < SEC_BAT_ADC_CHANNEL_NUM; i++)

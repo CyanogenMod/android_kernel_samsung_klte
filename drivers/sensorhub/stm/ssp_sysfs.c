@@ -19,9 +19,6 @@
 #include "../../staging/iio/iio.h"
 #define BATCH_IOCTL_MAGIC		0xFC
 
-#define BASE_DELAY	40000000LL
-#define MOD_DELAY	1000000LL
-
 struct batch_config {
 	int64_t timeout;
 	int64_t delay;
@@ -40,9 +37,6 @@ int get_msdelay(int64_t dDelayRate) {
 
 	if (dDelayRate > 200000000)
 		dDelayRate = 200000000;
-
-	if (dDelayRate <= BASE_DELAY)
-		dDelayRate = dDelayRate - MOD_DELAY;
 
 	return div_s64(dDelayRate, 1000000);
 }

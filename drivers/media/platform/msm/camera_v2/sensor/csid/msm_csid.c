@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -406,12 +406,19 @@ static long msm_csid_cmd(struct csid_device *csid_dev, void *arg)
 	case CSID_CFG: {
 		struct msm_camera_csid_params csid_params;
 		struct msm_camera_csid_vc_cfg *vc_cfg = NULL;
-		int32_t i = 0;
+		int8_t i = 0;
 		if (copy_from_user(&csid_params,
 				   (void*)cdata->cfg.csid_params,
 				   sizeof(struct msm_camera_csid_params))) {
 			pr_err("%s: %d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
+			break;
+		}
+		if (csid_params.lut_params.num_cid < 1 ||
+			csid_params.lut_params.num_cid > MAX_CID) {
+			pr_err("%s: %d num_cid outside range\n",
+				 __func__, __LINE__);
+			rc = -EINVAL;
 			break;
 		}
 		for (i = 0; i < csid_params.lut_params.num_cid; i++) {
@@ -437,6 +444,12 @@ static long msm_csid_cmd(struct csid_device *csid_dev, void *arg)
 				break;
 			}
 			csid_params.lut_params.vc_cfg[i] = vc_cfg;
+		}
+
+
+		if (rc < 0) {
+			pr_err("%s:%d failed\n", __func__, __LINE__);
+			break;
 		}
 		rc = msm_csid_config(csid_dev, &csid_params);
 		for (i--; i >= 0; i--)
